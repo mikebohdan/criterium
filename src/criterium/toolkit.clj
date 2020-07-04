@@ -60,9 +60,8 @@
 (defmacro with-time
   "Execute expr, adding timing to the data map.
 
-  Adds maps to the :time key in data, with the :before, :after, and
-  :delta sub-data.  Each map contains the :elapsed key with a timestamp in
-  nanoseconds."
+  Adds maps to the :time key in data, with the :before, :after, and :delta sub-data.
+  Each map contains the :elapsed key with a timestamp in nanoseconds."
   [data expr]
   `(-> ~data
        (assoc-in [:time :start] {:elapsed (jvm/timestamp)})
@@ -74,9 +73,8 @@
 (defmacro with-class-loader-counts
   "Execute expr, adding class loading counts to the data map.
 
-  Adds maps to the :class-loader key in data, with the :before,
-  :after, and :delta sub-keys.  Each map contains the :loaded-count
-  and :unloaded-count keys.
+  Adds maps to the :class-loader key in data, with the :before, :after, and :delta
+  sub-keys.  Each map contains the :loaded-count and :unloaded-count keys.
 
   Uses the ClassLoadingMXBean."
   [data expr]
@@ -90,8 +88,8 @@
 (defmacro with-compilation-time
   "Execute expr, add compilation time to the data map.
 
-  Adds maps to the :compilation key in data, with the :before, :after,
-  and :delta sub-keys.  Each map contains the :compilation-time key.
+  Adds maps to the :compilation key in data, with the :start, :finish, and :delta
+  sub-keys.  Each map contains the :compilation-time key.
 
   Uses the CompilationMXBean."
   [data expr]
@@ -105,10 +103,9 @@
 (defmacro with-memory
   "Execute expr, add compilation time to the data map.
 
-  Adds maps to the :compilation key in data, with the :before, :after,
-  and :delta sub-keys.  Each map contains sub-maps for each type of memory,
-  and the total memory (on the :total key).  Each sub-map contains the
-  :init, :committed, :max and :used keys.
+  Adds maps to the :memory key in data, with the :start, :finish, and :delta sub-keys.
+  Each map contains sub-maps for each type of memory, and the total memory (on
+  the :total key).  Each sub-map contains the :init, :committed, :max and :used keys.
 
   Uses the MemoryMXBean."
   [data expr]
@@ -120,9 +117,9 @@
 
 
 (defmacro with-runtime-memory
-  "Execute expr, add compilation time to the data map.
+  "Execute expr, add runtime memory to the data map.
 
-  Adds maps to the :compilation key in data, with the :before, :after,
+  Adds maps to the :runtime-memory key in data, with the :start, :finish,
   and :delta sub-keys.
 
   Uses the java Runtime class."
@@ -135,9 +132,9 @@
 
 
 (defmacro with-finalization-count
-  "Execute expr, add compilation time to the data map.
+  "Execute expr, add pending finalization count to the data map.
 
-  Adds maps to the :compilation key in data, with the :before, :after,
+  Adds maps to the :finalization key in data, with the :start, :finish,
   and :delta sub-keys.
 
   Uses the MemoryMXBean."
