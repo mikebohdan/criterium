@@ -52,6 +52,7 @@
   (:use criterium.stats)
   (:require [clojure.set :as set]
             [criterium
+             [eval :as eval]
              [jvm :as jvm]
              [toolkit :as toolkit]
              [util :as util]
@@ -173,38 +174,6 @@
 
 ;;; Memory management
 
-(defn force-gc
-  "Force garbage collection and finalisers so that execution time
-  associated with this is not incurred at another time. Up to
-  max-attempts are run to clear all pending finalizers and free as
-  much memory as possible.
-
-  Returns the GC execution time,  total changes in memory, and in
-  object finalizers pending."
-  ([] (force-gc *max-gc-attempts*))
-  ([max-attempts]
-   (debug "Cleaning JVM allocations ...")
-   (loop [all-deltas [] ; hold onto data we allocate here
-          attempts   0]
-     (let [deltas (toolkit/deltas
-                    (toolkit/instrumented
-                      (toolkit/with-memory
-                        (toolkit/with-finalization-count
-                          (toolkit/with-time
-                            (toolkit/with-expr-value
-                              (jvm/run-finalizers-and-gc)))))))]
-
-       (let [new-memory-used (-> deltas :memory :total :used)]
-         (debug "pending finalizers" (-> deltas :finalization :pending))
-         (debug "new-memory-used" new-memory-used)
-         (if (and (< attempts max-attempts)
-                  (or (pos? (-> deltas :finalization :pending))
-                      (< new-memory-used 0)))
-           (recur (conj all-deltas (dissoc deltas :expr-value))
-                  (inc attempts))
-           (reduce util/sum all-deltas)))))))
-
-
 (defn final-gc-warn
   "If the final GC execution time is significant compared to
   the runtime, then the runtime should maybe include this time."
@@ -217,70 +186,24 @@
      fractional-time
      final-gc-time]))
 
-
-;;; Mutable place to avoid JIT removing expr evaluation altogether
-
-(defprotocol MutablePlace
-  "Provides functions to get and set a mutable place"
-  (set-place [_ v] "Set mutable field to value.")
-  (get-place [_] "Get mutable field value."))
-
-(deftype Unsynchronized
-    [^{:unsynchronized-mutable true :tag Object} v]
-  MutablePlace
-  (set-place [_ value] (set! v value))
-  (get-place [_] v))
-
-(def mutable-place
-  "An object with a mutable, unsychronized field.
-
-  Used to store the result of each function call, to prevent JIT
-  optimising away the expression entirely.
-
-  The field is accessed with the MutablePlace protocol."
-  (Unsynchronized. nil))
-
-
 ;;; Execution
-
-(defmacro execute-fn-n-times
-  "Evaluates `(f)` `n` times, each time saving the
-  return value as an Object in `mutable-place`.
-
-  Except for the call to (f), only a few primitive long arithmetic
-  operations and comparisons to 0, and the storage of the return
-  value, are done during each iteration.
-
-  The JVM is not free to optimize away the calls to f, as the return
-  values are saved in `mutable-place`."
-  [f n]
-  `(loop [i# (long (dec ~n))
-          v# (~f)]
-     (set-place mutable-place v#)
-     (if (pos? i#)
-       (recur (unchecked-dec i#) (~f))
-       v#)))
 
 (defn execute-expr
   "Time the execution of `n` invocations of `f`. See `execute-expr*`."
   [n f]
-  (let [deltas (time-expr (execute-fn-n-times f n))]
-    (get-place mutable-place) ;; just for good measure, use the mutable value
-    deltas))
+  (time-expr (eval/execute-fn-n-times f n)))
 
 (defn execute-expr-for-warmup
   "Time the execution of `n` invocations of `f`. See `execute-expr*`."
   [n f]
-  (let [deltas (time-expr-for-warmup (execute-fn-n-times f n))]
-    (get-place mutable-place) ;; just for good measure, use the mutable value
-    deltas))
+  (time-expr-for-warmup (eval/execute-fn-n-times f n)))
 
 (defn collect-samples
   "Collect samples of invoking f execute-count times.
 
-  Collects an instrumentation data map for each invocation.
-  The data for each invocation is stored in an object array,
-  which is returned as the overall value."
+  Collects an instrumentation data map for each invocation.  To avoid creating gc'able
+  objects during collection, the data for each invocation is stored in an object array.
+  The array is returned as the overall value."
   [sample-count execution-count f gc-before-sample]
   {:pre [(pos? sample-count)]}
   (let [result (object-array sample-count)]
@@ -288,7 +211,7 @@
       (if (< i sample-count)
         (do
           (when gc-before-sample
-            (force-gc))
+            (toolkit/force-gc *max-gc-attempts*))
           (aset result i (execute-expr execution-count f))
           (recur (unchecked-inc i)))
         result))))
@@ -355,7 +278,7 @@
   (debug " estimated-fn-time" estimated-fn-time)
   (loop [n (max 1 (long (/ period (max 1 estimated-fn-time) 5)))]
     (when gc-before-sample
-      (force-gc))
+      (toolkit/force-gc *max-gc-attempts*))
     (let [deltas    (execute-expr-for-warmup n f)
           t         (elapsed-time deltas)
           ;; It is possible for small n and a fast expression to get
@@ -385,7 +308,7 @@
    longer running expressions."
   [sample-count warmup-jit-period target-execution-time f gc-before-sample
    overhead]
-  (force-gc)
+  (toolkit/force-gc *max-gc-attempts*)
   (let [_                   (progress "Warm up for JIT optimisations ...")
         [warmup-n
          deltas
@@ -402,14 +325,14 @@
                               "exec-count" n-exec \newline
                               "overhead[s]" overhead \newline
                               "total-overhead[ns]" total-overhead)
-        _                   (force-gc)
+        _                   (toolkit/force-gc *max-gc-attempts*)
         samples             (collect-samples
                               sample-count
                               n-exec
                               f
                               gc-before-sample)
         _                   (progress "Final GC...")
-        gc-deltas           (force-gc)
+        gc-deltas           (toolkit/force-gc)
         final-gc-time       (elapsed-time gc-deltas)
         sample-times        (->> samples
                                  (map elapsed-time)
@@ -454,7 +377,7 @@
 
   5. Repeat step 4 a total of sample-count times."
   [sample-count warmup-jit-period target-execution-time exprs gc-before-sample]
-  (force-gc)
+  (toolkit/force-gc *max-gc-attempts*)
   (let [_           (progress
                       (format "Warm up %d expressions for %.2e sec each:"
                               (count exprs) (/ warmup-jit-period 1.0e9)))
@@ -505,7 +428,7 @@
                      n-exec          (:n-exec expr)
                      samples         (map :sample data-seq)
                      _               (progress "Final GC...")
-                     gc-deltas       (force-gc)
+                     gc-deltas       (toolkit/force-gc *max-gc-attempts*)
                      final-gc-time   (elapsed-time gc-deltas)
                      sample-times    (map elapsed-time samples)
                      total           (reduce + 0 sample-times)

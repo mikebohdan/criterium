@@ -24,12 +24,23 @@
   ^long [] `(System/nanoTime))
 
 
-(defn run-finalizers-and-gc
-  "Run object finalizers and then GC"
+(defn run-finalization
+  "Run object finalizers"
   []
-  (System/runFinalization)
+  (System/runFinalization))
+
+(defn force-gc
+  "Force GC"
+  []
   (System/gc))
 
+(defn run-finalization-and-force-gc
+  "Run object finalization and then force GC.
+  This cleans up memory.
+  Repeated invocation may free up more memory."
+  []
+  (run-finalization)
+  (force-gc))
 
 (let [bean (.. ManagementFactory getClassLoadingMXBean)]
   (defn class-loader-counts

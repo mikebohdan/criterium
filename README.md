@@ -103,6 +103,12 @@ Serial correlation detection.
 Multimodal distribution detection.
 Use kernel density estimators?
 
+## Non-Goals
+
+Expressions are evaluated inside a function call.  We deliberately do
+not seek ultimate accuracy for very quick expressions where the
+function overhead may be significant.
+
 ## Releasing
 
 To release, run the `release.sh` script.  This requires that you have

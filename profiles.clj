@@ -28,7 +28,9 @@
  :dev {:aliases {"impl-perf" ["with-profile" "+impl" "perforate" "--quick"]}
        :plugins [[codox/codox.leiningen "0.6.4"]
                  [lein-marginalia "0.7.1"]]
-       :global-vars {*warn-on-reflection* true}}
+       :global-vars {*warn-on-reflection* true}
+       :dependencies [[org.clojure/test.check "1.0.0"]
+                      [com.hypirion/clj-xchart "0.2.0"]]}
  :impl {:perforate
         {:environments
          [{:name :array
