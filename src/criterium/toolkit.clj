@@ -43,7 +43,9 @@
 (defn- measured-expr*
   "Return a measured function for the given expression.
   The arguments are converted into a vector, which is used as an argument to the a
-  function that wraps the expression."
+  function that wraps the expression.
+  Any expr that is not a List is treated as a constant.  This is mainly for
+  internal benchmarking."
   [expr]
   (if (list? expr)
     (let [args     (vec (drop 1 expr))
@@ -52,8 +54,8 @@
          (fn [] ~args)
          (fn [~arg-syms] (~(first expr) ~@arg-syms))))
     `(measured
-       (fn [] [])
-       (fn [] ~expr))))
+       (fn [] ~expr)
+       identity)))
 
 (defmacro measured-expr
   "Return a Measured for the given expression."
