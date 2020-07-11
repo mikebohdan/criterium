@@ -1,0 +1,219 @@
+#+STARTUP: inlineimages header
+
+#+begin_src clojure :results value silent
+  (require '[criterium
+             [chart :as chart]
+             [time :as time]
+             [toolkit :as toolkit]])
+#+end_src
+
+
+* Time
+** Zero accuracy
+
+The smallest thing criterium can measure is a constant, which is
+evaluated inside the identity function.
+
+#+begin_src clojure :results value silent
+  (toolkit/elapsed-time (time/measure 1))
+#+end_src
+
+Lets look at a histogram of the distribution
+
+#+begin_src clojure :results file graphics :dir "data/images" :file "hist.png" :var dirn=(concat (file-name-directory (buffer-file-name)) "data/images/")
+  (let [{:keys [samples stats] :as res} (time/measure 1 :limit-evals 1000)
+        {[mean] :mean [variance] :variance} stats
+        upper-limit (+ mean (* 3 (Math/sqrt variance)))
+        vs (->>
+             samples
+             (mapv toolkit/elapsed-time)
+             (filterv #(< % upper-limit)))
+        num-outliers (- (count samples) (count vs))
+        chart (chart/histogram vs {:delta 1})
+        ;; path (str dirn "hist.png")
+        ]
+    (println "Ignoring n outliers: " num-outliers)
+    (clojure.pprint/pprint (dissoc res :samples))
+    (chart/view chart)
+    ;; (chart/spit chart path)
+    )
+#+end_src
+
+#+RESULTS:
+
+
+#+begin_src clojure :results pp
+  (time/measure 1 :limit-evals 10)
+#+end_src
+
+#+begin_example
+sample-stats
+{:avg {:time 65, :num-evals 1},
+ :stats
+ {:mean [65.375 (48.875 109.125)],
+  :variance [1945.8392857142856 (4.21428571428572 4573.642857142858)],
+  :median [47.0 (44.0 59.0)],
+  :0.025 [44.0 (44.0 44.0)],
+  :0.975 [154.15000000000003 (49.0 172.0)]},
+ :samples
+ [{:state 1, :expr-value 1, :time 172, :num-evals 1}
+  {:state 1, :expr-value 1, :time 70, :num-evals 1}
+  {:state 1, :expr-value 1, :time 48, :num-evals 1}
+  {:state 1, :expr-value 1, :time 47, :num-evals 1}
+  {:state 1, :expr-value 1, :time 44, :num-evals 1}
+  {:state 1, :expr-value 1, :time 46, :num-evals 1}
+  {:state 1, :expr-value 1, :time 49, :num-evals 1}
+  {:state 1, :expr-value 1, :time 44, :num-evals 1}]}
+#+end_example
+
+#+RESULTS:
+[[file:data/images/hist.png]]
+
+
+** Resolution
+
+* Memory
+
+To understand the memory usage of a measurement pipeline, we need to
+look at the memory usage of functions, hash-map and assoc.
+
+To measure the memory used, we create a simple pipeline, that doesn't
+measure time:
+
+
+#+begin_src clojure :results pp
+  (def memory-pipeline
+    (toolkit/pipeline
+      [:memory]
+      {:terminal-fn toolkit/with-expr-value}))
+
+  (defn total-memory-used [measured]
+    (toolkit/total-memory
+      (toolkit/deltas
+        (toolkit/instrumented measured memory-pipeline))))
+#+end_src
+
+The first time a function is called 32 bytes are used.
+
+#+begin_src clojure :results pp
+  (defn one [] 1)
+
+  ;; call all the above at least once
+  (total-memory-used (toolkit/measured-expr (one)))
+
+  (let [f (fn [x] x)  ; a new function to measure
+        measured (toolkit/measured one f)]
+    [(total-memory-used measured)
+     (total-memory-used measured)
+     (total-memory-used measured)
+     (total-memory-used measured)])
+
+  (let [f (fn [x] x)
+        g (fn [x] (f x))
+        h (fn [x] (g x))
+        measured (toolkit/measured one h)]
+    [(total-memory-used measured)
+     (total-memory-used measured)
+     (total-memory-used measured)
+     (total-memory-used measured)])
+#+end_src
+
+
+
+#+begin_src clojure :results pp
+  (let [distinct-ks (mapv  ; distinct keys to asoc into map
+                      #(keyword (str "k-" %))
+                      (range 128))
+        assoc-keys  (fn assoc-keys [[m ks]]
+                      (loop [m  m
+                             ks ks]
+                        (if (not-empty ks)
+                          (recur
+                            (assoc m (first ks) 1)
+                            (rest ks))
+                          m)))]
+    (assoc-keys [[{} [:a]]])  ; this allocates 32 bytes (one function)
+    (vec (for [i (range 1 128)]
+           (let [this-ks (take i distinct-ks)
+                 measured (toolkit/measured
+                            (fn []
+                              [{:x (one)} ;; nor a constant
+                               this-ks])
+                            assoc-keys)]
+
+             (total-memory-used measured)))))
+#+end_src
+
+The first few assoc do do not allocate memory.
+
+#+begin_src clojure :results pp
+  (take 16 memory-used-by-assoc)
+#+end_src
+
+Only later in the sequence is memory allocated, when clojure has to
+split a tree node in it's persistent data structure.
+
+
+We can also look at the total memory used by the pipeline, and see
+that it is zero for both terminal functions.
+
+#+begin_src clojure :results pp
+  (def measured-one (toolkit/measured-expr 1))
+  (toolkit/invoke-measured measured-one)  ; initial function allocation
+  (toolkit/total-memory
+    (time/measure*
+      measured-one
+      {:metrics [:memory :with-expr-value]}))
+  (toolkit/total-memory
+    (time/measure*
+      measured-one
+      {:metrics [:memory]}))
+#+end_src
+
+And finally, we can see that all metrics combined have zero
+allocation.
+
+#+begin_src clojure :results pp
+  (def measured-one (toolkit/measured-expr 1))
+  (toolkit/invoke-measured measured-one)  ; initial function allocation
+  (toolkit/total-memory
+    (time/measure*
+      measured-one
+      {:metrics :all}))
+#+end_src
+
+
+
+
+
+* other
+
+
+
+
+
+
+
+
+
+#+begin_src clojure :results file graphics :dir "data/images" :file "hist.png" :var dirn=(concat (file-name-directory (buffer-file-name)) "data/images/")
+  (let [{:keys [samples stats] :as res} (time/measure
+                                          1
+                                          :limit-evals 1000
+                                          :metrics [:with-expr-value :memory])
+        {[mean] :mean [variance] :variance} stats
+        upper-limit (+ mean (* 3 (Math/sqrt variance)))
+        vs (->>
+             samples
+             (mapv toolkit/total-memory)
+             (filterv #(< % upper-limit)))
+        num-outliers (- (count samples) (count vs))
+        chart (chart/histogram vs {:delta 1})
+        ;; path (str dirn "hist.png")
+        ]
+    (println "Ignoring n outliers: " num-outliers)
+    (clojure.pprint/pprint (dissoc res :samples))
+    (chart/view chart)
+    ;; (chart/spit chart path)
+    )
+#+end_src
