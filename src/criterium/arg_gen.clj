@@ -89,13 +89,14 @@
              (fn ~(gensym "for-all-body") [~(binding-vars bindings)]
                ~@body)))
 
+(comment
+  (def m (for-all [i (gen/choose 0 1000000000000000000)]
+           (inc i)))
 
-;; (def m (for-all [i (gen/choose 0 1000000000000000000)]
-;;          (inc i)))
+  (def m (for-all [i (gen/choose 0 1000000000000000000)] i))
 
-;; (def m (for-all [i (gen/choose 0 1000000000000000000)]
-;;          i))
+  ((:state-fn m))
 
-;; ((:state-fn m))
-
-;; (criterium.time/measure* m {})
+  (criterium.time/measure* m {:limit-evals 10000})
+  (criterium.time/measure* m {})
+  )

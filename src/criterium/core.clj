@@ -163,8 +163,7 @@
        (toolkit/with-class-loader-counts
          (toolkit/with-compilation-time
            (toolkit/with-time
-             (toolkit/with-expr
-               ~expr)))))))
+             ~expr))))))
 
 (defn elapsed-time
   "Helper to return the elapsed time from instrumentation data map."
@@ -449,29 +448,6 @@
 
 
 ;; Statistics
-
-(defn bootstrap-bca
-  "Bootstrap a statistic. Statistic can produce multiple statistics as a vector
-   so you can use juxt to pass multiple statistics.
-   http://en.wikipedia.org/wiki/Bootstrapping_(statistics)"
-  [data statistic size alpha rng-factory]
-  (progress "Bootstrapping ...")
-  (let [bca (bca-nonparametric data statistic size alpha rng-factory)]
-    (if (vector? bca)
-      (bca-to-estimate alpha bca)
-      (map (partial bca-to-estimate alpha) bca))))
-
-(defn bootstrap
-  "Bootstrap a statistic. Statistic can produce multiple statistics as a vector
-   so you can use juxt to pass multiple statistics.
-   http://en.wikipedia.org/wiki/Bootstrapping_(statistics)"
-  [data statistic size rng-factory]
-  (progress "Bootstrapping ...")
-  (let [samples   (bootstrap-sample data statistic size rng-factory)
-        transpose (fn [data] (apply map vector data))]
-    (if (vector? (first samples))
-      (map bootstrap-estimate samples)
-      (bootstrap-estimate samples))))
 
 
 ;;; Outliers

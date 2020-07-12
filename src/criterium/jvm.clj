@@ -21,7 +21,7 @@
 
 (defmacro timestamp
   "Obtain a timestamp using System/nanoTime."
-  ^long [] `(System/nanoTime))
+  [] `(System/nanoTime))
 
 
 (defn run-finalization

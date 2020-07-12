@@ -41,11 +41,41 @@
 (deftest bootstrap-estimate-test
   (is (= [1 0.0 [1.0 1.0]]
          (bootstrap-estimate (take 20 (repeatedly (constantly 1))))))
+  (is (= [2 0.0 [2.0 2.0]]
+         (bootstrap-estimate (take 20 (repeatedly (constantly 2))))))
+  (is (= [1/2 0.26315789473684204 [-0.5054587850434509 1.5054587850434509]]
+         (bootstrap-estimate (take 20 (cycle [0 1])))))
   (let [[m s [l u]] (bootstrap-estimate (take 1000000 (repeatedly rand)))]
     (is (test-max-error 0.5 m 1e-2))
     (is (test-max-error 0.0 l 0.2))
     (is (test-max-error 1.0 u 0.2))
     (is (test-max-error 0.0833 s 0.2))))
+
+(comment
+  (let [f (fn [n] (take n (repeatedly rand)))]
+    (dissoc (criterium.time/measure (f 1000000)) :expr-value))
+
+  (let [f (fn [n] (take n (criterium.well/well-rng-1024a)))]
+    (dissoc (criterium.time/measure (f 1000000)) :expr-value))
+
+  (criterium.time/time (bootstrap-estimate (take 1000000 (repeatedly rand))))
+
+  (let [f (fn [n] (bootstrap-estimate (take n (repeatedly rand))))]
+    (double (/ (criterium.toolkit/elapsed-time
+                 (-> (criterium.time/measure
+                      (f 1000000))
+                    (dissoc :expr-value)
+                    ))
+               (double criterium.toolkit/MILLISEC-NS))))
+
+  (def m (criterium.arg-gen/for-all
+             [v (clojure.test.check.generators/vector
+                  (clojure.test.check.generators/double* {:inifinte? false :NaN? false
+                                                          :min       0     :max  1})
+                  1000000)]
+           (bootstrap-estimate v)))
+
+  (dissoc (criterium.time/measure* m {}) :state))
 
 (deftest bootstrap-estimate-scale-test
   (is (= [1e-9 [1e-8 1e-8]]

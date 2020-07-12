@@ -3,9 +3,55 @@
 #+begin_src clojure :results value silent
   (require '[criterium
              [chart :as chart]
+             [jvm :as jvm]
              [time :as time]
              [toolkit :as toolkit]])
 #+end_src
+
+
+* System NanoTime
+
+** latency
+
+Test nanotime latency
+
+#+begin_src clojure :results pp
+  (defn nano-time-latency
+    [x]
+    (jvm/timestamp))
+
+  (defn state-fn [] (rand))
+  (def measured (toolkit/measured state-fn nano-time-latency 1))
+  (def bmeasured (toolkit/measured-batch measured 100))
+  (toolkit/invoke-measured bmeasured)
+
+  (dissoc (time/measure* measured {:limit-evals 10000}) :samples)
+#+end_src
+
+We see that this reports around 78.0ms.
+
+** granularity
+Test nanotime granularity
+
+#+begin_src clojure :results pp
+  (defn nano-time-granularity
+    [x]
+    (loop [t (jvm/timestamp)]
+      (if (= t (jvm/timestamp))
+        (recur t)
+        t)))
+
+  (defn state-fn [] (rand))
+  (def measured (toolkit/measured state-fn nano-time-granularity 1))
+  (def bmeasured (toolkit/measured-batch measured 100000))
+  (toolkit/invoke-measured bmeasured)
+
+  (dissoc (time/measure* bmeasured {:limit-evals 60000000 :limit-time 2}) :samples)
+  (dissoc (time/measure* measured {:limit-evals 10000000 :limit-time 1}) :samples)
+  (toolkit/divide (time/measure* bmeasured {:limit-evals 1000}) 100000)
+#+end_src
+
+We see that this reports around 115.0ms.
 
 
 * Time
@@ -71,6 +117,82 @@ sample-stats
 
 
 ** Resolution
+
+
+
+
+
+
+
+
+
+* Time
+** Zero accuracy
+
+The smallest thing criterium can measure is a constant, which is
+evaluated inside the identity function.
+
+#+begin_src clojure :results value silent
+  (toolkit/elapsed-time (time/measure 1))
+#+end_src
+
+Lets look at a histogram of the distribution
+
+#+begin_src clojure :results file graphics :dir "data/images" :file "hist.png" :var dirn=(concat (file-name-directory (buffer-file-name)) "data/images/")
+  (let [{:keys [samples stats] :as res} (time/measure 1 :limit-evals 1000)
+        {[mean] :mean [variance] :variance} stats
+        upper-limit (+ mean (* 3 (Math/sqrt variance)))
+        vs (->>
+             samples
+             (mapv toolkit/elapsed-time)
+             (filterv #(< % upper-limit)))
+        num-outliers (- (count samples) (count vs))
+        chart (chart/histogram vs {:delta 1})
+        ;; path (str dirn "hist.png")
+        ]
+    (println "Ignoring n outliers: " num-outliers)
+    (clojure.pprint/pprint (dissoc res :samples))
+    (chart/view chart)
+    ;; (chart/spit chart path)
+    )
+#+end_src
+
+#+RESULTS:
+
+
+#+begin_src clojure :results pp
+  (time/measure 1 :limit-evals 10)
+#+end_src
+
+#+begin_example
+sample-stats
+{:avg {:time 65, :num-evals 1},
+ :stats
+ {:mean [65.375 (48.875 109.125)],
+  :variance [1945.8392857142856 (4.21428571428572 4573.642857142858)],
+  :median [47.0 (44.0 59.0)],
+  :0.025 [44.0 (44.0 44.0)],
+  :0.975 [154.15000000000003 (49.0 172.0)]},
+ :samples
+ [{:state 1, :expr-value 1, :time 172, :num-evals 1}
+  {:state 1, :expr-value 1, :time 70, :num-evals 1}
+  {:state 1, :expr-value 1, :time 48, :num-evals 1}
+  {:state 1, :expr-value 1, :time 47, :num-evals 1}
+  {:state 1, :expr-value 1, :time 44, :num-evals 1}
+  {:state 1, :expr-value 1, :time 46, :num-evals 1}
+  {:state 1, :expr-value 1, :time 49, :num-evals 1}
+  {:state 1, :expr-value 1, :time 44, :num-evals 1}]}
+#+end_example
+
+#+RESULTS:
+[[file:data/images/hist.png]]
+
+
+** Resolution
+
+
+
+
 
 * Memory
 
@@ -217,3 +339,85 @@ allocation.
     ;; (chart/spit chart path)
     )
 #+end_src
+
+* Backup
+
+(defn memory-used-by-terminal-fn
+  "Measure the memory used by the specified terminal fn."
+  [f]
+  (let [measured (measured-expr 1)
+        pline    (pipeline [:memory] {:terminal-fn f})
+        data     (deltas (instrumented measured pline))]
+    (:memory data)))
+
+(def memory-used-by-terminal-fns
+  "Memory overhead of terminal functions.
+
+  Memory used by with-time includes a Long for the time difference."
+  (zipmap
+    (keys terminal-fns)
+    (map memory-used-by-terminal-fn (vals terminal-fns))))
+
+(defn memory-used-by-measure [measures]
+  (let [measured (measured-expr 1)
+        pline    (pipeline
+                   (conj measures :memory)
+                   {:terminal-fn with-expr-value})
+        data     (deltas (instrumented measured pline))]
+    (util/diff
+      (:memory data)
+      (memory-used-by-terminal-fns :with-expr-value))))
+
+(def memory-used-by-measures
+  "These seem to be zero. Presumably values returned by beans
+  are not counted in user land. Also clojure's 32 way maps
+  aren't allocating to add the values."
+  (zipmap
+    (keys measures)
+    (map
+      memory-used-by-measure
+      (map vector (keys measures)))))
+
+(def memory-used-by-all-measures
+  "This is zero, since each individual measure is zero,
+  and there is not enough change in the clojure structures
+  to cause a split in the tree nodes."
+  (memory-used-by-measure (vec (keys measures))))
+
+(def memory-used-by-assoc
+  (let [distinct-ks (mapv  ; distinct keys to asoc into map
+                      #(keyword (str "k-" %))
+                      (range 128))
+        pline       (pipeline
+                      [:memory]
+                      {:terminal-fn with-expr-value})]
+    (vec (for [i (range 1 128)]
+           (let [this-ks (take i distinct-ks)
+                 ff      (fn reduce-fn [m k]
+                           (assoc m k 1))
+                 f       (fn measured-fn [[m sks]]
+                           (reduce ff m sks))
+                 f       (fn measured-fn [[m ks]]
+                           (loop [m  m
+                                  ks ks]
+                             (if (not-empty ks)
+                               (recur
+                                 (assoc m (first ks) 1)
+                                 (rest ks))
+                               m)))
+                 one     (fn [] 1)
+
+                 measured (measured
+                            (fn []
+                              [{:x (one)} ;; nor a constant
+                               this-ks])
+                            f
+                            ;; (fn [[m ks]]
+                            ;;   (reduce
+                            ;;   ff
+                            ;;     m
+                            ;;     ks))
+                            )]
+             (total-memory
+               (deltas
+                 (instrumented measured pline))))))))

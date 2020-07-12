@@ -5,7 +5,9 @@
              [eval :as eval]
              [format :as format]
              [jvm :as jvm]
-             [toolkit :as toolkit]]))
+             [stats :as stats]
+             [toolkit :as toolkit]
+             [well :as well]]))
 
 (def last-time* (volatile! nil))
 
@@ -22,7 +24,7 @@
 
 (defmethod format-metric :time
   [_ val]
-  (let [v (/ (:elapsed val) 1e9)]
+  (let [v (/ val 1e9)]
     (format "%32s: %s\n" "Elapsed time" (format/format-value :time v))))
 
 (defn- format-count-time [[k {c :count t :time}]]
@@ -98,15 +100,73 @@
 ;;   (f (state-fn)))
 
 
-(defn sample-stats [samples]
-  (let [sum (toolkit/total samples)
-        avg (toolkit/divide sum (:num-evals sum))]
-    avg))
+(defn sample-stats [batch-size samples opts]
+  (let [sum           (toolkit/total samples)
+        num-evals     (:num-evals sum)
+        avg           (toolkit/divide sum num-evals)
+        times         (mapv toolkit/elapsed-time samples)
+        tail-quantile (:tail-quantile opts 0.025)
+        stats         (stats/bootstrap-bca
+                        (mapv double times)
+                        (juxt
+                          stats/mean
+                          stats/variance
+                          (partial stats/quantile 0.5)
+                          (partial stats/quantile tail-quantile)
+                          (partial stats/quantile (- 1.0 tail-quantile)))
+                        (:bootstrap-size opts 100)
+                        [0.5 tail-quantile (- 1.0 tail-quantile)]
+                        well/well-rng-1024a)
+        ks [:mean :variance :median :0.025 :0.975 ]
+        stats (zipmap ks stats)
+        scale-1 (fn [[p [l u]]]
+                   [(/ p batch-size)
+                    [(/ l batch-size) (/ u batch-size)]])
+        scale-2 (fn [[p [l u]]]
+                   [(/ p batch-size)
+                    [(/ l batch-size) (/ u batch-size)]]) ;; TODO FIXME
+        scale-fns {:mean scale-1
+                   :variance scale-2
+                   :median scale-1
+                   :0.025 scale-1
+                   :0.975 scale-1}]
+
+    {:num-evals   num-evals
+     :avg         avg
+     :stats       (zipmap ks
+                          (mapv
+                            (fn [k]
+                              ((scale-fns k) (k stats)))
+                            ks))
+     :samples     samples
+     :num-samples (count samples)}))
 
 (def DEFAULT-TIME-BUDGET-NS
   "Default time budget when no limit specified.
   100ms should be imperceptible."
   (* 100 toolkit/MILLISEC-NS))
+
+
+(defn- pipeline-args [options]
+  (let [use-metrics    (let [use-metrics (:metrics options [])]
+                         (if (= :all use-metrics)
+                           (keys toolkit/measures)
+                           use-metrics))
+        pipeline-options (if ((set use-metrics) :with-expr-value)
+                           {:terminal-fn toolkit/with-expr-value})]
+    [(vec (remove #{:with-expr-value :with-time} use-metrics))
+     pipeline-options]))
+
+(defn- pipeline-for-options [options]
+  (let [use-metrics    (let [use-metrics (:metrics options [])]
+                         (if (= :all use-metrics)
+                           (keys toolkit/measures)
+                           use-metrics))
+        pipeline-options (if ((set use-metrics) :with-expr-value)
+                           {:terminal-fn toolkit/with-expr-value})]
+    (toolkit/pipeline
+      (remove #{:with-expr-value :with-time} use-metrics)
+      pipeline-options)))
 
 (defn measure-stats
   "Evaluates measured and return metrics on its evaluation.
@@ -115,28 +175,38 @@
   keyword selectors. Valid metrics
   are :time, :garbage-collector, :finalization, :memory, :runtime-memory,
   :compilation, and :class-loader."
-  [measured {:keys [limit-evals limit-time max-gc-attempts]
-             :as   options}]
-  (let [time-budget-ns (or limit-time DEFAULT-TIME-BUDGET-NS)
-        eval-budget    (or limit-evals 10000)
-        use-metrics    (let [use-metrics (:metrics options [])]
-                         (if (= :all use-metrics)
-                           (keys toolkit/measures)
-                           use-metrics))
-        pipeline       (toolkit/pipeline use-metrics)
-        _              (toolkit/force-gc (or max-gc-attempts 3))
-        estimate       (toolkit/estimate-execution-time
-                         measured
-                         {:time-budget-ns (quot time-budget-ns 4)
-                          :eval-budget (quot eval-budget 4)})
-        time-budget-ns (- time-budget-ns (:sum estimate))
-        eval-budget    (- eval-budget (:num-evals estimate))
-        vals           (toolkit/sample
-                         measured
-                         pipeline
-                         {:time-budget-ns time-budget-ns
-                          :eval-budget    eval-budget})]
-    (sample-stats vals)))
+  [{:keys [eval-count] :as measured}
+   {:keys [limit-evals limit-time max-gc-attempts]
+    :as   options}]
+  (let [time-budget-ns           (if limit-time
+                                   (long (* limit-time toolkit/SEC-NS))
+                                   DEFAULT-TIME-BUDGET-NS)
+        eval-budget              (or limit-evals 10000)
+        [use-metrics pl-options] (pipeline-args options)
+        pipeline                 (toolkit/pipeline
+                                   use-metrics
+                                   options)
+        _                        (toolkit/force-gc (or max-gc-attempts 3))
+        estimate                 (toolkit/estimate-execution-time
+                                   measured
+                                   {:time-budget-ns (quot time-budget-ns 4)
+                                    :eval-budget    (quot eval-budget 4)})
+        _ (println "estimate" estimate)
+        time-budget-ns           (- time-budget-ns (:sum estimate))
+        eval-budget              (- eval-budget (:num-evals estimate))
+        vals                     (if (= toolkit/with-expr-value
+                                        (:terminal-fn pl-options))
+                                   (toolkit/sample-no-time
+                                     measured
+                                     pipeline
+                                     {:eval-budget    eval-budget})
+                                   (toolkit/sample
+                                     measured
+                                     pipeline
+                                     {:time-budget-ns time-budget-ns
+                                      :eval-budget    eval-budget}))]
+
+    (sample-stats eval-count vals {})))
 
 (defn measure-point-value
   "Evaluates measured and return metrics on its evaluation.
@@ -145,21 +215,28 @@
   keyword selectors. Valid metrics
   are :time, :garbage-collector, :finalization, :memory, :runtime-memory,
   :compilation, and :class-loader."
-  [measured {:keys [max-gc-attempts]
+  [measured {:keys [max-gc-attempts metrics terminsl-fn]
              :as   options}]
   (let [time-budget-ns DEFAULT-TIME-BUDGET-NS
         eval-budget    10000
-        use-metrics    (let [use-metrics (:metrics options [])]
-                         (if (= :all use-metrics)
-                           (keys toolkit/measures)
-                           use-metrics))
-        pipeline       (toolkit/pipeline use-metrics)
+        [use-metrics pl-options] (pipeline-args options)
+        pipeline                 (toolkit/pipeline
+                                   use-metrics
+                                   options)
+        ;; let functions allocate on initial invocation
+        _              (toolkit/invoke-measured measured)
         _              (toolkit/force-gc (or max-gc-attempts 3))
-        vals           (toolkit/sample
-                         measured
-                         pipeline
-                         {:time-budget-ns time-budget-ns
-                          :eval-budget    eval-budget})]
+        vals           (if (= toolkit/with-expr-value
+                              (:terminal-fn pl-options))
+                         (toolkit/sample-no-time
+                           measured
+                           pipeline
+                           {:eval-budget eval-budget})
+                         (toolkit/sample
+                           measured
+                           pipeline
+                           {:time-budget-ns time-budget-ns
+                            :eval-budget    eval-budget}))]
     (last vals)))
 
 (defn measure*
@@ -169,7 +246,7 @@
   keyword selectors. Valid metrics
   are :time, :garbage-collector, :finalization, :memory, :runtime-memory,
   :compilation, and :class-loader."
-  [measured {:keys [limit-evals limit-time max-gc-attempts]
+  [measured {:keys [limit-evals limit-time max-gc-attempts metrics]
              :as   options}]
   (if (or limit-evals limit-time)
     (measure-stats measured options)

@@ -26,15 +26,17 @@
   [x] (* x x))
 
 (defn cube
-  "Square of argument"
+  "Cube of argument"
   [x] (* x x x))
 
 
 ;;; Statistics
 (defn mean
   "Arithmetic mean of data."
-  [data]
-  (/ (reduce + data) (count data)))
+  ([data]
+   (/ (reduce + data) (count data)))
+  ([data count]
+   (/ (reduce + data) count)))
 
 (defn sum
   "Sum of each data point."
@@ -55,11 +57,18 @@
   ([data df]
    ;; Uses a single pass, non-pairwise algorithm, without shifting.
    (letfn [(update-estimates [[m q k] x]
-             [(+ m (/ (- x m) (inc k)))
-              (+ q (/ (* k (sqr (- x m))) (inc k)))
-              (inc k)])]
-     (let [[m q k] (reduce update-estimates [0.0 0.0 0.0] data)]
+             (let [kp1 (inc k)
+                   delta (- x m)]
+               [(+ m (/ delta kp1))
+                (+ q (/ (* k (sqr delta)) kp1))
+                kp1]))]
+     (let [[m q k] (reduce update-estimates [0.0 0.0 0] data)]
        (/ q (- k df))))))
+
+(defn variance*
+  "variance based on subtracting mean"
+  [data mean count]
+  (/ (reduce #(+ %1 (sqr (- %2 mean))) 0.0 data) (dec count)))
 
 ;; For the moment we take the easy option of sorting samples
 (defn median
@@ -143,8 +152,14 @@
   statistic's variance for the confidence interval, but we should use BCa of
   ABC."
   [sampled-stat]
-  (let [stats ((juxt mean variance ) sampled-stat)]
-    (conj stats (apply confidence-interval stats))))
+  (let [n (count sampled-stat)
+        m (mean sampled-stat n)
+        v (variance* sampled-stat m n)
+        ;; stats ((juxt mean variance) sampled-stat)
+        stats [m v]]
+    (conj stats
+          (apply confidence-interval stats)
+          )))
 
 (defn scale-bootstrap-estimate [estimate scale]
   [(* (first estimate) scale)
@@ -308,8 +323,32 @@ descending order (so the last element of coefficients is the constant term)."
       (bca-nonparametric-eval
        n size data z-alpha estimate samples jack-samples))))
 
-(defn bca-to-estimate [alpha bca-estimate]
-  [(first (first bca-estimate)) (next (first bca-estimate))])
+(defn bca-to-estimate
+  [alpha bca-estimate]
+  [(first (first bca-estimate))
+   (next (first bca-estimate))])
+
+
+(defn bootstrap-bca
+  "Bootstrap a statistic. Statistic can produce multiple statistics as a vector
+   so you can use juxt to pass multiple statistics.
+   http://en.wikipedia.org/wiki/Bootstrapping_(statistics)"
+  [data statistic size alpha rng-factory]
+  (let [bca (bca-nonparametric data statistic size alpha rng-factory)]
+    (if (vector? bca)
+      (bca-to-estimate alpha bca)
+      (map (partial bca-to-estimate alpha) bca))))
+
+(defn bootstrap
+  "Bootstrap a statistic. Statistic can produce multiple statistics as a vector
+   so you can use juxt to pass multiple statistics.
+   http://en.wikipedia.org/wiki/Bootstrapping_(statistics)"
+  [data statistic size rng-factory]
+  (let [samples   (bootstrap-sample data statistic size rng-factory)
+        transpose (fn [data] (apply map vector data))]
+    (if (vector? (first samples))
+      (map bootstrap-estimate samples)
+      (bootstrap-estimate samples))))
 
 
 
