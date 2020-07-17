@@ -11,47 +11,87 @@
 
 * System NanoTime
 
+See https://shipilev.net/blog/2014/nanotrusting-nanotime/
+
 ** latency
 
 Test nanotime latency
 
 #+begin_src clojure :results pp
   (defn nano-time-latency
-    [x]
+    ^long [x]
     (jvm/timestamp))
 
   (defn state-fn [] (rand))
   (def measured (toolkit/measured state-fn nano-time-latency 1))
-  (def bmeasured (toolkit/measured-batch measured 100))
+  (def bmeasured (toolkit/measured-batch measured 10000))
   (toolkit/invoke-measured bmeasured)
 
-  (dissoc (time/measure* measured {:limit-evals 10000}) :samples)
+  (dissoc (time/measure*
+            bmeasured
+            {:limit-evals 50000000
+             :limit-time 3}
+            ) :samples)
 #+end_src
 
-We see that this reports around 78.0ms.
+We see that this reports around 48ns.
 
 ** granularity
+
 Test nanotime granularity
 
 #+begin_src clojure :results pp
   (defn nano-time-granularity
-    [x]
-    (loop [t (jvm/timestamp)]
-      (if (= t (jvm/timestamp))
-        (recur t)
-        t)))
+    ^long [x]
+    (let [t (jvm/timestamp)]
+      (loop []
+        (if (= t (jvm/timestamp))
+          (recur)
+          t))))
 
   (defn state-fn [] (rand))
   (def measured (toolkit/measured state-fn nano-time-granularity 1))
   (def bmeasured (toolkit/measured-batch measured 100000))
   (toolkit/invoke-measured bmeasured)
 
-  (dissoc (time/measure* bmeasured {:limit-evals 60000000 :limit-time 2}) :samples)
+  (dissoc
+    (time/measure*
+      bmeasured
+      {:limit-evals 60000000 :limit-time 4})
+    :samples)
   (dissoc (time/measure* measured {:limit-evals 10000000 :limit-time 1}) :samples)
   (toolkit/divide (time/measure* bmeasured {:limit-evals 1000}) 100000)
 #+end_src
 
-We see that this reports around 115.0ms.
+#+begin_src clojure :results pp
+  (defn nano-time-granularity
+    ^long [batch-size]
+    (loop [t (jvm/timestamp)
+           n batch-size]
+      (let [t1 (jvm/timestamp)]
+        (if (= t t1)
+          (recur n t1)
+          (if (pos? n)
+            (recur (unchecked-dec n) t1)
+            t)))))
+
+  (def batch-size 1000)
+  (defn state-fn [] batch-size)
+  (def measured (toolkit/measured state-fn nano-time-granularity batch-size))
+  (toolkit/invoke-measured measured)
+
+  (dissoc
+    (time/measure*
+      measured
+      {:limit-evals 60000000 :limit-time 4})
+    :samples)
+  (dissoc (time/measure* measured {:limit-evals 10000000 :limit-time 1}) :samples)
+  (toolkit/divide (time/measure* bmeasured {:limit-evals 1000}) 100000)
+#+end_src
+
+We see that this reports around 92.0ms, or twice the latency (since it
+does at least two nanoTime calls).  This suggests the granularity is
+the same as the latency.
 
 
 * Time
@@ -67,15 +107,26 @@ evaluated inside the identity function.
 Lets look at a histogram of the distribution
 
 #+begin_src clojure :results file graphics :dir "data/images" :file "hist.png" :var dirn=(concat (file-name-directory (buffer-file-name)) "data/images/")
-  (let [{:keys [samples stats] :as res} (time/measure 1 :limit-evals 1000)
+  (let [measured (toolkit/measured-expr 1)
+        batch-size 1000
+        batch-measured (toolkit/measured-batch measured batch-size)
+        _ (toolkit/invoke-measured batch-measured)
+        {:keys [samples stats] :as res} (time/measure*
+                                          batch-measured {:limit-evals 10000000})
         {[mean] :mean [variance] :variance} stats
+        _ (clojure.pprint/pprint stats)
         upper-limit (+ mean (* 3 (Math/sqrt variance)))
+        scaled-upper-limit (* upper-limit batch-size)
+        _ (println "upper-limit" upper-limit scaled-upper-limit)
         vs (->>
              samples
              (mapv toolkit/elapsed-time)
+             (mapv #(/ % (double batch-size)))
              (filterv #(< % upper-limit)))
         num-outliers (- (count samples) (count vs))
-        chart (chart/histogram vs {:delta 1})
+        _ (println {:num-outliers num-outliers
+                    :n (count vs)})
+        chart (chart/histogram vs {:delta 0.1})
         ;; path (str dirn "hist.png")
         ]
     (println "Ignoring n outliers: " num-outliers)
@@ -87,9 +138,12 @@ Lets look at a histogram of the distribution
 
 #+RESULTS:
 
+Gives a mean around 17ns.
+
 
 #+begin_src clojure :results pp
   (time/measure 1 :limit-evals 10)
+  (time/measure 1 :limit-evals 10000 :batch-size 1000)
 #+end_src
 
 #+begin_example

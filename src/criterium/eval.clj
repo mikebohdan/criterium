@@ -4,30 +4,55 @@
 
 ;;; Mutable place to avoid JIT removing expr evaluation altogether
 
-(defprotocol MutablePlace
-  "Provides functions to get and set a mutable place"
-  (set-place [_ v] "Set mutable field to value.")
-  (get-place [_] "Get mutable field value."))
+;; We use deftype and definterface to minimise runtime costs
+(definterface SinkObject
+  (^void sinkObject [^Object x]))
 
-(deftype Unsynchronized
-    [^{:unsynchronized-mutable true :tag Object} v]
-  MutablePlace
-  (set-place [_ value] (set! v value))
-  (get-place [_] v))
+(deftype ObjectSink
+    [^{:volatile-mutable true :tag Object} v]
+  SinkObject
+  (^void sinkObject [_ ^Object sv]
+   (when (identical? v sv)
+     (set! v sv))))
 
-(def mutable-place
-  "An object with a mutable, unsychronized field.
+(def ^ObjectSink object-sink
+  "An object which can sink objects.
 
   Used to store the result of each expression, to prevent JIT
-  optimizing away the expression entirely.
+  optimizing away the expression entirely."
+  (ObjectSink. ::unique-val))
 
-  The field is accessed with the MutablePlace protocol."
-  (Unsynchronized. nil))
-
-(defn sink-value
-  "Sink the value into a mutable place."
+(defn sink-object
+  "Sink the value into a mutable place,
+  Only writes if the it fails an identity check with a volatile read
+  of the mutable place, which should never happen."
   [v]
-  (set-place mutable-place v))
+  (.sinkObject object-sink v))
+
+
+(definterface SinkPrimitiveLong
+  (^void sinkPrimitiveLong [^long x]))
+
+(deftype PrimitiveLongSink
+    [^{:volatile-mutable true :tag 'long} v]
+  SinkPrimitiveLong
+  (^void sinkPrimitiveLong [_ ^long sv]
+   (when (identical? v sv)
+     (set! v sv))))
+
+(def ^PrimitiveLongSink primitive-log-sink
+  "An object which can sink primitive longs.
+
+  Used to store the result of each expression, to prevent JIT
+  optimizing away the expression entirely."
+  (PrimitiveLongSink. (long Long/MAX_VALUE)))
+
+(defn sink-primitive-long
+  "Sink the primitive long value into a mutable place,
+  Only writes if the it fails an identity check with a volatile read
+  of the mutable place, which should never happen."
+  [^long v]
+  (.sinkPrimitiveLong primitive-log-sink v))
 
 ;;; Execution
 

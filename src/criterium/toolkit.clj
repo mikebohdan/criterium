@@ -70,18 +70,19 @@
 
 (defn measured-batch
   "Wrap a measured to run multiple times."
-  [{:keys [state-fn f] :as _measured} batch-size]
-  {:pre [(> batch-size 1)]}
+  [{:keys [state-fn f eval-count] :as _measured}
+   batch-size
+   & [{:keys [sink-fn]
+       :or {sink-fn eval/sink-object}}]]
+  {:pre [(>= batch-size 1)]}
   (measured
     state-fn
     (fn [state]
-      (let [v (f state)]
-        (loop [^long i (dec batch-size)]
-          (eval/sink-value (f state))
-          (if (pos? i)
-            (recur (dec i))
-            v))))
-    batch-size))
+      (loop [^int i batch-size]
+        (when (pos? i)
+          (sink-fn (f state))
+          (recur (dec i)))))
+    (* batch-size eval-count)))
 
 
 (defn invoke-measured [{:keys [state-fn f] :as measured}]
@@ -106,7 +107,7 @@
      (toolkit/instrumented
        (toolkit/measured-expr some-expr)
        (toolkit/with-time))"
-  [{:keys [state-fn f] :as measured} next-fn]
+  [{:keys [state-fn] :as measured} next-fn]
   (assert (measured? measured))
   (let [state (state-fn)
         data {:state state}]
@@ -116,8 +117,8 @@
 (defn with-expr-value
   "Execute measured, adding the return value to the data map's :expr-value key."
   []
-  (fn [{:keys [state] :as data} {:keys [f] :as _measured}]
-    (assoc data :expr-value (f state) :num-evals 1)))
+  (fn [{:keys [state] :as data} {:keys [eval-count f] :as _measured}]
+    (assoc data :expr-value (f state) :num-evals eval-count)))
 
 
 (defn with-time
@@ -279,7 +280,6 @@
     :or   {time-budget-ns (* 500 MILLISEC-NS)
            eval-budget    1000000}
     :as   _options}]
-  (println "time-budget-ns" time-budget-ns)
   (loop [result         []
          eval-budget    (long eval-budget)
          time-budget-ns (long time-budget-ns)]
@@ -344,8 +344,159 @@
        (next-fn data measured))))
 
 ;;; timing
-(defn elapsed-time [data]
+(defn elapsed-time
+  ^long [data]
   (:time data))
+
+
+(defn first-estimate
+  "Run measured for an initial estimate of the time to execute..
+
+  Returns an estimated  execution time."
+  [measured]
+  (let [pline   (with-time)
+        ;; The first evaluation is *always* unrepresentative
+        _ignore (instrumented measured pline)
+        v0      (instrumented measured pline)]
+    (long (quot (elapsed-time v0) (:eval-count measured)))))
+
+(defn estimate-eval-count
+  "Estimate batch-size."
+  [t0 {:keys [time-budget-ns eval-budget target-batch-time-ns]
+       :or {target-batch-time-ns (* 10 MILLISEC-NS)}
+       :as options}]
+  (let [n-est     (min (some-> time-budget-ns (quot t0) long) Long/MAX_VALUE)
+        n-avail   (min (or eval-budget Long/MAX_VALUE)
+                     n-est)
+        n-desired (max 1 (quot target-batch-time-ns t0))]
+    ;; (println "n-desired" n-desired)
+    (cond
+      (<= n-avail 1)
+      1
+
+      (< n-avail (* 10 n-desired))
+      (max 1 (quot n-avail 10))
+
+      :else
+      n-desired)))
+
+;; (defn warmup-batch-size
+;;   "Estimate batch-size for warmup."
+;;   [t0 {:keys [time-budget-ns eval-budget warmup-period-ns] :as options}]
+;;   (let [n-est (min (or (some-> time-budget-ns (quot t0)) Long/MAX_VALUE)
+;;                    (or (some-> warmup-period-ns (quot t0)) Long/MAX_VALUE))
+;;         n-avail (min (or eval-budget Long/MAX_VALUE)
+;;                      n-est)
+;;         n-desired (quot (* 10 MILLISEC-NS) t0)]
+;;     (cond
+;;       (<= n-avail 1)
+;;       1
+
+;;       (< n-avail (* 10 n-desired))
+;;       (max 1 (quot n-avail 10))
+
+;;       :else
+;;       n-desired)))
+
+;; (warmup-batch-size 1 {:eval-budget 120})
+
+(defn phase-budget
+  [time-budget-ns eval-budget phase-period-ns phase-fraction]
+  {:time-budget-ns (min
+                     (long (quot time-budget-ns phase-fraction))
+                     (or phase-period-ns Long/MAX_VALUE))
+   :eval-budget    (long (quot eval-budget phase-fraction))})
+
+
+(defn warmup-params
+  "Estimate parameters for warmup"
+  [{:keys [eval-count] :as measured}
+   t0
+   {:keys [time-budget-ns eval-budget warmup-period-ns warmup-fraction
+              target-batch-time-ns]
+       :or   {warmup-fraction 10}
+       :as   options}]
+  (let [warmup-budget (phase-budget
+                        time-budget-ns eval-budget warmup-period-ns warmup-fraction)
+        est-eval-count (estimate-eval-count
+                         t0
+                         (merge
+                           warmup-budget
+                           (select-keys options [:target-batch-time-ns])))
+
+        ;; time-budget-ns (or time-budget-ns
+        ;;                    (some-> eval-budget (quot t0)))
+        ;; warmup-options (cond-> {}
+        ;;                  time-budget-ns (assoc :time-budget-ns
+        ;;                                        (min
+        ;;                                          (quot time-budget-ns warmup-fraction)
+        ;;                                          (or warmup-period-ns Long/MAX_VALUE)))
+        ;;                  eval-budget (assoc :eval-budget
+        ;;                                     (quot eval-budget warmup-fraction)))
+        ]
+    (assoc warmup-budget
+           :batch-size (max 1 (quot est-eval-count eval-count)))))
+
+(defn warmup
+  "Run measured for the given amount of time to enable JIT compilation.
+
+  Returns a vector of execution count, deltas and estimated function
+  execution time."
+  [measured
+   t0
+   {:keys [time-budget-ns eval-budget warmup-period-ns warmup-fraction]
+    :as   options}]
+  (let [pline (with-class-loader-counts
+                (with-compilation-time
+                  (with-time)))
+        {:keys [time-budget-ns eval-budget batch-size warmup-period-ns]
+         :as   warmup-options}
+        (warmup-params measured t0 options)
+
+        _ (println "warmup-options" warmup-options)
+
+        measured-batch (if (= 1 batch-size)
+                         measured  ; re-use measured if possible to keep jit
+                         (measured-batch
+                           measured
+                           batch-size
+                           (select-keys options [:sink-fn])))]
+    (println "eval-count" (:eval-count measured))
+    (loop [num-evals  0
+           time-ns    0
+           delta-free 0
+           vs         []]
+      (let [v         (instrumented measured-batch pline)
+            t         (elapsed-time v)
+            time-ns   (unchecked-add time-ns t)
+            num-evals (unchecked-add num-evals (long (:num-evals v)))
+            cl-counts (-> v :class-loader :loaded-count)
+            comp-time (-> v :compilation :compilation-time)
+            ]
+        (println "num-evals" (:num-evals v) "t" t)
+        ;; (if (pos? cl-counts)
+        ;;   (debug "  classes loaded before" count "iterations"))
+        ;; (if (pos? comp-time)
+        ;; (debug "  compilation occurred before" count "iterations"))
+        ;; (debug "elapsed-time" elapsed "count" count)
+        ;; (println "warmuo"
+        ;;          {:cl-counts cl-counts
+        ;;           :comp-time comp-time})
+        (if (and (> delta-free 2)
+                 (or (>= num-evals eval-budget)
+                     (>= time-ns time-budget-ns)))
+          {:num-evals      num-evals
+           :time-ns        time-ns
+           :samples        (conj vs v)
+           :measured-batch measured-batch}
+          (recur num-evals
+                 time-ns
+                 (if (and (zero? cl-counts)
+                          (zero? comp-time))
+                   (unchecked-inc delta-free)
+                   0)
+                 (conj vs v)))))))
+
 
 (defn estimate-execution-time
   "Return an initial estimate for the execution time of a measured function.

@@ -147,23 +147,21 @@
 (defmacro time-expr
   "Returns a map containing execution time and result of specified function."
   [expr]
-  `(toolkit/deltas
-     (toolkit/instrumented
-       (toolkit/with-garbage-collector-stats
-         (toolkit/with-time
-           (toolkit/with-expr-value
-             ~expr))))))
+  `(toolkit/instrumented
+    (toolkit/with-garbage-collector-stats
+      (toolkit/with-time
+        (toolkit/with-expr-value
+          ~expr)))))
 
 (defmacro time-expr-for-warmup
   "Returns a map containing execution time, change in loaded and unloaded
   class counts, change in compilation time and result of specified function."
   [expr]
-  `(toolkit/deltas
-     (toolkit/instrumented
-       (toolkit/with-class-loader-counts
-         (toolkit/with-compilation-time
-           (toolkit/with-time
-             ~expr))))))
+  `(toolkit/instrumented
+     (toolkit/with-class-loader-counts
+       (toolkit/with-compilation-time
+         (toolkit/with-time
+           ~expr)))))
 
 (defn elapsed-time
   "Helper to return the elapsed time from instrumentation data map."
