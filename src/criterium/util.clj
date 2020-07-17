@@ -32,6 +32,13 @@
 (defn sig-figs
   "Round a double to the given precision (number of significant digits)"
   [d precision]
+  (let [p (Math/ceil (Math/log10 d))
+        factor (Math/pow 10 (- precision p))]
+    (/ (Math/round (* d factor)) factor)))
+
+(defn round-decimal-places
+  "Round a double to the given decimal places"
+  [d precision]
   (let [factor (Math/pow 10 precision)]
     (/ (Math/round (* d factor)) factor)))
 

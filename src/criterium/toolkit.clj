@@ -453,7 +453,7 @@
          :as   warmup-options}
         (warmup-params measured t0 options)
 
-        _ (println "warmup-options" warmup-options)
+        ;; _ (println "warmup-options" warmup-options)
 
         measured-batch (if (= 1 batch-size)
                          measured  ; re-use measured if possible to keep jit
@@ -461,7 +461,7 @@
                            measured
                            batch-size
                            (select-keys options [:sink-fn])))]
-    (println "eval-count" (:eval-count measured))
+    ;; (println "eval-count" (:eval-count measured))
     (loop [num-evals  0
            time-ns    0
            delta-free 0

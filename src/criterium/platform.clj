@@ -66,21 +66,25 @@
 
 
 ;; Minimum measured time
-(defn constant-bench []
+(defn constant-bench [& [options]]
   (time/measure*
     (toolkit/measured
       (fn ^long [] 1)
       (fn ^long [^long x] x)
       1)
-    {:limit-time 1}))
+    (merge
+      {:limit-time 1}
+      options)))
 
-(defn empty-bench []
+(defn empty-bench [& [options]]
   (time/measure*
     (toolkit/measured
       (fn ^long [] 0)
       (fn [^long x])
       1)
-    {:limit-time 1}))
+    (merge
+      {:limit-time 1}
+      options)))
 
 (defn platform-stats
   "Return mean estimates for times that describe the accuracy of timing."

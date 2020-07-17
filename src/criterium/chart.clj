@@ -95,7 +95,7 @@
        :x-axis {:title (:value-label options "Value")
                 :label {:rotation 90}
                 :tick-mark-spacing-hint tick-spacing
-                :decimal-pattern "###.#"}
+                :decimal-pattern "###.##"}
        :y-axis {:title "Frequency"}})
     ))
 
@@ -114,7 +114,7 @@
 (defn time-histogram
   [{:keys [samples stats batch-size] :as res} & [options]]
   {:pre [samples]}
-  (let [{[mean] :mean [variance] :variance} stats
+  (let [{[mean] :mean [variance] :variance} (:time stats)
         upper-limit (+ mean (* 3 (Math/sqrt variance)))
         vs (->>
              samples

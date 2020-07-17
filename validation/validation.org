@@ -18,33 +18,41 @@ See https://shipilev.net/blog/2014/nanotrusting-nanotime/
 
 Test nanotime latency
 
-#+begin_src clojure :results pp
-  (chart/view
+#+begin_src clojure :results file graphics :dir "data/images" :file "nanotime-latency.png" :var dir=(concat (file-name-directory (buffer-file-name)) "data/images/")
+  (chart/spit
     (chart/time-histogram
       (platform/nanotime-latency
         10000
         {:return-samples true})
-      {:title "nanoTime Latency"}))
+      {:title "nanoTime Latency"})
+    "validation/data/images/nanotime-latency.png")
 #+end_src
 
-We see that this reports around 48ns.
+#+RESULTS:
+[[file:data/images/nanotime-latency.png]]
+
+We see that this reports around 31ns.
 
 ** granularity
 
 Test nanotime granularity
 
-#+begin_src clojure :results pp
-(chart/view
+#+begin_src clojure  :results file graphics :dir "data/images" :file "nanotime-granularity.png" :var dir=(concat (file-name-directory (buffer-file-name)) "data/images/")
+(chart/spit
   (chart/time-histogram
     (platform/nanotime-granularity
         100000
         {:return-samples true})
-    {:title "nanoTime Granularity"}))
+    {:title "nanoTime Granularity"})
+  "validation/data/images/nanotime-granularity.png")
 #+end_src
 
-We see that this reports around 92.0ms, or twice the latency (since it
-does at least two nanoTime calls).  This suggests the granularity is
-the same as the latency.
+#+RESULTS:
+[[file:data/images/nanotime-granularity.png]]
+
+We see that this reports around 31.0ms, or about the same as latency.
+Interestingly there seems to be a hard limit to the lower bound, which
+is not seen in the latency.
 
 
 * Time
@@ -53,48 +61,22 @@ the same as the latency.
 The smallest thing criterium can measure is a constant, which is
 evaluated inside the identity function.
 
-#+begin_src clojure :results value silent
-  (toolkit/elapsed-time (time/measure 1))
-#+end_src
 
 Lets look at a histogram of the distribution
 
-#+begin_src clojure :results file graphics :dir "data/images" :file "hist.png" :var dirn=(concat (file-name-directory (buffer-file-name)) "data/images/")
-  (let [measured (toolkit/measured-expr 1)
-        eval-count 1000
-        batch-measured (toolkit/measured-batch measured eval-count)
-        _ (toolkit/invoke-measured batch-measured)
-        {:keys [samples stats batch-size] :as res}
-        (time/measure*
-          batch-measured {:limit-time 1
-                          :return-samples true})
-        {[mean] :mean [variance] :variance} stats
-        _ (clojure.pprint/pprint stats)
-        upper-limit (+ mean (* 3 (Math/sqrt variance)))
-        scaled-upper-limit (* upper-limit batch-size)
-        _ (println "upper-limit" upper-limit scaled-upper-limit)
-        _ (clojure.pprint/pprint samples)
-        vs (->>
-             samples
-             (mapv toolkit/elapsed-time)
-             (mapv #(/ % (double batch-size)))
-             (filterv #(< % upper-limit)))
-        num-outliers (- (count samples) (count vs))
-        _ (println {:num-outliers num-outliers
-                    :n (count vs)})
-        chart (chart/histogram vs {:delta 0.1})
-        ;; path (str dirn "hist.png")
-        ]
-    (println "Ignoring n outliers: " num-outliers)
-    (clojure.pprint/pprint (dissoc res :samples))
-    (chart/view chart)
-    ;; (chart/spit chart path)
-    )
+#+begin_src clojure :results file graphics :dir "data/images" :file "constant.png" :var dir=(concat (file-name-directory (buffer-file-name)) "data/images/")
+  (chart/spit
+    (chart/time-histogram
+      (platform/constant-bench
+        {:return-samples true})
+      {:title "Constant"})
+    (str "validation/data/images/constant.png"))
 #+end_src
 
 #+RESULTS:
+[[file:data/images/constant.png]]
 
-Gives a mean around 17ns.
+Gives a mean around 21ns.
 
 
 #+begin_src clojure :results pp

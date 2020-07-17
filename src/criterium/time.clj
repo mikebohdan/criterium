@@ -11,14 +11,14 @@
 
 (def last-time* (volatile! nil))
 
-(def metrics
-  {:time              `toolkit/with-time
-   :garbage-collector `toolkit/with-garbage-collector-stats
-   :finalization      `toolkit/with-finalization-count
-   :memory            `toolkit/with-memory
-   :runtime-memory    `toolkit/with-runtime-memory
-   :compilation       `toolkit/with-compilation-time
-   :class-loader      `toolkit/with-class-loader-counts})
+;; (def metrics
+;;   {:time              `toolkit/with-time
+;;    :garbage-collector `toolkit/with-garbage-collector-stats
+;;    :finalization      `toolkit/with-finalization-count
+;;    :memory            `toolkit/with-memory
+;;    :runtime-memory    `toolkit/with-runtime-memory
+;;    :compilation       `toolkit/with-compilation-time
+;;    :class-loader      `toolkit/with-class-loader-counts})
 
 (defmulti format-metric (fn [metric val] metric))
 
@@ -44,7 +44,7 @@
     str
     (format "%36s:\n" (name k))
     (for [[mk v] vs]
-      (format "%40s: %%s\n" (name mk) (format/format-value :memory v)))))
+      (format "%40s: %s\n" (name mk) (format/format-value :memory v)))))
 
 (defmethod format-metric :memory
   [_ val]
@@ -86,8 +86,81 @@
   [_ _]
   "")
 
-(defn- wrap-for-metric [expr stat]
-  `(~(metrics stat) ~expr))
+(def metric-paths
+  {:time [[:time]]
+   :memory [[:memory :total :used]
+            [:memory :heap :used]]
+   :class-loader [[:class-loader :loaded-count]
+                  [:class-loader :unloaded-count]]
+   :compilation-time [[:compilation-time :compilation-time]]
+   :runtime-memory [[:runtime-memory :max]
+                    [:runtime-memory :free]
+                    [:runtime-memory :total]]
+   :finalization-count [:finalization-count :pending]
+   :garbage-collector [[:garbage-collector :total :time]
+                       [:garbage-collector :total :count]]})
+
+(defn path-accessor [path]
+  (reduce comp (reverse path)))
+
+(def metric-format
+  {[:time]                               {:dimension :ns :label "Elapsed Time"}
+   [:memory :total :used]                {:dimension :memory
+                                          :label     "Total Used Memory"}
+   [:memory :heap :used]                 {:dimension :memory
+                                          :label     "Total Heap Memory"}
+   [:class-loader :loaded-count]         {:dimension :count :label "Classes Loaded"}
+   [:class-loader :unloaded-count]       {:dimension :count :label "Classes Unloaded"}
+   [:compilation-time :compilation-time] {:dimension :ns :label "Compilation Time"}
+   [:runtime-memory :max]                {:dimension :memory
+                                          :label     "Max Memory (runtime)"}
+   [:runtime-memory :free]               {:dimension :memory
+                                          :label     "Free Memory (runtime)"}
+   [:runtime-memory :total]              {:dimension :memory
+                                          :label     "Total Memory (runtime)"}
+   [:finalization-count :pending]        {:dimension :count
+                                          :label     "Finalizations Pending"}
+   [:garbage-collector :total :time]     {:dimension :ns :label "GC Time"}
+   [:garbage-collector :total :count]    {:dimension :count :label "GC count"}})
+
+;; (defn- wrap-for-metric [expr stat]
+;;   `(~(metrics stat) ~expr))
+
+(defn print-stat [path {:keys [mean variance] :as stat}]
+  (let [{:keys [dimension label]} (metric-format path)
+        [scale units] (format/scale dimension (first mean))]
+    (println
+      (format "%36s: %.3g ± %.3g %s"
+              label
+              (* scale (first mean))
+              (* scale 3 (Math/sqrt (first variance)))
+              units))))
+
+(defn view-histogram [{:keys [samples batch-size stats] :as result} path]
+  (let [stat (get-in stats path)
+        mean (first (:mean stat))
+        {:keys [dimension label]} (metric-format path)
+        [scale units] (format/scale dimension mean)
+        vs (->>
+             samples
+             (mapv (path-accessor path))
+             (mapv #(/ % (double batch-size)))
+             (mapv #(* % scale)))
+        chart-options {:title label
+                       :value-label (str "value [" units"]")}]
+    (criterium.chart/view
+      (criterium.chart/histogram
+        vs
+        chart-options))))
+
+(defn print-stats [result {:keys [histogram] :as options}]
+  (doseq [metric (:metrics result)]
+    (doseq [path (metric-paths metric)]
+      (let [stat (get-in (:stats result) path)]
+        (print-stat path stat)
+        (when histogram
+          (view-histogram result path)))))
+  )
 
 (defn print-metrics [metrics]
   (doseq [[k v] metrics]
@@ -100,15 +173,12 @@
 ;;   (f (state-fn)))
 
 
-(defn sample-stats [batch-size samples {:keys [return-samples] :as opts}]
-  ;; (clojure.pprint/pprint samples)
-  (let [sum           (toolkit/total samples)
-        num-evals     (:num-evals sum)
-        avg           (toolkit/divide sum num-evals)
-        times         (mapv toolkit/elapsed-time samples)
+(defn stats-for [path batch-size samples opts]
+  (let [vs            (mapv (path-accessor path) samples)
         tail-quantile (:tail-quantile opts 0.025)
+        ;; _ (println "path" path "vs" vs)
         stats         (stats/bootstrap-bca
-                        (mapv double times)
+                        (mapv double vs)
                         (juxt
                           stats/mean
                           stats/variance
@@ -119,7 +189,6 @@
                         [0.5 tail-quantile (- 1.0 tail-quantile)]
                         well/well-rng-1024a)
         ks [:mean :variance :median :0.025 :0.975 ]
-        stats (zipmap ks stats)
         sqr-batch-size (stats/sqr batch-size)
         scale-1 (fn [[p [l u]]]
                    [(/ p batch-size)
@@ -131,18 +200,70 @@
                    :variance scale-2
                    :median scale-1
                    :0.025 scale-1
-                   :0.975 scale-1}]
+                   :0.975 scale-1}
+
+        stats (zipmap ks stats)
+        stats (zipmap ks
+                      (mapv
+                        (fn [k]
+                          ((scale-fns k) (k stats)))
+                        ks))]
+    stats))
+
+(defn sample-stats [metrics batch-size samples {:keys [return-samples] :as opts}]
+  ;; (clojure.pprint/pprint samples)
+  (let [sum           (toolkit/total samples)
+        num-evals     (:num-evals sum)
+        avg           (toolkit/divide sum num-evals)
+        paths (mapcat metric-paths metrics)
+        stats (reduce
+                (fn [res path]
+                  (assoc-in res path (stats-for path batch-size samples opts)))
+                {}
+                paths)
+
+        ;; times         (mapv toolkit/elapsed-time samples)
+        ;; tail-quantile (:tail-quantile opts 0.025)
+        ;; stats         (stats/bootstrap-bca
+        ;;                 (mapv double times)
+        ;;                 (juxt
+        ;;                   stats/mean
+        ;;                   stats/variance
+        ;;                   (partial stats/quantile 0.5)
+        ;;                   (partial stats/quantile tail-quantile)
+        ;;                   (partial stats/quantile (- 1.0 tail-quantile)))
+        ;;                 (:bootstrap-size opts 100)
+        ;;                 [0.5 tail-quantile (- 1.0 tail-quantile)]
+        ;;                 well/well-rng-1024a)
+
+        ;; ks [:mean :variance :median :0.025 :0.975 ]
+        ;; stats (zipmap ks stats)
+        ;; sqr-batch-size (stats/sqr batch-size)
+        ;; scale-1 (fn [[p [l u]]]
+        ;;            [(/ p batch-size)
+        ;;             [(/ l batch-size) (/ u batch-size)]])
+        ;; scale-2 (fn [[p [l u]]]
+        ;;            [(/ p sqr-batch-size)
+        ;;             [(/ l sqr-batch-size) (/ u sqr-batch-size)]]) ;; TODO FIXME
+        ;; scale-fns {:mean scale-1
+        ;;            :variance scale-2
+        ;;            :median scale-1
+        ;;            :0.025 scale-1
+        ;;            :0.975 scale-1}
+        ]
 
     (cond->
         {:num-evals   num-evals
          :avg         avg
-         :stats       (zipmap ks
-                              (mapv
-                                (fn [k]
-                                  ((scale-fns k) (k stats)))
-                                ks))
+         :stats       stats
+         ;; (zipmap ks
+         ;;                      (mapv
+         ;;                        (fn [k]
+         ;;                          ((scale-fns k) (k stats)))
+         ;;                        ks))
          :num-samples (count samples)
-         :batch-size batch-size}
+         :batch-size batch-size
+         :metrics metrics}
       return-samples (assoc :samples samples))))
 
 (def DEFAULT-TIME-BUDGET-NS
@@ -186,7 +307,7 @@
   (toolkit/force-gc (or max-gc-attempts 3))
   (let [;; primitive estimate
         t0                       (toolkit/first-estimate measured)
-        _ (println "t0" t0)
+        ;; _ (println "t0" t0)
 
         ;; budgets
         time-budget-ns           (if limit-time
@@ -201,8 +322,8 @@
                                      (* 3 (long (quot time-budget-ns t0))))
         warmup-period-ns         (some-> warmup-period (* toolkit/SEC-NS))
 
-        _ (println {:time-budget-ns time-budget-ns
-                    :eval-budget eval-budget})
+        ;; _ (println {:time-budget-ns time-budget-ns
+        ;;             :eval-budget eval-budget})
 
         ;; warmup - non batched function
         {:keys [num-evals time-ns samples measured-batch] :as warmup-result}
@@ -219,9 +340,9 @@
         t1 (quot (reduce + (map toolkit/elapsed-time samples))
                  (reduce + (map :num-evals samples)))
         ;; _ (println "warmup-result" warmup-result)
-        _ (println "t1" t1 "batch-size" (:eval-count measured-batch))
-        _ (println {:time-budget-ns time-budget-ns
-                    :eval-budget eval-budget})
+        ;; _ (println "t1" t1 "batch-size" (:eval-count measured-batch))
+        ;; _ (println {:time-budget-ns time-budget-ns
+        ;;             :eval-budget eval-budget})
 
         _              (toolkit/force-gc (or max-gc-attempts 3))
 
@@ -236,11 +357,9 @@
         eval-budget (- eval-budget num-evals)
         t2 (quot time-ns num-evals)
         ;; _ (println "warmup-result" warmup-result)
-        _ (println "t2" t2 "batch-size" (:eval-count measured-batch))
-        _ (println {:time-budget-ns time-budget-ns
-                    :eval-budget eval-budget})
-
-
+        ;; _ (println "t2" t2 "batch-size" (:eval-count measured-batch))
+        ;; _ (println {:time-budget-ns time-budget-ns
+        ;;             :eval-budget eval-budget})
 
         ;; ;;; batch size estimate
         ;; estimate       (toolkit/estimate-execution-time
@@ -269,7 +388,11 @@
                            {:time-budget-ns time-budget-ns
                             :eval-budget    eval-budget}))]
 
-    (sample-stats (:eval-count measured-batch) vals options)))
+    (sample-stats
+      (conj use-metrics :time)
+      (:eval-count measured-batch)
+      vals
+      options)))
 
 (defn measure-point-value
   "Evaluates measured and return metrics on its evaluation.
@@ -341,10 +464,12 @@
   are :time, :garbage-collector, :finalization, :memory, :runtime-memory,
   :compilation, and :class-loader."
   [measured options]
-  (let [deltas (measure* measured options)]
-    (vreset! last-time* deltas)
-    (print-metrics deltas)
-    (:expr-value deltas)))
+  (let [result (measure* measured (assoc options :return-samples true))]
+    (vreset! last-time* result)
+    (if (:num-samples result)
+      (print-stats result options)
+      (print-metrics result))
+    (:expr-value result)))
 
 (defmacro time
   "Evaluates expr and prints the time it took.
@@ -446,3 +571,31 @@
 ;; (dissoc (measure (Thread/sleep 1000) :stats true) :samples)
 ;; Execution error (ArithmeticException) at criterium.stats/mean (stats.clj:37).
 ;; Divide by zero
+
+(comment
+
+  (time 1)
+
+  (time (Thread/sleep 10))
+
+  (time 1 :limit-time 1)
+
+
+  (time (do
+          (range 100000)
+          (range 10))
+        :metrics
+        [:memory
+         :runtime-memory
+         :finalization-count])
+
+  (time (repeatedly 100 #(Object.))
+        :metrics
+        [:memory
+         :class-loader
+         :compilation-time
+         :runtime-memory
+         :finalization-count
+         :garbage-collector])
+
+  )
