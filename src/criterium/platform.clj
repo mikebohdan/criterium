@@ -26,10 +26,12 @@
     n))
 
 
-(defn nanotime-latency [^long n]
+(defn nanotime-latency [n & [options]]
   (time/measure*
-    (nanotime-latency-measured n)
-    {:limit-time 1}))
+    (nanotime-latency-measured (long n))
+    (merge
+      {:limit-time 1}
+      options)))
 
 
 ;;; nanoTime granularity
@@ -55,10 +57,12 @@
       eval-count)))
 
 
-(defn nanotime-granularity [^long n]
+(defn nanotime-granularity [n & [options]]
   (time/measure*
-    (nanotime-granularity-measured n)
-    {:limit-time 1}))
+    (nanotime-granularity-measured (long n))
+    (merge
+      {:limit-time 1}
+      options)))
 
 
 ;; Minimum measured time
@@ -66,18 +70,28 @@
   (time/measure*
     (toolkit/measured
       (fn ^long [] 1)
-      (fn [^long x] x)
+      (fn ^long [^long x] x)
       1)
     {:limit-time 1}))
 
+(defn empty-bench []
+  (time/measure*
+    (toolkit/measured
+      (fn ^long [] 0)
+      (fn [^long x])
+      1)
+    {:limit-time 1}))
 
 (defn platform-stats
+  "Return mean estimates for times that describe the accuracy of timing."
   []
   (let [latency (nanotime-latency 1000)
         granularity (nanotime-granularity 100)
-        constant (constant-bench)]
+        constant (constant-bench)
+        empty (empty-bench)]
     {:latency (-> latency :stats :mean first)
      :granularity (-> granularity :stats :mean first)
-     :constant (-> constant :stats :mean first)}))
+     :constant (-> constant :stats :mean first)
+     :empty (-> empty :stats :mean first)}))
 
 ;; (platform-stats)

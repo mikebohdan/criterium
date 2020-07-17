@@ -4,6 +4,7 @@
   (require '[criterium
              [chart :as chart]
              [jvm :as jvm]
+             [platform :as platform]
              [time :as time]
              [toolkit :as toolkit]])
 #+end_src
@@ -18,20 +19,12 @@ See https://shipilev.net/blog/2014/nanotrusting-nanotime/
 Test nanotime latency
 
 #+begin_src clojure :results pp
-  (defn nano-time-latency
-    ^long [x]
-    (jvm/timestamp))
-
-  (defn state-fn [] (rand))
-  (def measured (toolkit/measured state-fn nano-time-latency 1))
-  (def bmeasured (toolkit/measured-batch measured 10000))
-  (toolkit/invoke-measured bmeasured)
-
-  (dissoc (time/measure*
-            bmeasured
-            {:limit-evals 50000000
-             :limit-time 3}
-            ) :samples)
+  (chart/view
+    (chart/time-histogram
+      (platform/nanotime-latency
+        10000
+        {:return-samples true})
+      {:title "nanoTime Latency"}))
 #+end_src
 
 We see that this reports around 48ns.
@@ -41,52 +34,12 @@ We see that this reports around 48ns.
 Test nanotime granularity
 
 #+begin_src clojure :results pp
-  (defn nano-time-granularity
-    ^long [x]
-    (let [t (jvm/timestamp)]
-      (loop []
-        (if (= t (jvm/timestamp))
-          (recur)
-          t))))
-
-  (defn state-fn [] (rand))
-  (def measured (toolkit/measured state-fn nano-time-granularity 1))
-  (def bmeasured (toolkit/measured-batch measured 100000))
-  (toolkit/invoke-measured bmeasured)
-
-  (dissoc
-    (time/measure*
-      bmeasured
-      {:limit-evals 60000000 :limit-time 4})
-    :samples)
-  (dissoc (time/measure* measured {:limit-evals 10000000 :limit-time 1}) :samples)
-  (toolkit/divide (time/measure* bmeasured {:limit-evals 1000}) 100000)
-#+end_src
-
-#+begin_src clojure :results pp
-  (defn nano-time-granularity
-    ^long [batch-size]
-    (loop [t (jvm/timestamp)
-           n batch-size]
-      (let [t1 (jvm/timestamp)]
-        (if (= t t1)
-          (recur n t1)
-          (if (pos? n)
-            (recur (unchecked-dec n) t1)
-            t)))))
-
-  (def batch-size 1000)
-  (defn state-fn [] batch-size)
-  (def measured (toolkit/measured state-fn nano-time-granularity batch-size))
-  (toolkit/invoke-measured measured)
-
-  (dissoc
-    (time/measure*
-      measured
-      {:limit-evals 60000000 :limit-time 4})
-    :samples)
-  (dissoc (time/measure* measured {:limit-evals 10000000 :limit-time 1}) :samples)
-  (toolkit/divide (time/measure* bmeasured {:limit-evals 1000}) 100000)
+(chart/view
+  (chart/time-histogram
+    (platform/nanotime-granularity
+        100000
+        {:return-samples true})
+    {:title "nanoTime Granularity"}))
 #+end_src
 
 We see that this reports around 92.0ms, or twice the latency (since it
@@ -108,16 +61,19 @@ Lets look at a histogram of the distribution
 
 #+begin_src clojure :results file graphics :dir "data/images" :file "hist.png" :var dirn=(concat (file-name-directory (buffer-file-name)) "data/images/")
   (let [measured (toolkit/measured-expr 1)
-        batch-size 1000
-        batch-measured (toolkit/measured-batch measured batch-size)
+        eval-count 1000
+        batch-measured (toolkit/measured-batch measured eval-count)
         _ (toolkit/invoke-measured batch-measured)
-        {:keys [samples stats] :as res} (time/measure*
-                                          batch-measured {:limit-evals 10000000})
+        {:keys [samples stats batch-size] :as res}
+        (time/measure*
+          batch-measured {:limit-time 1
+                          :return-samples true})
         {[mean] :mean [variance] :variance} stats
         _ (clojure.pprint/pprint stats)
         upper-limit (+ mean (* 3 (Math/sqrt variance)))
         scaled-upper-limit (* upper-limit batch-size)
         _ (println "upper-limit" upper-limit scaled-upper-limit)
+        _ (clojure.pprint/pprint samples)
         vs (->>
              samples
              (mapv toolkit/elapsed-time)

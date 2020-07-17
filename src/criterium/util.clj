@@ -28,3 +28,19 @@
 (defn divide-by
   [divisor]
   (fn [x] (/ x divisor)))
+
+(defn sig-figs
+  "Round a double to the given precision (number of significant digits)"
+  [d precision]
+  (let [factor (Math/pow 10 precision)]
+    (/ (Math/round (* d factor)) factor)))
+
+(defn round-up-to
+  "Round v up to nearest multiple of f"
+  [v f]
+  (* f (Math/ceil (/ v f))))
+
+(defn round-down-to
+  "Round v down to nearest multiple of f"
+  [v f]
+  (* f (Math/floor (/ v f))))

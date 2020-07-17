@@ -48,18 +48,20 @@
   (let [size 100
         seed nil
         state-fn-state (state-fn-state size seed)
-        gen (apply gen/tuple args)]
+        gen args ;; (apply gen/tuple args)
+        ]
     (toolkit/measured
       (state-fn gen state-fn-state)
-      f)))
+      f
+      1)))
 
-(defn- binding-vars
-  [bindings]
-  (mapv first (partition 2 bindings)))
+;; (defn- binding-vars
+;;   [bindings]
+;;   (mapv first (partition 2 bindings)))
 
-(defn- binding-gens
-  [bindings]
-  (mapv second (partition 2 bindings)))
+;; (defn- binding-gens
+;;   [bindings]
+;;   (mapv second (partition 2 bindings)))
 
 (defmacro for-all
   "Returns a measured, which is the combination of some generators and an expression
@@ -68,14 +70,13 @@
   `for-all` takes a `let`-style bindings vector, where the right-hand side of each
   binding is a generator.
 
-  The body should be an expression of the generated values that will
-  be measured.
+  The body should be an expression of the generated values that will be measured.
 
-  When there are multiple binding pairs, the earlier pairs are not
-  visible to the later pairs.
+  When there are multiple binding pairs, the earlier pairs are visible to the later
+  pairs.
 
-  If there are multiple body expressions, all but the last one are
-  executed for side effects, as with `do`.
+  If there are multiple body expressions, all but the last one are executed for side
+  effects, as with `do`.
 
   Example:
 
@@ -85,18 +86,50 @@
        (+ a b))
     {})"
   [bindings & body]
-  `(for-all* ~(vec (binding-gens bindings))
-             (fn ~(gensym "for-all-body") [~(binding-vars bindings)]
-               ~@body)))
+  (let [pairs (partition 2 bindings)
+        binding-vars (mapv first pairs)
+        binding-gens (reduce
+                        (fn [curr [sym code]]
+                          `(gen/bind ~code (fn [~sym] ~curr)))
+                        `(gen/return ~binding-vars)
+                        (reverse pairs))]
+    `(for-all*
+       ~binding-gens
+       (fn ~(gensym "for-all-body") [~binding-vars]
+         ~@body))))
 
 (comment
   (def m (for-all [i (gen/choose 0 1000000000000000000)]
            (inc i)))
 
-  (def m (for-all [i (gen/choose 0 1000000000000000000)] i))
+  (def m (for-all [i (gen/choose 0 1000000000000000000)]
+           i))
+
+  (def nth-bench
+    (for-all [v (gen/vector gen/int 1 100000)
+              i (gen/choose 0 (dec (count v)))]
+      (nth v i)))
+
+  (def vec-nth-bench
+    (for-all [v (gen/vector gen/int 1 100000)
+              i (gen/choose 0 (dec (count v)))]
+      (.nth ^clojure.lang.APersistentVector v ^int i)))
 
   ((:state-fn m))
 
-  (criterium.time/measure* m {:limit-evals 10000})
+  (criterium.time/measure* m {:limit-time 1})
+  (dissoc (criterium.time/measure* m {:limit-evals 100}) :samples)
+  (dissoc (criterium.time/measure* nth-bench {:limit-time 1}) :samples)
+  (dissoc (criterium.time/measure* vec-nth-bench {:limit-time 1}) :samples)
   (criterium.time/measure* m {})
   )
+
+(def g (gen/bind
+    (gen/vector gen/int 1 100000)
+    (fn [v]
+      (gen/bind
+        (gen/choose 0 (dec (count v)))
+        (fn [i] (gen/return [v i])))))
+  )
+
+;; (gen/generate g)

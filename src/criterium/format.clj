@@ -21,6 +21,15 @@
     (< value 1)    [1e3 "ms"]
     :else          [1 "s"]))
 
+(defmethod scale :ns
+  [_ value]
+  (cond
+    (< value 1000) [1 "ns"]
+    (< value 1e6)  [1e-3 "µs"]
+    (< value 1e9)  [1e-6 "ms"]
+    (< value 60e9) [1e-9 "s"]
+    :else          [60e-9 "min"]))
+
 
 (def ONE-KB 1024)
 (def ONE-MB (* 1024 1024))

@@ -473,7 +473,7 @@
             cl-counts (-> v :class-loader :loaded-count)
             comp-time (-> v :compilation :compilation-time)
             ]
-        (println "num-evals" (:num-evals v) "t" t)
+        ;;(println "num-evals" (:num-evals v) "t" t)
         ;; (if (pos? cl-counts)
         ;;   (debug "  classes loaded before" count "iterations"))
         ;; (if (pos? comp-time)

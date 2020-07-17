@@ -100,7 +100,7 @@
 ;;   (f (state-fn)))
 
 
-(defn sample-stats [batch-size samples opts]
+(defn sample-stats [batch-size samples {:keys [return-samples] :as opts}]
   ;; (clojure.pprint/pprint samples)
   (let [sum           (toolkit/total samples)
         num-evals     (:num-evals sum)
@@ -133,16 +133,17 @@
                    :0.025 scale-1
                    :0.975 scale-1}]
 
-    {:num-evals   num-evals
-     :avg         avg
-     :stats       (zipmap ks
-                          (mapv
-                            (fn [k]
-                              ((scale-fns k) (k stats)))
-                            ks))
-     :samples     samples
-     :num-samples (count samples)
-     :batch-size batch-size}))
+    (cond->
+        {:num-evals   num-evals
+         :avg         avg
+         :stats       (zipmap ks
+                              (mapv
+                                (fn [k]
+                                  ((scale-fns k) (k stats)))
+                                ks))
+         :num-samples (count samples)
+         :batch-size batch-size}
+      return-samples (assoc :samples samples))))
 
 (def DEFAULT-TIME-BUDGET-NS
   "Default time budget when no limit specified.
@@ -268,7 +269,7 @@
                            {:time-budget-ns time-budget-ns
                             :eval-budget    eval-budget}))]
 
-    (sample-stats (:eval-count measured-batch) vals {})))
+    (sample-stats (:eval-count measured-batch) vals options)))
 
 (defn measure-point-value
   "Evaluates measured and return metrics on its evaluation.

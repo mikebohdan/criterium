@@ -37,7 +37,7 @@
     [^{:volatile-mutable true :tag 'long} v]
   SinkPrimitiveLong
   (^void sinkPrimitiveLong [_ ^long sv]
-   (when (identical? v sv)
+   (when (= v sv)
      (set! v sv))))
 
 (def ^PrimitiveLongSink primitive-log-sink
