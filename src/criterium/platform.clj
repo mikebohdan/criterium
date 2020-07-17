@@ -69,22 +69,45 @@
 (defn constant-bench [& [options]]
   (time/measure*
     (toolkit/measured
-      (fn ^long [] 1)
-      (fn ^long [^long x] x)
+      (fn [] 1)
+      (fn [x] x)
       1)
     (merge
-      {:limit-time 1}
+      {:limit-time 10
+       ;; :sink-fn criterium.eval/sink-primitive-long
+       }
       options)))
+;; (constant-bench)
+
+(def m (toolkit/measured
+      (fn ^long [] 1)
+      (fn ^long [^long x] x)
+      1))
+
+(def mb (toolkit/measured-batch
+          m
+          100))
+
+(require 'no.disassemble)
+(comment
+  (clojure.pprint/pprint
+    ;; (no.disassemble/disassemble-data (:f m))
+    (no.disassemble/disassemble-str (.f mb))
+    (no.disassemble/disassemble-str nanotime-latency-fn)
+    (no.disassemble/disassemble-str (criterium.eval.ObjectSink. 1 1 nil))
+    (no.disassemble/disassemble-str (toolkit/with-time))))
 
 (defn empty-bench [& [options]]
   (time/measure*
     (toolkit/measured
-      (fn ^long [] 0)
-      (fn [^long x])
+      (fn [] 0)
+      (fn [x])
       1)
     (merge
-      {:limit-time 1}
+      {:limit-time 10}
       options)))
+
+;; (empty-bench)
 
 (defn platform-stats
   "Return mean estimates for times that describe the accuracy of timing."
@@ -93,9 +116,9 @@
         granularity (nanotime-granularity 100)
         constant (constant-bench)
         empty (empty-bench)]
-    {:latency (-> latency :stats :mean first)
-     :granularity (-> granularity :stats :mean first)
-     :constant (-> constant :stats :mean first)
-     :empty (-> empty :stats :mean first)}))
+    {:latency (-> latency :stats :time :mean first)
+     :granularity (-> granularity :stats :time :mean first)
+     :constant (-> constant :stats :time :mean first)
+     :empty (-> empty :stats :time :mean first)}))
 
 ;; (platform-stats)

@@ -1,4 +1,5 @@
 #+STARTUP: inlineimages header
+#+PROPERTY: header-args :cache yes :exports both
 
 #+begin_src clojure :results value silent
   (require '[criterium
@@ -23,7 +24,8 @@ Test nanotime latency
     (chart/time-histogram
       (platform/nanotime-latency
         10000
-        {:return-samples true})
+        {:return-samples true
+         :limit-time 10})
       {:title "nanoTime Latency"})
     "validation/data/images/nanotime-latency.png")
 #+end_src
@@ -42,7 +44,8 @@ Test nanotime granularity
   (chart/time-histogram
     (platform/nanotime-granularity
         100000
-        {:return-samples true})
+        {:return-samples true
+         :limit-time 10})
     {:title "nanoTime Granularity"})
   "validation/data/images/nanotime-granularity.png")
 #+end_src
@@ -53,7 +56,6 @@ Test nanotime granularity
 We see that this reports around 31.0ms, or about the same as latency.
 Interestingly there seems to be a hard limit to the lower bound, which
 is not seen in the latency.
-
 
 * Time
 ** Zero accuracy

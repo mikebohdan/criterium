@@ -21,8 +21,15 @@
 (def MILLISEC-NS 1000000)
 (def SEC-NS 1000000000)
 
-(defrecord Measured
-    [state-fn f eval-count])
+;; (defrecord Measured
+;;     [^clojure.lang.IFn state-fn
+;;      ^clojure.lang.IFn f
+;;      ^long eval-count])
+
+(deftype Measured
+    [^clojure.lang.IFn state-fn
+     ^clojure.lang.IFn f
+     ^long eval-count])
 
 (defn measured? [x]
   (instance? Measured x))
@@ -38,8 +45,11 @@
   The call of the state function is not measured.
 
   This is used to prevent constant folding for constant inputs."
-  [state-fn f eval-count]
-  (->Measured state-fn f eval-count))
+  ^Measured
+  [^clojure.lang.IFn state-fn
+   ^clojure.lang.IFn f
+   ^long eval-count]
+  (Measured. state-fn f eval-count))
 
 
 (defn- measured-expr*
@@ -70,23 +80,25 @@
 
 (defn measured-batch
   "Wrap a measured to run multiple times."
-  [{:keys [state-fn f eval-count] :as _measured}
+  [^Measured m
    batch-size
-   & [{:keys [sink-fn]
+   & [{:keys [^clojure.lang.IFn sink-fn]
        :or {sink-fn eval/sink-object}}]]
   {:pre [(>= batch-size 1)]}
-  (measured
-    state-fn
-    (fn [state]
-      (loop [^int i batch-size]
-        (when (pos? i)
-          (sink-fn (f state))
-          (recur (dec i)))))
-    (* batch-size eval-count)))
+  (let [batch-size (long batch-size)
+        ^clojure.lang.IFn f (.f m)]
+    (measured
+      (.state-fn ^Measured m)
+      (fn [state]
+        (loop [i batch-size]
+          (when (pos? i)
+            (sink-fn (f state)) ;
+            (recur (unchecked-dec i)))))
+      (* batch-size (.eval-count m)))))
 
 
-(defn invoke-measured [{:keys [state-fn f] :as measured}]
-  (f (state-fn)))
+(defn invoke-measured [^Measured measured]
+  ((.f measured) ((.state-fn measured))))
 
 
 ;;; Instrumentation
@@ -107,9 +119,9 @@
      (toolkit/instrumented
        (toolkit/measured-expr some-expr)
        (toolkit/with-time))"
-  [{:keys [state-fn] :as measured} next-fn]
+  [^Measured measured next-fn]
   (assert (measured? measured))
-  (let [state (state-fn)
+  (let [state ((.state-fn measured))
         data {:state state}]
     (next-fn data measured)))
 
@@ -117,9 +129,15 @@
 (defn with-expr-value
   "Execute measured, adding the return value to the data map's :expr-value key."
   []
-  (fn [{:keys [state] :as data} {:keys [eval-count f] :as _measured}]
-    (assoc data :expr-value (f state) :num-evals eval-count)))
+  (fn [{:keys [state] :as data} ^Measured measured]
+    (assoc data
+           :expr-value ((.f measured) state)
+           :num-evals (.eval-count measured))))
 
+
+;; disable locals clearing in the body of the timing
+(alter-var-root #'*compiler-options*
+                assoc :disable-locals-clearing true)
 
 (defn with-time
   "Execute measured, adding timing to the data map.
@@ -127,13 +145,19 @@
   Adds maps to the :time key in data, with the :before, :after, and :delta sub-data.
   Each map contains the :elapsed key with a timestamp in nanoseconds."
   []
-  (fn [{:keys [state] :as data} {:keys [f eval-count] :as _measured}]
-    (let [start      (jvm/timestamp)
-          expr-value (f state)
-          finish     (jvm/timestamp)]
-      (assoc data :time (unchecked-subtract finish start)
+  (fn [{:keys [state] :as data} ^Measured measured]
+    (let [^clojure.lang.IFn f (.f measured)
+          start               (jvm/timestamp)
+          expr-value          (f state)
+          finish              (jvm/timestamp)]
+      (assoc data
+             :time (unchecked-subtract finish start)
              :expr-value expr-value
-             :num-evals  eval-count))))
+             :num-evals  (.eval-count measured)))))
+
+(alter-var-root #'*compiler-options*
+                assoc :disable-locals-clearing false)
+
 
 
 (defn with-class-loader-counts
@@ -273,7 +297,7 @@
 (defn sample
   "Sample by invoking measured using pipeline.
   Collects an instrumentation data map for each invocation."
-  [{:keys [^long eval-count] :as measured}
+  [^Measured measured
    pipeline
    {:keys [time-budget-ns
            eval-budget]
@@ -288,7 +312,7 @@
             t    (long (:time vals))]
         (recur
           (conj result vals)
-          (unchecked-subtract eval-budget eval-count)
+          (unchecked-subtract eval-budget (.eval-count measured))
           (unchecked-subtract time-budget-ns t)))
       result)))
 
@@ -353,12 +377,12 @@
   "Run measured for an initial estimate of the time to execute..
 
   Returns an estimated  execution time."
-  [measured]
+  [^Measured measured]
   (let [pline   (with-time)
         ;; The first evaluation is *always* unrepresentative
         _ignore (instrumented measured pline)
         v0      (instrumented measured pline)]
-    (long (quot (elapsed-time v0) (:eval-count measured)))))
+    (long (quot (elapsed-time v0) (.eval-count measured)))))
 
 (defn estimate-eval-count
   "Estimate batch-size."
@@ -410,7 +434,7 @@
 
 (defn warmup-params
   "Estimate parameters for warmup"
-  [{:keys [eval-count] :as measured}
+  [^Measured measured
    t0
    {:keys [time-budget-ns eval-budget warmup-period-ns warmup-fraction
               target-batch-time-ns]
@@ -435,7 +459,7 @@
         ;;                                     (quot eval-budget warmup-fraction)))
         ]
     (assoc warmup-budget
-           :batch-size (max 1 (quot est-eval-count eval-count)))))
+           :batch-size (max 1 (quot est-eval-count (.eval-count measured))))))
 
 (defn warmup
   "Run measured for the given amount of time to enable JIT compilation.

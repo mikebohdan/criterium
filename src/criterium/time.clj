@@ -2,12 +2,14 @@
   "Provides an augmented time macro for simple timing of expressions"
   (:refer-clojure :exclude [time])
   (:require [criterium
+             [chart :as chart]
              [eval :as eval]
              [format :as format]
              [jvm :as jvm]
              [stats :as stats]
              [toolkit :as toolkit]
-             [well :as well]]))
+             [well :as well]])
+  (:import [criterium.toolkit Measured]))
 
 (def last-time* (volatile! nil))
 
@@ -300,7 +302,7 @@
   keyword selectors. Valid metrics
   are :time, :garbage-collector, :finalization, :memory, :runtime-memory,
   :compilation, and :class-loader."
-  [{:keys [eval-count] :as measured}
+  [^Measured measured
    {:keys [limit-evals limit-time max-gc-attempts warmup-period warmup-fraction]
     :as   options}]
   ;; Start by running GC until it has nothing to do.
@@ -346,7 +348,8 @@
 
         _              (toolkit/force-gc (or max-gc-attempts 3))
 
-        {:keys [num-evals time-ns samples measured-batch] :as warmup-result}
+        {:keys [num-evals time-ns samples ^Measured measured-batch]
+         :as warmup-result}
         (toolkit/warmup
           measured
           t1
@@ -390,7 +393,7 @@
 
     (sample-stats
       (conj use-metrics :time)
-      (:eval-count measured-batch)
+      (.eval-count measured-batch)
       vals
       options)))
 

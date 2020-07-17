@@ -115,17 +115,20 @@
   [{:keys [samples stats batch-size] :as res} & [options]]
   {:pre [samples]}
   (let [{[mean] :mean [variance] :variance} (:time stats)
-        upper-limit (+ mean (* 3 (Math/sqrt variance)))
+        [scale units] (format/scale :ns mean)
+        upper-limit (+ mean (* 2 (Math/sqrt variance)))
         vs (->>
              samples
              (mapv toolkit/elapsed-time)
              (mapv #(/ % (double batch-size)))
-             (filterv #(< % upper-limit)))
+             (filterv #(< % upper-limit))
+             (mapv #(* % scale)))
         num-outliers (- (count samples) (count vs))
-        ;; _ (println {:num-outliers num-outliers
-        ;;             :n            (count vs)})
-        [scale units] (format/scale :ns mean)
-        va (mapv #(* % scale) vs)
+        _ (println {:mean mean
+                    :variance variance
+                    :upper-limit upper-limit
+                    :num-outliers num-outliers
+                    :n            (count vs)})
         chart (histogram
                 vs
                 (merge

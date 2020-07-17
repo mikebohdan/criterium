@@ -1,5 +1,9 @@
 (ns criterium.eval
-  "Expression evaluation")
+  "Expression evaluation"
+  (:require [criterium
+             [jvm :as jvm]])
+  (:import [java.util Random]
+           [java.lang.ref WeakReference]))
 
 
 ;;; Mutable place to avoid JIT removing expr evaluation altogether
@@ -9,25 +13,32 @@
   (^void sinkObject [^Object x]))
 
 (deftype ObjectSink
-    [^{:volatile-mutable true :tag Object} v]
+    [^{:volatile-mutable true :tag long} m
+     ^{:unsynchronized-mutable true :tag long} r
+     ^{:unsynchronized-mutable true} obj]
   SinkObject
   (^void sinkObject [_ ^Object sv]
-   (when (identical? v sv)
-     (set! v sv))))
+   (let [mm m]
+     (set! r (* r 0x19660D 0x3C6EF35F))
+     (when (zero? (bit-and r mm))
+       (set! obj (WeakReference. sv))
+       (set! m (unchecked-inc (bit-shift-left mm 1)))))))
 
-(def ^ObjectSink object-sink
-  "An object which can sink objects.
+(let [^ObjectSink object-sink (ObjectSink.
+                                1
+                                (.nextLong (Random. (jvm/timestamp)))
+                                nil)]
+  ;; An object which can sink objects.
 
-  Used to store the result of each expression, to prevent JIT
-  optimizing away the expression entirely."
-  (ObjectSink. ::unique-val))
+  ;; Used to store the result of each expression, to prevent JIT
+  ;; optimizing away the expression entirely.
 
-(defn sink-object
-  "Sink the value into a mutable place,
+  (defn sink-object
+    "Sink the value into a mutable place,
   Only writes if the it fails an identity check with a volatile read
   of the mutable place, which should never happen."
-  [v]
-  (.sinkObject object-sink v))
+    [v]
+    (.sinkObject object-sink v)))
 
 
 (definterface SinkPrimitiveLong
@@ -40,19 +51,19 @@
    (when (= v sv)
      (set! v sv))))
 
-(def ^PrimitiveLongSink primitive-log-sink
-  "An object which can sink primitive longs.
+(let [^PrimitiveLongSink primitive-log-sink
+      (PrimitiveLongSink. (long Long/MAX_VALUE))]
+  ;; An object which can sink primitive longs.
 
-  Used to store the result of each expression, to prevent JIT
-  optimizing away the expression entirely."
-  (PrimitiveLongSink. (long Long/MAX_VALUE)))
+  ;; Used to store the result of each expression, to prevent JIT
+  ;; optimizing away the expression entirely.
 
-(defn sink-primitive-long
-  "Sink the primitive long value into a mutable place,
+  (defn sink-primitive-long
+    "Sink the primitive long value into a mutable place,
   Only writes if the it fails an identity check with a volatile read
   of the mutable place, which should never happen."
-  [^long v]
-  (.sinkPrimitiveLong primitive-log-sink v))
+    [^long v]
+    (.sinkPrimitiveLong primitive-log-sink v)))
 
 ;;; Execution
 
