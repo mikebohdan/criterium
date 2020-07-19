@@ -46,7 +46,8 @@
       measured (criterium.toolkit/measured state-fn f 1)]
   (criterium.time/measure*
     measured
-    {:limit-time 10}))
+    {:limit-time 10
+     :limit-evals 10000000000}))
 
 (let [^clojure.lang.IPersistentVector v [1 2 3]
       state-fn (fn ^clojure.lang.IPersistentVector [] v)
@@ -55,7 +56,8 @@
       measured (criterium.toolkit/measured state-fn f 1)]
   (criterium.time/measure*
     measured
-    {:limit-time 10}))
+    {:limit-time 10
+     :limit-evals 10000000000}))
 
 (criterium.time/measure*
   (criterium.toolkit/measured-batch

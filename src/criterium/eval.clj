@@ -8,6 +8,9 @@
 
 ;;; Mutable place to avoid JIT removing expr evaluation altogether
 
+(alter-var-root #'*compiler-options*
+                assoc :disable-locals-clearing true)
+
 ;; We use deftype and definterface to minimise runtime costs
 (definterface SinkObject
   (^void sinkObject [^Object x]))
@@ -40,6 +43,8 @@
     [v]
     (.sinkObject object-sink v)))
 
+(alter-var-root #'*compiler-options*
+                assoc :disable-locals-clearing false)
 
 (definterface SinkPrimitiveLong
   (^void sinkPrimitiveLong [^long x]))

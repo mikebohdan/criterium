@@ -12,8 +12,10 @@
   (:require [criterium
              [eval :as eval]
              [jvm :as jvm]
+             [measured :as measured]
              [util :as util]]
-            [clojure.walk :as walk]))
+            [clojure.walk :as walk])
+  (:import [criterium.measured Measured]))
 
 
 (def NANOSEC-NS 1)
@@ -21,84 +23,6 @@
 (def MILLISEC-NS 1000000)
 (def SEC-NS 1000000000)
 
-;; (defrecord Measured
-;;     [^clojure.lang.IFn state-fn
-;;      ^clojure.lang.IFn f
-;;      ^long eval-count])
-
-(deftype Measured
-    [^clojure.lang.IFn state-fn
-     ^clojure.lang.IFn f
-     ^long eval-count])
-
-(defn measured? [x]
-  (instance? Measured x))
-
-
-(defn measured
-  "Return a Measured for the given state function and function to be measured.
-
-  The basic unit of measurement, a Measured consists of a state generation funtion and a
-  function to be measured.  The function to be measured takes the result of calling the
-  state function as an argument, ie. (f (state-fn)).
-
-  The call of the state function is not measured.
-
-  This is used to prevent constant folding for constant inputs."
-  ^Measured
-  [^clojure.lang.IFn state-fn
-   ^clojure.lang.IFn f
-   ^long eval-count]
-  (Measured. state-fn f eval-count))
-
-
-(defn- measured-expr*
-  "Return a measured function for the given expression.
-  The arguments are converted into a vector, which is used as an argument to the a
-  function that wraps the expression.
-  Any expr that is not a List is treated as a constant.  This is mainly for
-  internal benchmarking."
-  [expr]
-  (if (list? expr)
-    (let [args     (vec (drop 1 expr))
-          arg-syms (vec (repeatedly (count args) (fn [] (gensym "arg"))))]
-      `(measured
-         (fn [] ~args)
-         (fn [~arg-syms] (~(first expr) ~@arg-syms))
-         1))
-    `(measured
-       (fn [] ~expr)
-       identity
-       1)))
-
-
-(defmacro measured-expr
-  "Return a Measured for the given expression."
-  [expr]
-  (measured-expr* expr))
-
-
-(defn measured-batch
-  "Wrap a measured to run multiple times."
-  [^Measured m
-   batch-size
-   & [{:keys [^clojure.lang.IFn sink-fn]
-       :or {sink-fn eval/sink-object}}]]
-  {:pre [(>= batch-size 1)]}
-  (let [batch-size (long batch-size)
-        ^clojure.lang.IFn f (.f m)]
-    (measured
-      (.state-fn ^Measured m)
-      (fn [state]
-        (loop [i batch-size]
-          (when (pos? i)
-            (sink-fn (f state)) ;
-            (recur (unchecked-dec i)))))
-      (* batch-size (.eval-count m)))))
-
-
-(defn invoke-measured [^Measured measured]
-  ((.f measured) ((.state-fn measured))))
 
 
 ;;; Instrumentation
@@ -120,7 +44,7 @@
        (toolkit/measured-expr some-expr)
        (toolkit/with-time))"
   [^Measured measured next-fn]
-  (assert (measured? measured))
+  (assert (measured/measured? measured))
   (let [state ((.state-fn measured))
         data {:state state}]
     (next-fn data measured)))
@@ -169,7 +93,7 @@
   Uses the ClassLoadingMXBean."
   [next-fn]
   (fn [data measured]
-    (assert (measured? measured))
+    (assert (measured/measured? measured))
     (let [start (jvm/class-loader-counts)]
       (-> data
          (next-fn measured)
@@ -185,7 +109,7 @@
   Uses the CompilationMXBean."
   [next-fn]
   (fn [data measured]
-    (assert (measured? measured))
+    (assert (measured/measured? measured))
     (let [start (jvm/compilation-time)]
       (-> data
          (next-fn measured)
@@ -202,7 +126,7 @@
   Uses the MemoryMXBean."
   [next-fn]
   (fn memory [data measured]
-    (assert (measured? measured))
+    (assert (measured/measured? measured))
     (let [start (jvm/memory)]
       (-> data
          (next-fn measured)
@@ -218,7 +142,7 @@
   Uses the java Runtime class."
   [next-fn]
   (fn [data measured]
-    (assert (measured? measured))
+    (assert (measured/measured? measured))
     (let [start (jvm/runtime-memory)]
       (-> data
          (next-fn measured)
@@ -234,7 +158,7 @@
   Uses the MemoryMXBean."
   [next-fn]
   (fn finalization-count [data measured]
-    (assert (measured? measured))
+    (assert (measured/measured? measured))
     (let [start (jvm/finalization-count)]
       (-> data
          (next-fn measured)
@@ -247,7 +171,7 @@
   Uses the GarbageCollectorMXBean beans."
   [next-fn]
   (fn [data measured]
-    (assert (measured? measured))
+    (assert (measured/measured? measured))
     (let [start (jvm/garbage-collector-stats)]
       (-> data
          (next-fn measured)
@@ -344,7 +268,7 @@
   Returns the GC execution time,  total changes in memory, and in
   object finalizers pending."
   [max-attempts]
-  (let [measured (measured-expr (jvm/run-finalization-and-force-gc))
+  (let [measured (measured/expr (jvm/run-finalization-and-force-gc))
         pipeline (with-memory
                    (with-finalization-count
                      (with-time)))]
@@ -362,7 +286,7 @@
 (defn with-force-gc
   "Force garbage collection up to max-attempt times before execution."
   [max-attempts next-fn]
-  (fn [data expr]
+  (fn [data measured]
     (-> data
        (force-gc max-attempts)
        (next-fn data measured))))
@@ -481,7 +405,7 @@
 
         measured-batch (if (= 1 batch-size)
                          measured  ; re-use measured if possible to keep jit
-                         (measured-batch
+                         (measured/batch
                            measured
                            batch-size
                            (select-keys options [:sink-fn])))]

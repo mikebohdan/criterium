@@ -102,7 +102,8 @@
    :garbage-collector [[:garbage-collector :total :time]
                        [:garbage-collector :total :count]]})
 
-(defn path-accessor [path]
+(defn path-accessor
+  [path]
   (reduce comp (reverse path)))
 
 (def metric-format
@@ -178,7 +179,7 @@
 (defn stats-for [path batch-size samples opts]
   (let [vs            (mapv (path-accessor path) samples)
         tail-quantile (:tail-quantile opts 0.025)
-        ;; _ (println "path" path "vs" vs)
+         ;; _ (println "path" path "vs" vs)
         stats         (stats/bootstrap-bca
                         (mapv double vs)
                         (juxt
@@ -339,8 +340,8 @@
              :warmup-period-ns warmup-period-ns}))
         time-budget-ns (- time-budget-ns time-ns)
         eval-budget (- eval-budget num-evals)
-        t1 (quot (reduce + (map toolkit/elapsed-time samples))
-                 (reduce + (map :num-evals samples)))
+        t1 (/ (reduce + (map toolkit/elapsed-time samples))
+              (reduce + (map :num-evals samples)))
         ;; _ (println "warmup-result" warmup-result)
         ;; _ (println "t1" t1 "batch-size" (:eval-count measured-batch))
         ;; _ (println {:time-budget-ns time-budget-ns
@@ -358,7 +359,7 @@
            :warmup-period-ns warmup-period-ns})
         time-budget-ns (- time-budget-ns time-ns)
         eval-budget (- eval-budget num-evals)
-        t2 (quot time-ns num-evals)
+        t2 (/ time-ns num-evals)
         ;; _ (println "warmup-result" warmup-result)
         ;; _ (println "t2" t2 "batch-size" (:eval-count measured-batch))
         ;; _ (println {:time-budget-ns time-budget-ns
