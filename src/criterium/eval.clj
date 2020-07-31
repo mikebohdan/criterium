@@ -3,72 +3,128 @@
   (:require [criterium
              [jvm :as jvm]])
   (:import [java.util Random]
-           [java.lang.ref WeakReference]))
+           [java.lang.ref WeakReference]
+           [org.openjdk.jmh.infra Blackhole]))
 
+
+
+(def ^Blackhole blackhole
+  (Blackhole.
+    "Today's password is swordfish. I understand instantiating Blackholes directly is dangerous."))
+
+(defn evaporate []
+  (.evaporate
+    blackhole
+    "Yes, I am Stephen Hawking, and know a thing or two about black holes.")
 
 ;;; Mutable place to avoid JIT removing expr evaluation altogether
 
-(alter-var-root #'*compiler-options*
-                assoc :disable-locals-clearing true)
+  (alter-var-root #'*compiler-options*
+                  assoc :disable-locals-clearing true))
 
 ;; We use deftype and definterface to minimise runtime costs
-(definterface SinkObject
-  (^void sinkObject [^Object x]))
+(definterface SinkOps
+  (^void sink [^Object x])
+  (^void sink [^long x]))
 
-(deftype ObjectSink
+(deftype Sink
     [^{:volatile-mutable true :tag long} m
      ^{:unsynchronized-mutable true :tag long} r
+     ^{:volatile-mutable true :tag long} l1
+     ^{:unsynchronized-mutable true :tag long} l2
      ^{:unsynchronized-mutable true} obj]
-  SinkObject
-  (^void sinkObject [_ ^Object sv]
+  SinkOps
+  (^void sink [_ ^Object sv]
    (let [mm m]
      (set! r (* r 0x19660D 0x3C6EF35F))
      (when (zero? (bit-and r mm))
        (set! obj (WeakReference. sv))
-       (set! m (unchecked-inc (bit-shift-left mm 1)))))))
+       (set! m (unchecked-inc (bit-shift-left mm 1))))))
+  (^void sink [_ ^long sv]
+   (let [ll1 l1
+         ll2 l2]
+     (when (= (bit-xor sv ll1) (bit-xor sv ll2))
+       (inc nil)))))
 
-(let [^ObjectSink object-sink (ObjectSink.
-                                1
-                                (.nextLong (Random. (jvm/timestamp)))
-                                nil)]
-  ;; An object which can sink objects.
+(def ^Sink sink
+  (let [rand (Random. (jvm/timestamp))
+        l1 (.nextLong rand)]
+    (Sink.
+      1
+      (.nextLong rand)
+      l1
+      (inc l1)
+      nil)
+  ;; ;; An object which can sink objects.
 
-  ;; Used to store the result of each expression, to prevent JIT
-  ;; optimizing away the expression entirely.
+  ;; ;; Used to store the result of each expression, to prevent JIT
+  ;; ;; optimizing away the expression entirely.
 
-  (defn sink-object
-    "Sink the value into a mutable place,
-  Only writes if the it fails an identity check with a volatile read
-  of the mutable place, which should never happen."
-    [v]
-    (.sinkObject object-sink v)))
+  ;; (defn sink
+  ;;   "Sink the value into a mutable place,
+  ;; Only writes if the it fails an identity check with a volatile read
+  ;; of the mutable place, which should never happen."
+  ;;   ([v]
+  ;;    (.sink the-sink v)))
+  ))
+
+;; (let [rand (Random. (jvm/timestamp))
+;;       l1 (.nextLong rand)
+;;       ^Sink the-sink (Sink.
+;;                        1
+;;                        (.nextLong rand)
+;;                        l1
+;;                        (inc l1)
+;;                        nil)]
+
+;;   ;; An object which can sink objects.
+
+;;   ;; Used to store the result of each expression, to prevent JIT
+;;   ;; optimizing away the expression entirely.
+
+;;   (defn sink
+;;     "Sink the value into a mutable place,
+;;   Only writes if the it fails an identity check with a volatile read
+;;   of the mutable place, which should never happen."
+;;     ([v]
+;;      (.sink the-sink v))))
 
 (alter-var-root #'*compiler-options*
                 assoc :disable-locals-clearing false)
 
-(definterface SinkPrimitiveLong
-  (^void sinkPrimitiveLong [^long x]))
+;; (definterface SinkPrimitiveLong
+;;   )
 
-(deftype PrimitiveLongSink
-    [^{:volatile-mutable true :tag 'long} v]
-  SinkPrimitiveLong
-  (^void sinkPrimitiveLong [_ ^long sv]
-   (when (= v sv)
-     (set! v sv))))
+;; (deftype PrimitiveLongSink
+;;     [^{:volatile-mutable true :tag 'long} l1
+;;      ^{:unsynchronized-mutable true :tag 'long} l2]
+;;   SinkPrimitiveLong
+;;   ;; (^void sinkPrimitiveLong [_ ^long sv]
+;;   ;;  (when (= v sv)
+;;   ;;    (set! v sv)))
+;;   (^void sinkPrimitiveLong [_ ^long sv]
+;;    (let [^long ll1 l1
+;;          ^long ll2 l2]
+;;      (when (= (bit-xor sv ll1) (bit-xor sv ll2))
+;;        (inc nil))))) ; will throw
 
-(let [^PrimitiveLongSink primitive-log-sink
-      (PrimitiveLongSink. (long Long/MAX_VALUE))]
-  ;; An object which can sink primitive longs.
+;; (let [rand (.nextLong (Random. (jvm/timestamp)))
+;;       ^PrimitiveLongSink primitive-log-sink
 
-  ;; Used to store the result of each expression, to prevent JIT
-  ;; optimizing away the expression entirely.
+;;       (PrimitiveLongSink. rand (inc rand))]
 
-  (defn sink-primitive-long
-    "Sink the primitive long value into a mutable place,
-  Only writes if the it fails an identity check with a volatile read
-  of the mutable place, which should never happen."
-    [^long v]
-    (.sinkPrimitiveLong primitive-log-sink v)))
+;;   (def pls primitive-log-sink)
+;;   ;; An object which can sink primitive longs.
+
+;;   ;; Used to store the result of each expression, to prevent JIT
+;;   ;; optimizing away the expression entirely.
+
+;;   (defn sink-primitive-long
+;;     "Sink the primitive long value into a mutable place,
+;;   Only writes if the it fails an identity check with a volatile read
+;;   of the mutable place, which should never happen."
+;;     [^long v]
+;;     (.sinkPrimitiveLong primitive-log-sink v)))
 
 ;;; Execution
 

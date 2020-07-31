@@ -385,3 +385,22 @@ descending order (so the last element of coefficients is the constant term)."
   "Kernel density estimator for x, given n samples X, weights K and width h."
   [h K n X x]
   (/ (reduce #(+ %1 (K (/ (- x %2) h))) 0 X) (* n h)))
+
+
+(defn linear-regression [xs ys]
+  (let [n (count xs)
+        mx (/ (reduce + xs) n)
+        my (/ (reduce + ys) n)
+        nmxmy (* n mx my)
+        nmxmx (* n mx mx)
+        s1 (- (reduce + (map (fn [x y] (* x y)) xs ys)) nmxmy)
+        s2 (- (reduce + (map (fn [x] (* x x)) xs)) nmxmx)
+        a1 (/ s1 s2)
+        a0 (- my (* a1 mx))]
+    [a0 a1]))
+
+;; (= (linear-regression (range 10) (range 10)) [0 1])
+;; (= (linear-regression (range 10) (range 1 11)) [1 1])
+
+;; (let [[a0 a1] (linear-regression (range 10) (range 1 11))]
+;;   (+ a0 (* a1 10)))

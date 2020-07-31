@@ -14,9 +14,9 @@
     {"Expected rate" [xs ys]
      }
     {:x-axis {:title "Number of evals"
-              :logarithmic? true}
+              :logarithmic? false}
      :y-axis {:title "Elapsed"
-              :logarithmic? true}}))
+              :logarithmic? false}}))
 
 (defn bin-definition [mn mx n {:keys [delta num-bins]}]
   (cond

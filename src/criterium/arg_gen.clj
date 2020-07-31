@@ -6,6 +6,7 @@
              [rose-tree :as rose]]
             [criterium
              [jvm :as jvm]
+             [measured :as measured]
              [toolkit :as toolkit]]))
 
 
@@ -50,7 +51,7 @@
         state-fn-state (state-fn-state size seed)
         gen args ;; (apply gen/tuple args)
         ]
-    (toolkit/measured
+    (measured/measured
       (state-fn gen state-fn-state)
       f
       1)))
@@ -95,8 +96,13 @@
                         (reverse pairs))]
     `(for-all*
        ~binding-gens
-       (fn ~(gensym "for-all-body") [~binding-vars]
-         ~@body))))
+       ;; ~(list 'quote `(do ~@body))
+       ~(measured/measured-expr-fn
+          binding-vars
+          `(do ~@body))
+       ;; (fn ~(gensym "for-all-body") [~binding-vars]
+       ;;   ~@body)
+       )))
 
 (comment
   (def m (for-all [i (gen/choose 0 1000000000000000000)]

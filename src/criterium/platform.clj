@@ -3,75 +3,83 @@
   (:require [criterium
              [eval :as eval]
              [jvm :as jvm]
+             [measured :as measured]
              [time :as time]
              [toolkit :as toolkit]]))
 
 
 ;;; nanoTime latency
 
-(defn nanotime-latency-fn
-  ^long [^long x]
-  (loop [i (dec x)]
-    (jvm/timestamp)
-    (when (pos? i)
-      (recur (unchecked-dec i))))
-  (jvm/timestamp))
+;; (defn nanotime-latency-fn
+;;   ^long [^long x]
+;;   (loop [i (dec x)]
+;;     (jvm/timestamp)
+;;     (when (pos? i)
+;;       (recur (unchecked-dec i))))
+;;   (jvm/timestamp))
 
 
-(defn nanotime-latency-measured
-  [^long n]
-  (toolkit/measured
-    (fn ^long [] n)
-    nanotime-latency-fn
-    n))
+;; (defn nanotime-latency-measured
+;;   [^long n]
+;;   (measured/measured
+;;     (fn ^long [] n)
+;;     nanotime-latency-fn
+;;     n))
 
 
-(defn nanotime-latency [n & [options]]
+(defn nanotime-latency [& [options]]
   (time/measure*
-    (nanotime-latency-measured (long n))
+    ;;(nanotime-latency-measured (long n))
+    (measured/expr (jvm/timestamp))
     (merge
-      {:limit-time 1}
+      {:limit-time 10}
       options)))
 
+;; (nanotime-latency)
 
 ;;; nanoTime granularity
 
 (defn- nanotime-granularity-fn
-  ^long [^long eval-count]
-  (loop [n eval-count
-         t (jvm/timestamp)]
-    (let [t1 (jvm/timestamp)]
-      (if (= t t1)
-        (recur n t1)
-        (if (pos? n)
-          (recur (unchecked-dec n) t1)
-          t1)))))
+  [_ ^long eval-count]
+  (let [start (jvm/timestamp)]
+    (loop [n eval-count
+           t (jvm/timestamp)]
+      (let [t1 (jvm/timestamp)]
+        (if (= t t1)
+          (recur n t1)
+          (if (pos? n)
+            (recur (unchecked-dec n) t1)
+            t1))))
+    (let [finish (jvm/timestamp)]
+      [(unchecked-subtract finish start) nil])))
 
 
 (defn nanotime-granularity-measured
-  [eval-count]
-  (let [state-fn (fn granularity-state-fn [] eval-count)]
-    (toolkit/measured
+  []
+  (let [state-fn (fn granularity-state-fn [] nil)]
+    (measured/measured
       state-fn
       nanotime-granularity-fn
-      eval-count)))
+      1)))
 
 
-(defn nanotime-granularity [n & [options]]
+(defn nanotime-granularity [& [options]]
   (time/measure*
-    (nanotime-granularity-measured (long n))
+    (nanotime-granularity-measured)
     (merge
-      {:limit-time 1}
+      {:limit-time 10}
       options)))
+;; (nanotime-granularity)
 
 
 ;; Minimum measured time
 (defn constant-bench [& [options]]
   (time/measure*
-    (toolkit/measured
-      (fn [] 1)
-      (fn [x] x)
-      1)
+    (measured/expr 1)
+    ;; (measured/measured
+    ;;   (fn [] 1)
+    ;;   (fn [x] x)
+    ;;   1)
     (merge
       {:limit-time 10
        ;; :sink-fn criterium.eval/sink-primitive-long
@@ -79,30 +87,34 @@
       options)))
 ;; (constant-bench)
 
-(def m (toolkit/measured
+(def m (measured/measured
          (fn [] 1)
          (fn [x] x)
       1))
 
-(def mb (toolkit/measured-batch
+(def m (measured/expr 1))
+
+(def mb (measured/batch
           m
           100))
 
 (require 'no.disassemble)
 (comment
   (clojure.pprint/pprint
-    ;; (no.disassemble/disassemble-data (:f m))
-    (println (no.disassemble/disassemble-str (.f mb)))
+    (println (no.disassemble/disassemble-str (:f m)))
+    (println (no.disassemble/disassemble-str (:f mb)))
     (println (no.disassemble/disassemble-str nanotime-latency-fn))
     (println (no.disassemble/disassemble-str (criterium.eval.ObjectSink. 1 1 nil)))
-    (println (no.disassemble/disassemble-str (toolkit/with-time)))))
+    (println (no.disassemble/disassemble-str (toolkit/with-time)))
+    ))
 
 (defn empty-bench [& [options]]
   (time/measure*
-    (toolkit/measured
-      (fn [] 0)
-      (fn [x])
-      1)
+    (measured/expr nil)
+    ;; (measured/measured
+    ;;   (fn [] 0)
+    ;;   (fn [x])
+    ;;   1)
     (merge
       {:limit-time 10}
       options)))
@@ -112,8 +124,8 @@
 (defn platform-stats
   "Return mean estimates for times that describe the accuracy of timing."
   []
-  (let [latency (nanotime-latency 1000)
-        granularity (nanotime-granularity 100)
+  (let [latency (nanotime-latency)
+        granularity (nanotime-granularity)
         constant (constant-bench)
         empty (empty-bench)]
     {:latency (-> latency :stats :time :mean first)

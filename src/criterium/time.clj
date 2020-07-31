@@ -6,10 +6,10 @@
              [eval :as eval]
              [format :as format]
              [jvm :as jvm]
+             [measured :as measured]
              [stats :as stats]
              [toolkit :as toolkit]
-             [well :as well]])
-  (:import [criterium.toolkit Measured]))
+             [well :as well]]))
 
 (def last-time* (volatile! nil))
 
@@ -280,9 +280,11 @@
                          (if (= :all use-metrics)
                            (keys toolkit/measures)
                            use-metrics))
-        pipeline-options (if ((set use-metrics) :with-expr-value)
-                           {:terminal-fn toolkit/with-expr-value})]
-    [(vec (remove #{:with-expr-value :with-time} use-metrics))
+        ;; pipeline-options (if ((set use-metrics) :with-time)
+        ;;                    {:terminal-fn toolkit/with-expr-value})
+        pipeline-options {}
+        ]
+    [(vec (remove #{:with-time} use-metrics))
      pipeline-options]))
 
 (defn- pipeline-for-options [options]
@@ -290,10 +292,11 @@
                          (if (= :all use-metrics)
                            (keys toolkit/measures)
                            use-metrics))
-        pipeline-options (if ((set use-metrics) :with-expr-value)
-                           {:terminal-fn toolkit/with-expr-value})]
+        pipeline-options {};; (if ((set use-metrics) :with-expr-value)
+                           ;; {:terminal-fn toolkit/with-expr-value})
+        ]
     (toolkit/pipeline
-      (remove #{:with-expr-value :with-time} use-metrics)
+      (remove #{:with-time} use-metrics)
       pipeline-options)))
 
 (defn measure-stats
@@ -303,7 +306,7 @@
   keyword selectors. Valid metrics
   are :time, :garbage-collector, :finalization, :memory, :runtime-memory,
   :compilation, and :class-loader."
-  [^Measured measured
+  [measured
    {:keys [limit-evals limit-time max-gc-attempts warmup-period warmup-fraction]
     :as   options}]
   ;; Start by running GC until it has nothing to do.
@@ -380,7 +383,7 @@
         pipeline                 (toolkit/pipeline
                                    use-metrics
                                    options)
-        vals           (if (= toolkit/with-expr-value
+        vals           (if (= toolkit/with-time
                               (:terminal-fn pl-options))
                          (toolkit/sample-no-time
                            measured-batch
@@ -394,7 +397,7 @@
 
     (sample-stats
       (conj use-metrics :time)
-      (.eval-count measured-batch)
+      (:eval-count measured-batch)
       vals
       options)))
 
@@ -414,19 +417,13 @@
                                    use-metrics
                                    options)
         ;; let functions allocate on initial invocation
-        _              (toolkit/invoke-measured measured)
+        _              (measured/invoke measured)
         _              (toolkit/force-gc (or max-gc-attempts 3))
-        vals           (if (= toolkit/with-expr-value
-                              (:terminal-fn pl-options))
-                         (toolkit/sample-no-time
-                           measured
-                           pipeline
-                           {:eval-budget eval-budget})
-                         (toolkit/sample
+        vals           (toolkit/sample
                            measured
                            pipeline
                            {:time-budget-ns time-budget-ns
-                            :eval-budget    eval-budget}))]
+                            :eval-budget    eval-budget})]
     (last vals)))
 
 (defn measure*
@@ -450,7 +447,7 @@
   "Like time, but returns measurements rather than printing them."
   [expr & options]
   (let [options (apply hash-map options)]
-    `(measure* (toolkit/measured-expr ~expr) ~options)))
+    `(measure* (measured/expr ~expr) ~options)))
 
 
 (defn time*
@@ -498,7 +495,7 @@
         ;; f-sym            (gensym "f")
         ;; state-sym        (gensym "state")
         ]
-    `(time* (toolkit/measured-expr ~expr) ~options)
+    `(time* (measured/expr ~expr) ~options)
     ;; `(let [measured-fn# ~measured-fn-form
     ;;        state-fn#    (:state-fn measured-fn#)
     ;;        ~state-sym   (state-fn#)

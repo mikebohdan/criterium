@@ -1,12 +1,3 @@
-;;;; Copyright (c) Hugo Duncan. All rights reserved.
-
-;;;; The use and distribution terms for this software are covered by the
-;;;; Eclipse Public License 1.0 (http://opensource.org/licenses/eclipse-1.0.php)
-;;;; which can be found in the file epl-v10.html at the root of this distribution.
-;;;; By using this software in any fashion, you are agreeing to be bound by
-;;;; the terms of this license.
-;;;; You must not remove this notice, or any other, from this software.
-
 (ns criterium.toolkit
   "Standalone instrumentation and measurement functions."
   (:require [criterium
@@ -14,8 +5,7 @@
              [jvm :as jvm]
              [measured :as measured]
              [util :as util]]
-            [clojure.walk :as walk])
-  (:import [criterium.measured Measured]))
+            [clojure.walk :as walk]))
 
 
 (def NANOSEC-NS 1)
@@ -43,25 +33,25 @@
      (toolkit/instrumented
        (toolkit/measured-expr some-expr)
        (toolkit/with-time))"
-  [^Measured measured next-fn]
+  [measured next-fn]
   (assert (measured/measured? measured))
-  (let [state ((.state-fn measured))
+  (let [state ((:state-fn measured))
         data {:state state}]
     (next-fn data measured)))
 
-
-(defn with-expr-value
-  "Execute measured, adding the return value to the data map's :expr-value key."
-  []
-  (fn [{:keys [state] :as data} ^Measured measured]
-    (assoc data
-           :expr-value ((.f measured) state)
-           :num-evals (.eval-count measured))))
+;; (defn with-expr-value
+;;   "Execute measured, adding the return value to the data map's :expr-value key."
+;;   []
+;;   (fn [{:keys [state] :as data} measured]
+;;     (let [[_ expr-value]])
+;;     (assoc data
+;;            :expr-value ((:f measured) state (:eval-count measured))
+;;            :num-evals (.eval-count measured))))
 
 
 ;; disable locals clearing in the body of the timing
-(alter-var-root #'*compiler-options*
-                assoc :disable-locals-clearing true)
+;; (alter-var-root #'*compiler-options*
+;;                 assoc :disable-locals-clearing true)
 
 (defn with-time
   "Execute measured, adding timing to the data map.
@@ -69,18 +59,17 @@
   Adds maps to the :time key in data, with the :before, :after, and :delta sub-data.
   Each map contains the :elapsed key with a timestamp in nanoseconds."
   []
-  (fn [{:keys [state] :as data} ^Measured measured]
-    (let [^clojure.lang.IFn f (.f measured)
-          start               (jvm/timestamp)
-          expr-value          (f state)
-          finish              (jvm/timestamp)]
+  (fn [{:keys [state] :as data} measured]
+    (let [f (:f measured)
+          eval-count (:eval-count measured)
+          [^long elapsed expr-value] (f state eval-count)]
       (assoc data
-             :time (unchecked-subtract finish start)
+             :time elapsed
              :expr-value expr-value
-             :num-evals  (.eval-count measured)))))
+             :num-evals  eval-count))))
 
-(alter-var-root #'*compiler-options*
-                assoc :disable-locals-clearing false)
+;; (alter-var-root #'*compiler-options*
+;;                 assoc :disable-locals-clearing false)
 
 
 
@@ -180,7 +169,8 @@
 
 (def terminal-fns
   {:with-time       with-time
-   :with-expr-value with-expr-value})
+   ;; :with-expr-value with-expr-value
+   })
 
 
 (def measures
@@ -221,24 +211,25 @@
 (defn sample
   "Sample by invoking measured using pipeline.
   Collects an instrumentation data map for each invocation."
-  [^Measured measured
+  [measured
    pipeline
    {:keys [time-budget-ns
            eval-budget]
     :or   {time-budget-ns (* 500 MILLISEC-NS)
            eval-budget    1000000}
     :as   _options}]
-  (loop [result         []
-         eval-budget    (long eval-budget)
-         time-budget-ns (long time-budget-ns)]
-    (if (and (pos? eval-budget) (pos? time-budget-ns))
-      (let [vals (instrumented measured pipeline)
-            t    (long (:time vals))]
-        (recur
-          (conj result vals)
-          (unchecked-subtract eval-budget (.eval-count measured))
-          (unchecked-subtract time-budget-ns t)))
-      result)))
+  (let [eval-count (long (:eval-count measured))]
+    (loop [result         []
+           eval-budget    (long eval-budget)
+           time-budget-ns (long time-budget-ns)]
+      (if (and (pos? eval-budget) (pos? time-budget-ns))
+        (let [vals (instrumented measured pipeline)
+              t    (long (:time vals))]
+          (recur
+            (conj result vals)
+            (unchecked-subtract eval-budget eval-count)
+            (unchecked-subtract time-budget-ns t)))
+        result))))
 
 (defn sample-no-time
   "Sample by invoking measured using pipeline.
@@ -301,12 +292,12 @@
   "Run measured for an initial estimate of the time to execute..
 
   Returns an estimated  execution time."
-  [^Measured measured]
+  [measured]
   (let [pline   (with-time)
         ;; The first evaluation is *always* unrepresentative
         _ignore (instrumented measured pline)
         v0      (instrumented measured pline)]
-    (long (quot (elapsed-time v0) (.eval-count measured)))))
+    (long (quot (elapsed-time v0) (:eval-count measured)))))
 
 (defn estimate-eval-count
   "Estimate batch-size."
@@ -358,7 +349,7 @@
 
 (defn warmup-params
   "Estimate parameters for warmup"
-  [^Measured measured
+  [measured
    t0
    {:keys [time-budget-ns eval-budget warmup-period-ns warmup-fraction
               target-batch-time-ns]
@@ -383,7 +374,7 @@
         ;;                                     (quot eval-budget warmup-fraction)))
         ]
     (assoc warmup-budget
-           :batch-size (max 1 (quot est-eval-count (.eval-count measured))))))
+           :batch-size (max 1 (quot est-eval-count (:eval-count measured))))))
 
 (defn warmup
   "Run measured for the given amount of time to enable JIT compilation.
@@ -408,7 +399,8 @@
                          (measured/batch
                            measured
                            batch-size
-                           (select-keys options [:sink-fn])))]
+                           ;; (select-keys options [:sink-fn])
+                           ))]
     ;; (println "eval-count" (:eval-count measured))
     (loop [num-evals  0
            time-ns    0
