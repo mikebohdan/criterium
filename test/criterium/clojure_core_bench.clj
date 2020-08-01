@@ -81,7 +81,9 @@
      (criterium.chart/view c)
     ))
 
-(identity-regression)
+(comment
+  (identity-regression)
+  )
 
 
 
@@ -107,7 +109,7 @@
 ;; nth
 
 (comment
-  (defn inc-depth [x] (repeat 3 (take 3 x)))
+  (defn inc-depth [x] (vec (repeat 3 (vec (take 3 x)))))
   (defn v-n [depth]
     (let [v0 ['a 'b 'c]]
       (last (take depth (iterate inc-depth v0)))))
@@ -136,7 +138,7 @@
   (criterium.time/measure*
     (measured/expr
       (nth v 2)
-      {:arg-metas [{} {:tag 'long}]}
+      {:arg-metas [{} {:tag 'int}]}
       )
     {:limit-time  10
      :limit-evals 1000000000})
@@ -148,7 +150,23 @@
                    {:tag long}]})
     {:limit-time  10
      :limit-evals 1000000000}) ;; eerrrr
-                                        ;
+
+(criterium.time/measure*
+    (measured/expr
+      (.nth ^clojure.lang.Indexed (.nth v 2) 1)
+      {:arg-metas [{:tag clojure.lang.Indexed}
+                   {:tag long}
+                   {:tag long}]})
+    {:limit-time  10
+     :limit-evals 1000000000}) ;; eerrrr
+
+(measured/symbolic
+  (measured/expr
+    (.nth ^clojure.lang.Indexed (.nth v 2) 1)
+    {:arg-metas [{:tag clojure.lang.Indexed}
+                 {:tag long}
+                 {:tag long}]}))
+
   (criterium.time/measure*
     (measured/expr
       (.nth [0 1 2 3 4 5 6 7 8 9] 9)

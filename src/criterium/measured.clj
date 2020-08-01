@@ -1,6 +1,7 @@
 (ns criterium.measured
   "Defines the Measured type and measure-batch"
-  (:require [criterium
+  (:require [clojure.walk :as walk]
+            [criterium
              [eval :as eval]])
   (:import [criterium.measured Helpers]
            [org.openjdk.jmh.infra Blackhole]))
@@ -9,7 +10,8 @@
 (defrecord Measured
     [^clojure.lang.IFn state-fn
      ^clojure.lang.IFn f
-     ^long eval-count])
+     ^long eval-count
+     expr-fn])
 
 (defn measured?
   "Predicate for x being a Measured"
@@ -31,12 +33,85 @@
 
   The eval-count allows usage where the function is a wrapper that
   evaluates the subject expression multiple times.
+
+  expr-fn returns a symbolic representation of the measured.
   "
   ^Measured
-  [^clojure.lang.IFn state-fn
-   ^clojure.lang.IFn f
-   ^long eval-count]
-  (->Measured state-fn f eval-count))
+  [state-fn
+   f
+   eval-count
+   & [expr-fn]]
+  (->Measured state-fn f (long eval-count) expr-fn))
+
+(defn symbolic [measured]
+  (if-let [expr-fn (:expr-fn measured)]
+    (expr-fn)))
+
+(defn f-expr? [x]
+  (or (list? x) (instance? clojure.lang.Cons x)))
+
+(defrecord FormExpr
+    [op arg-syms arg-vals metamap])
+
+(defn form-expr? [x]
+  (instance? FormExpr x))
+
+(defn gen-arg-sym []
+  (gensym "arg"))
+
+(defn form-print [x]
+  (cond
+    (symbol? x) x
+
+    (form-expr? x)
+    (vary-meta
+      `(~(:op x) ~@(mapv form-print (:arg-syms x)))
+      merge
+      (:metadata x))))
+
+(defn factor-form [form]
+  (let [subj  (first form)
+        tform (fn [x]
+                (println "postwalk"
+                         x
+                         subj
+                         (type x)
+                         (f-expr? x)
+                         (and (f-expr? x) (= subj (first x))))
+                (if (and (f-expr? x) (= subj (first x)))
+                  (reduce
+                    (fn [res arg]
+                      (if (form-expr? arg)
+                        (-> res
+                           (update :arg-syms conj arg)
+                           (update :arg-vals merge (:arg-vals arg))
+                           )
+                        (let [arg-sym (gen-arg-sym)]
+                          (-> res
+                             (update :arg-syms conj arg-sym)
+                             (update :arg-vals assoc arg-sym arg)))))
+                    (->FormExpr (first x) [] {} (meta x))
+                    (rest x))
+                  x))
+        res   (walk/postwalk
+                tform
+                form
+                )]
+    (println "factor-form" {:subj subj  :form form :res res})
+    {:expr (form-print res)
+     :arg-vals (:arg-vals res)}))
+
+(defn factor-const [expr]
+  (let [arg-sym (gen-arg-sym)]
+    {:expr arg-sym
+     ;; :arg-syms [arg-sym]
+     :arg-vals {arg-sym expr}}))
+
+(defn factor-expr [expr]
+  (if (f-expr? expr)
+    (factor-form expr)
+    (factor-const expr)
+    ))
 
 
 (defn ^:internal measured-expr-fn
@@ -78,7 +153,7 @@
                 (fn [arg-sym arg-meta]
                   (println "hinting" arg-sym arg-meta)
                   (let [tag (:tag arg-meta)]
-                    (if (and (symbol? tag) (#{'long 'int} tag))
+                    (if (and (symbol? tag) (#{'long 'int 'double 'float} tag))
                       [arg-sym
                        (list tag arg-sym)]
                       [(with-meta arg-sym arg-meta)
@@ -107,6 +182,60 @@
     `(f ~@['a'b])
     {:arg-metas [{:tag 'Long}{:tag 'Long}]}))
 
+
+
+(comment
+  (factor-expr '(x (x 1 (+ 1 2))))
+  (factor-expr '2)
+  )
+
+
+;; (defn factor-expr [expr]
+;;   (let [f (if (f-expr? expr)
+;;             (first expr))]
+;;     (println "f" f)
+;;     (vary-meta
+;;       (clojure.walk/walk
+;;         (fn [x]
+;;           (println "inner" x (type x))
+;;           (if (and (f-expr? x) (= f (first x)))
+;;             (vary-meta x assoc :keep true)
+;;             x))
+;;         (fn [x]
+;;           (println "outer" x (type x))
+;;           x)
+;;         expr)
+;;       assoc :keep true)))
+
+;; (set! *print-meta* true)
+;; (let [f (factor-expr
+;;           '(x (x 1 (+ 1 2))))]
+;;   #_f
+;;   #_(meta f)
+;;   #_(meta (first f))
+;;   (second f)
+;;   #_(meta (second f))
+;;   (nth (second f) 2)
+;;   #_(meta (nth (second f) 2))
+;;   )
+
+
+;; (let [f (clojure.walk/prewalk
+;;           (fn [x]
+;;             (println "prewalk" x)
+;;             x)
+;;           '(x (x 1 (+ 1 2)))
+;;           )]
+;;   f
+;;   #_(meta f)
+;;   #_(meta (first f))
+;;   (second f)
+;;   #_(meta (second f))
+;;   #_(nth (second f) 2)
+;;   #_(meta (nth (second f) 2))
+;;   )
+
+
 (defn- measured-expr*
   "Return a measured function for the given expression.
 
@@ -116,47 +245,62 @@
   Any expr that is not a List is treated as a constant.  This is mainly
   for internal benchmarking."
   [expr & [options]]
+  (println "measured-expr* expr" expr)
   (println "measured-expr* options" options)
   (println "list?" (list? expr) (type expr))
-  (if (or (list? expr) (instance? clojure.lang.Cons expr))
-    (let [args     (vec (drop 1 expr))
-          arg-syms (vec (repeatedly (count args) (fn [] (gensym "arg"))))]
-      `(measured
-         (fn [] ~args)
-         ~(measured-expr-fn arg-syms `(~(first expr) ~@arg-syms) options)
-         ;; (fn [~arg-syms eval-count#]
-         ;;   (let [~blackhole-sym eval/blackhole
-         ;;         n#             (dec eval-count#)
-         ;;         start#         (jvm/timestamp)
-         ;;         expr-value#    (~(first expr) ~@arg-syms)]
-         ;;     (loop [i# n#]
-         ;;       (when (pos? i#)
-         ;;         ;;(.sink sink (f state))
-         ;;         (.consume ~blackhole-sym (~(first expr) ~@arg-syms))
-         ;;         (recur (unchecked-dec i#))))
-         ;;     (let [finish# (jvm/timestamp)]
-         ;;       (eval/evaporate)
-         ;;       [(unchecked-subtract finish# start#) expr-value#])))
-         1))
-    (let [arg-sym (gensym "expr-val")]
-      `(measured
-         (fn [] [~expr])
-         ~(measured-expr-fn [arg-sym] arg-sym options)
-         ;; (fn [expr-value# eval-count#]
-         ;;   (let [~blackhole-sym eval/blackhole
-         ;;         n#             (dec (long eval-count#))
-         ;;         start#         (jvm/timestamp)
-         ;;         expr-value#    expr-value#]
-         ;;     (loop [i# n#]
-         ;;       (when (pos? i#)
-         ;;         ;;(.sink sink (f state))
-         ;;         (.consume ~blackhole-sym expr-value#)
-         ;;         (recur (unchecked-dec i#))))
-         ;;     (let [finish# (jvm/timestamp)]
-         ;;       (eval/evaporate)
-         ;;       [(unchecked-subtract finish# start#) expr-value#])))
-         1))
-    ))
+
+  (let [{:keys [expr arg-vals] :as f} (factor-expr expr)]
+    (println "measured-expr* factored" f)
+    (println "measured-expr* factored" {:expr expr :arg-vals arg-vals})
+    `(measured
+       (fn [] ~(vec (vals arg-vals)))
+       ~(measured-expr-fn
+          (vec (keys arg-vals))
+          expr
+          options)
+       1
+       (fn [] ~(list 'quote `(do (let [~@arg-vals]
+                                  ~expr)))))
+
+    #_(if (or (list? expr) (instance? clojure.lang.Cons expr))
+      (let [args     (vec (drop 1 expr))
+            arg-syms (vec (repeatedly (count args) (fn [] (gensym "arg"))))]
+        `(measured
+           (fn [] ~args)
+           ~(measured-expr-fn arg-syms `(~(first expr) ~@arg-syms) options)
+           ;; (fn [~arg-syms eval-count#]
+           ;;   (let [~blackhole-sym eval/blackhole
+           ;;         n#             (dec eval-count#)
+           ;;         start#         (jvm/timestamp)
+           ;;         expr-value#    (~(first expr) ~@arg-syms)]
+           ;;     (loop [i# n#]
+           ;;       (when (pos? i#)
+           ;;         ;;(.sink sink (f state))
+           ;;         (.consume ~blackhole-sym (~(first expr) ~@arg-syms))
+           ;;         (recur (unchecked-dec i#))))
+           ;;     (let [finish# (jvm/timestamp)]
+           ;;       (eval/evaporate)
+           ;;       [(unchecked-subtract finish# start#) expr-value#])))
+           1))
+      (let [arg-sym (gensym "expr-val")]
+        `(measured
+           (fn [] [~expr])
+           ~(measured-expr-fn [arg-sym] arg-sym options)
+           ;; (fn [expr-value# eval-count#]
+           ;;   (let [~blackhole-sym eval/blackhole
+           ;;         n#             (dec (long eval-count#))
+           ;;         start#         (jvm/timestamp)
+           ;;         expr-value#    expr-value#]
+           ;;     (loop [i# n#]
+           ;;       (when (pos? i#)
+           ;;         ;;(.sink sink (f state))
+           ;;         (.consume ~blackhole-sym expr-value#)
+           ;;         (recur (unchecked-dec i#))))
+           ;;     (let [finish# (jvm/timestamp)]
+           ;;       (eval/evaporate)
+           ;;       [(unchecked-subtract finish# start#) expr-value#])))
+           1))
+      )))
 
 (comment
   (measured-expr*
@@ -227,6 +371,12 @@
   (expr
     (nth v 1)
     {:arg-metas [{:tag 'Long}{:tag 'Long}]})
+
+  (symbolic
+    (expr
+      (nth (nth v 1) 0)
+      {:arg-metas [{:tag 'Long}{:tag 'Long}]}))
+
   (expr (nth v 1)))
 
 (alter-var-root #'*compiler-options*
