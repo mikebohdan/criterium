@@ -36,7 +36,7 @@
       (vswap! state-fn-state assoc :rng r2 :size-seq rest-size-seq)
       (rose/root result-map-rose))))
 
-(defn for-all*
+(defn measured-impl
   "A function version of `for-all`. Takes a sequence of N generators and a function of N
   args, and returns a measured function, which can be called with generated values, like
   with `for-all`.
@@ -45,10 +45,8 @@
 
   (for-all* [gen/large-integer gen/large-integer]
             (fn [a b] (+ a b) a))"
-  [gen f]
-  (let [size 100
-        seed nil
-        state-fn-state (state-fn-state size seed)
+  [gen f {:keys [size seed] :or {size 100 seed nil}}]
+  (let [state-fn-state (state-fn-state size seed)
         ;; gen args ;; (apply gen/tuple args)
         ]
     (measured/measured
@@ -64,7 +62,7 @@
 ;;   [bindings]
 ;;   (mapv second (partition 2 bindings)))
 
-(defmacro for-all
+(defmacro measured*
   "Returns a measured, which is the combination of some generators and an expression
   that should be measured for all generated values.
 
@@ -86,7 +84,10 @@
               b gen/large-integer]
        (+ a b))
     {})"
-  [bindings & body]
+  [{:keys [size seed arg-metas]
+    :or   {size 100 seed nil}
+    :as   options}
+   bindings & body]
   (let [pairs (partition 2 bindings)
         binding-vars (mapv first pairs)
         binding-gens (reduce
@@ -95,20 +96,38 @@
                         `(gen/return ~binding-vars)
                         (reverse pairs))
         options {}
+        _ (println "eaxmple-state form"
+                   `((state-fn ~binding-gens (state-fn-state 2 nil))))
         example-state (eval `((state-fn ~binding-gens (state-fn-state 2 nil))))
         types (mapv type example-state)
         arg-metas (mapv measured/tag-meta types)
         options {:arg-metas arg-metas}]
-    `(for-all*
+    `(measured-impl
        ~binding-gens
        ;; ~(list 'quote `(do ~@body))
        ~(measured/measured-expr-fn
           binding-vars
           `(do ~@body)
           options)
+       ~{:size size
+         :seed seed}
        ;; (fn ~(gensym "for-all-body") [~binding-vars]
        ;;   ~@body)
        )))
+
+
+
+(defmacro measured
+  "Return a measured using test.check generators for state."
+  ;; ([binding & body]
+  ;;  `(measured* nil ~for-all-expr))
+  [bindings & body]
+  (if (vector? bindings)
+    `(measured* nil ~bindings ~@body)
+    (do
+      (assert (map? bindings) "options must be passed as a literal map")
+      `(measured* ~bindings ~@body))))
+
 
 (comment
   (def m (for-all [i (gen/choose 0 1000000000000000000)]

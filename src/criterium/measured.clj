@@ -262,6 +262,8 @@
             (drop l1 m2)))))
 
 (def TYPE-NAME-CONVERSIONS
+  ;; converting is good for measureds that use these values directly
+  ;; but causes wrapping if the values are returned from the measured.
   {'java.lang.Long    'long
    'java.lang.Integer 'int
    'java.lang.Double  'double

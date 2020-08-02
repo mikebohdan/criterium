@@ -9,13 +9,15 @@
 ;;; arg-gen a constant
 
 (defn constant-bench [mx]
-  (arg-gen/for-all [i (gen/choose 0 mx)]
+  (arg-gen/measured {:size mx} [i gen/small-integer]
     i))
+
 
 (comment
   (criterium.time/measure*
-    (constant-bench 10000)
-    {:limit-time 10}))
+    (constant-bench 10)
+    {:limit-time 10})
+  )
 
 ;;; Identity
 
@@ -33,25 +35,26 @@
 ;;   (dotimes [i n]
 ;;     (recursively)))
 
+(def gen-for-identity (gen/vector gen/any))
 
 (defn identity-bench0 [mx]
-  (arg-gen/for-all [i (gen/choose 0 mx)]
+  (arg-gen/measured {:size mx} [i gen-for-identity]
     i))
 
 (defn identity-bench [mx]
-  (arg-gen/for-all [i (gen/choose 0 mx)]
+  (arg-gen/measured {:size mx} [i gen-for-identity]
     (identity i)))
 
 (defn identity-bench2 [mx]
-  (arg-gen/for-all [i (gen/choose 0 mx)]
+  (arg-gen/measured {:size mx} [i gen-for-identity]
     (recursively 2 identity i)))
 
 (defn identity-bench3 [mx]
-  (arg-gen/for-all [i (gen/choose 0 mx)]
+  (arg-gen/measured {:size mx} [i gen-for-identity]
     (recursively 3 identity i)))
 
 (defn identity-bench4 [mx]
-  (arg-gen/for-all [i (gen/choose 0 mx)]
+  (arg-gen/measured {:size mx} [i gen-for-identity]
     (recursively 4 identity i)))
 
 (defn identity-regression []
@@ -96,8 +99,8 @@
 ;;; inc
 
 (defn inc-bench [mx]
-  (arg-gen/for-all [i (gen/choose 0 mx)]
-    (inc ^long i)))
+  (arg-gen/measured {:size mx} [i (gen/choose 0 1000)]
+    (inc i)))
 
 (comment
   (criterium.time/measure*
@@ -265,9 +268,11 @@
 
 
 (defn nth-bench [mx]
-  (arg-gen/for-all [v (gen/vector gen/int 1 mx)
-                    i (gen/choose 0 (dec (count v)))]
-    (nth v ^long i)
+  (arg-gen/measured
+    {:size mx}
+    [v (gen/vector gen/int 1 1000)
+     i (gen/choose 0 (dec (count v)))]
+    (nth v i)
     ;; (+
     ;;   (nth v ^long i)
     ;;    ;; (nth v ^long (- i 1))
@@ -288,7 +293,7 @@
 ;; 3 133.27992622571227 59
 ;; 2 74.414102064389   54
 ;; 1 20.50997218893159
-ll   16.888833639012905
+;; ll   16.888833639012905
 
 ;; make this a direct linked function, so we don't
 ;; end up with getRawRoot calls inside the timing loop.
@@ -301,14 +306,16 @@ ll   16.888833639012905
       vec-nth)))
 
 (defn vec-nth-bench [mx]
-  (arg-gen/for-all [v (gen/vector gen/int 1 mx)
-                    i (gen/choose 0 (dec (count v)))]
+  (arg-gen/measured
+    {:size mx}
+    [v (gen/vector gen/int 1 1000)
+     i (gen/choose 0 (dec (count v)))]
     ;; (vec-nth v i)
-    (.nth ^clojure.lang.Indexed v ^long i)
+    (.nth ^clojure.lang.Indexed v i)
     ))
 
 ;; (defn vec-nth-bench [mx]
-;;   (arg-gen/for-all [v (gen/vector gen/int 1 mx)
+;;   (arg-gen/measured [v (gen/vector gen/int 1 mx)
 ;;                     i (gen/choose 0 (dec (count v)))]
 ;;     (vec-nth v i)))
 
@@ -357,14 +364,18 @@ ll   16.888833639012905
 
 
 (defn vector-destructure-bench [mx]
-  (arg-gen/for-all [v (gen/vector gen/int 3 mx)
-                    i (gen/choose 0 (dec (count v)))]
+  (arg-gen/measured
+    {:size mx}
+    [v (gen/vector gen/int 3 1000)
+     i (gen/choose 0 (dec (count v)))]
     (let [[a b c] v]
       (+ a b c))))
 
 (defn vector-explicit-destructure-bench [mx]
-  (arg-gen/for-all [v (gen/vector gen/int 3 mx)
-                    i (gen/choose 0 (dec (count v)))]
+  (arg-gen/measured
+    {:size mx}
+    [v (gen/vector gen/int 3 1000)
+     i (gen/choose 0 (dec (count v)))]
     (+ (.nth ^clojure.lang.IPersistentVector v 0)
        (.nth ^clojure.lang.IPersistentVector v 1)
        (.nth ^clojure.lang.IPersistentVector v 2))))
