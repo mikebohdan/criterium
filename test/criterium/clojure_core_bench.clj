@@ -146,7 +146,7 @@
   (criterium.time/measure*
     (measured/expr
       (.nth v 2)
-      {:arg-metas [{:tag clojure.lang.Indexed}
+      #_{:arg-metas [{:tag clojure.lang.Indexed}
                    {:tag int}]})
     {:limit-time  10
      :limit-evals 1000000000})
@@ -241,7 +241,7 @@
     (no.disassemble/disassemble-str
       (:f (measured/expr
             (.nth v 2)
-            {:arg-metas [{:tag clojure.lang.Indexed}
+            #_{:arg-metas [{:tag clojure.lang.Indexed}
                          {:tag long}]}
             ))))
 

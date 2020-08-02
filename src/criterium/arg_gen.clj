@@ -26,7 +26,7 @@
                 :rng rng
                 :size-seq size-seq})))
 
-(defn state-fn   ;; TODO make state-fn-state a mutable field on measured?
+(defn state-fn   ; TODO make state-fn-state a mutable field on measured?
   [gen state-fn-state]
   (fn []
     (let [{:keys [rng size-seq]} @state-fn-state
@@ -45,11 +45,11 @@
 
   (for-all* [gen/large-integer gen/large-integer]
             (fn [a b] (+ a b) a))"
-  [args f]
+  [gen f]
   (let [size 100
         seed nil
         state-fn-state (state-fn-state size seed)
-        gen args ;; (apply gen/tuple args)
+        ;; gen args ;; (apply gen/tuple args)
         ]
     (measured/measured
       (state-fn gen state-fn-state)
@@ -58,7 +58,7 @@
 
 ;; (defn- binding-vars
 ;;   [bindings]
-;;   (mapv first (partition 2 bindings)))
+;;sddcc   (mapv first (partition 2 bindings)))
 
 ;; (defn- binding-gens
 ;;   [bindings]
@@ -93,13 +93,19 @@
                         (fn [curr [sym code]]
                           `(gen/bind ~code (fn [~sym] ~curr)))
                         `(gen/return ~binding-vars)
-                        (reverse pairs))]
+                        (reverse pairs))
+        options {}
+        example-state (eval `((state-fn ~binding-gens (state-fn-state 2 nil))))
+        types (mapv type example-state)
+        arg-metas (mapv measured/tag-meta types)
+        options {:arg-metas arg-metas}]
     `(for-all*
        ~binding-gens
        ;; ~(list 'quote `(do ~@body))
        ~(measured/measured-expr-fn
           binding-vars
-          `(do ~@body))
+          `(do ~@body)
+          options)
        ;; (fn ~(gensym "for-all-body") [~binding-vars]
        ;;   ~@body)
        )))
@@ -119,7 +125,8 @@
   (def vec-nth-bench
     (for-all [v (gen/vector gen/int 1 100000)
               i (gen/choose 0 (dec (count v)))]
-      (.nth ^clojure.lang.APersistentVector v ^int i)))
+      ;;(.nth ^clojure.lang.APersistentVector v ^int i)
+      (.nth  v  i)))
 
   ((:state-fn m))
 

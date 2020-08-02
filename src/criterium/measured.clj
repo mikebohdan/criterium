@@ -252,6 +252,30 @@
 ;;   #_(meta (nth (second f) 2))
 ;;   )
 
+(defn merge-metas [m1 m2]
+  (println "merge-metas" m1 m2)
+  (let [l1 (count m1)
+        l2 (count m2)]
+    (into (mapv merge m1 m2)
+          (if (>= l1 l2)
+            (drop l2 m1)
+            (drop l1 m2)))))
+
+(def TYPE-NAME-CONVERSIONS
+  {'java.lang.Long    'long
+   'java.lang.Integer 'int
+   'java.lang.Double  'double
+   'java.lang.Float   'float})
+
+(defn type-name-conversion [t]
+  (TYPE-NAME-CONVERSIONS t t))
+
+(defn tag-meta [^Class t]
+  (if t
+    (let [type-name (-> (.getCanonicalName ^Class t)
+                       symbol
+                       type-name-conversion)]
+      {:tag type-name})))
 
 (defn- measured-expr*
   "Return a measured function for the given expression.
@@ -267,8 +291,19 @@
     (println "measured-expr* options" options)
     (println "list?" (list? expr) (type expr)))
 
-  (let [{:keys [expr arg-vals] :as f} (factor-expr expr)]
+  (let [{:keys [expr arg-vals] :as f} (factor-expr expr)
+        types (mapv (comp type eval) (vals arg-vals))
+        arg-metas (mapv tag-meta types)
+        ;; types (replace {'java.lang.Long    'long
+        ;;                 'java.lang.Integer 'int
+        ;;                 'java.lang.Double  'double
+        ;;                 'java.lang.Float   'float} types)
+        ;; arg-metas
+        ;; (mapv #(hash-map :tag %) types)
+        options (update options :arg-metas merge-metas arg-metas)]
     (println "measured-expr* factored" f)
+    (println "measured-expr* arg types" types)
+    (println "measured-expr* arg arg-metas"arg-metas types)
     (binding [*print-meta* true]
       (println "measured-expr* factored" {:expr expr :arg-vals arg-vals}))
     `(measured
