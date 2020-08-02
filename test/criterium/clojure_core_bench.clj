@@ -74,11 +74,11 @@
                             :stats :time :mean first)))
              []
              ms)
-        [a0 a1] (criterium.stats/linear-regression xs ys)
+        lr (criterium.stats/linear-regression xs ys)
         ;; _ (println {:xs xs :ys ys})
         c  (criterium.chart/xy-chart xs ys)
         ]
-    (println "Regression" [a0 a1])
+    (println "Regression" lr)
     ;; (println {:xs xs :ys ys})
     ;; (println :hello)
      (criterium.chart/view c)
@@ -311,7 +311,7 @@
     [v (gen/vector gen/int 1 1000)
      i (gen/choose 0 (dec (count v)))]
     ;; (vec-nth v i)
-    (.nth ^clojure.lang.Indexed v i)
+    (.nth  v i)
     ))
 
 ;; (defn vec-nth-bench [mx]
@@ -323,6 +323,11 @@
   (criterium.time/measure*
     (nth-bench 10000)
     {:limit-time 10})
+
+  (criterium.time/measure*
+    (vec-nth-bench 10000)
+    {:limit-time 10})
+
 
   (println
     (no.disassemble/disassemble-str

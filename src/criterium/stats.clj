@@ -387,20 +387,33 @@ descending order (so the last element of coefficients is the constant term)."
   (/ (reduce #(+ %1 (K (/ (- x %2) h))) 0 X) (* n h)))
 
 
-(defn linear-regression [xs ys]
-  (let [n (count xs)
-        mx (/ (reduce + xs) n)
-        my (/ (reduce + ys) n)
-        nmxmy (* n mx my)
-        nmxmx (* n mx mx)
-        s1 (- (reduce + (map (fn [x y] (* x y)) xs ys)) nmxmy)
-        s2 (- (reduce + (map (fn [x] (* x x)) xs)) nmxmx)
-        a1 (/ s1 s2)
-        a0 (- my (* a1 mx))]
-    [a0 a1]))
+(defn sum-square-delta [vs mv]
+  (reduce + (map (comp sqr #(- % mv)) vs)))
 
-;; (= (linear-regression (range 10) (range 10)) [0 1])
-;; (= (linear-regression (range 10) (range 1 11)) [1 1])
+(defn linear-regression [xs ys]
+  (let [n             (count xs)
+        mx            (/ (reduce + xs) n)
+        my            (/ (reduce + ys) n)
+        nmxmy         (* n mx my)
+        nmxmx         (* n mx mx)
+        s1            (- (reduce + (map (fn [x y] (* x y)) xs ys)) nmxmy)
+        s2            (- (reduce + (map (fn [x] (* x x)) xs)) nmxmx)
+        a1            (/ s1 s2)
+        a0            (- my (* a1 mx))
+        f             (fn [x] (+ a0 (* a1 x)))
+        pred-ys       (mapv f xs)
+        sqr-residuals (mapv (comp sqr -) ys pred-ys)
+        ss-residuals  (reduce + sqr-residuals)
+        variance      (/ ss-residuals (- n 2))
+        ss-total      (sum-square-delta ys my)
+        r-sqr         (- 1 (/ ss-residuals ss-total))
+        ]
+    {:coeffs   [a0 a1]
+     :variance variance
+     :r-sqr    r-sqr}))
+
+;; (= (linear-regression (range 10) (range 10)) [0 1 0 1])
+;; (= (linear-regression (range 10) (range 1 11)) [1 1 0 1])
 
 ;; (let [[a0 a1] (linear-regression (range 10) (range 1 11))]
 ;;   (+ a0 (* a1 10)))
