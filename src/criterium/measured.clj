@@ -1,8 +1,8 @@
 (ns criterium.measured
   "Defines the Measured type and measure-batch"
-  (:require [clojure.walk :as walk]
-            [criterium
-             [eval :as eval]])
+  (:require [criterium
+             [eval :as eval]
+             [util :as util]])
   (:import [criterium.measured Helpers]
            [org.openjdk.jmh.infra Blackhole]))
 
@@ -64,20 +64,33 @@
     (symbol? x) x
 
     (form-expr? x)
-    (vary-meta
-      `(~(:op x) ~@(mapv form-print (:arg-syms x)))
-      merge
-      (:metadata x))))
+    (do
+      (println "print" x)
+      (with-meta
+        `(~(:op x) ~@(mapv form-print (:arg-syms x)))
+        (:metamap x)))))
 
 (defn factor-form [form]
+  (binding [*print-meta* true]
+    (println "factor-form"
+             {:x form
+              :meta (meta (second form))}
+             ;; subj
+             ;; (type x)
+             ;; (f-expr? x)
+             ;; (and (f-expr? x) (= subj (first x)))
+                           ))
   (let [subj  (first form)
         tform (fn [x]
-                (println "postwalk"
-                         x
-                         subj
-                         (type x)
-                         (f-expr? x)
-                         (and (f-expr? x) (= subj (first x))))
+                (binding [*print-meta* true]
+                  (println "postwalk"
+                           {:x    x
+                            :meta (meta x)}
+                           ;; subj
+                           ;; (type x)
+                           ;; (f-expr? x)
+                           ;; (and (f-expr? x) (= subj (first x)))
+                           ))
                 (if (and (f-expr? x) (= subj (first x)))
                   (reduce
                     (fn [res arg]
@@ -90,10 +103,14 @@
                           (-> res
                              (update :arg-syms conj arg-sym)
                              (update :arg-vals assoc arg-sym arg)))))
-                    (->FormExpr (first x) [] {} (meta x))
+                    (->FormExpr
+                      (first x)
+                      []
+                      {}
+                      (meta x))
                     (rest x))
                   x))
-        res   (walk/postwalk
+        res   (util/postwalk
                 tform
                 form
                 )]
@@ -245,13 +262,15 @@
   Any expr that is not a List is treated as a constant.  This is mainly
   for internal benchmarking."
   [expr & [options]]
-  (println "measured-expr* expr" expr)
-  (println "measured-expr* options" options)
-  (println "list?" (list? expr) (type expr))
+  (binding [*print-meta* true]
+    (println "measured-expr* expr" expr)
+    (println "measured-expr* options" options)
+    (println "list?" (list? expr) (type expr)))
 
   (let [{:keys [expr arg-vals] :as f} (factor-expr expr)]
     (println "measured-expr* factored" f)
-    (println "measured-expr* factored" {:expr expr :arg-vals arg-vals})
+    (binding [*print-meta* true]
+      (println "measured-expr* factored" {:expr expr :arg-vals arg-vals}))
     `(measured
        (fn [] ~(vec (vals arg-vals)))
        ~(measured-expr-fn

@@ -147,18 +147,18 @@
     (measured/expr
       (.nth v 2)
       {:arg-metas [{:tag clojure.lang.Indexed}
-                   {:tag long}]})
+                   {:tag int}]})
     {:limit-time  10
-     :limit-evals 1000000000}) ;; eerrrr
+     :limit-evals 1000000000})
 
-(criterium.time/measure*
+  (criterium.time/measure*
     (measured/expr
       (.nth ^clojure.lang.Indexed (.nth v 2) 1)
       {:arg-metas [{:tag clojure.lang.Indexed}
-                   {:tag long}
-                   {:tag long}]})
+                   {:tag int}
+                   {:tag int}]})
     {:limit-time  10
-     :limit-evals 1000000000}) ;; eerrrr
+     :limit-evals 1000000000})
 
 (measured/symbolic
   (measured/expr
