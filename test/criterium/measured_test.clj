@@ -10,7 +10,6 @@
             (fn [arg ^long n]
               (vswap! eval-count #(+ n ^long %))
               [::time [arg arg]])
-            1
             (fn [] ::symbolic))]
     (is (measured/measured? m))
     (is (= ::symbolic (measured/symbolic m)))

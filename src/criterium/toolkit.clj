@@ -40,23 +40,23 @@
   "Return a budget for a measurement phase, given a total budget.
   The phase-period-ns is an optional limit on the time budget,
   The phase fraction is a fraction to apply to the total budget."
-  ^Budget [^Budget budget
-           ^long period-ns
-           ^double fraction
+  ^Budget [^Budget total-budget
+           period-ns
+           fraction
            ^double default-fraction]
   (budget
     (cond
       (and period-ns fraction)
-      (min period-ns
-           (long (quot (.elapsed-time-ns budget) fraction)))
+      (min ^long period-ns
+           (long (quot (.elapsed-time-ns total-budget) ^double fraction)))
 
       period-ns period-ns
-      fraction (long (quot (.elapsed-time-ns budget) fraction))
+      fraction (long (quot (.elapsed-time-ns total-budget) ^double fraction))
 
-      :else (long (quot (.elapsed-time-ns budget) default-fraction)))
+      :else (long (quot (.elapsed-time-ns total-budget) default-fraction)))
     (cond
-      fraction (long (quot (.eval-count budget) fraction))
-      (nil? period-ns) (long (quot (.eval-count budget) default-fraction))
+      fraction (long (quot (.eval-count total-budget) ^double fraction))
+      (nil? period-ns) (long (quot (.eval-count total-budget) default-fraction))
       :else Long/MAX_VALUE)))
 
 (defn budget-remaining?
@@ -81,7 +81,7 @@
                      pipeline/time-metric))]
     (loop [samples  [] ; hold onto data we allocate here
            attempts 0]
-      (let [sample                      (pipeline/execute pipeline measured)
+      (let [sample                      (pipeline/execute pipeline measured 1)
             ^long new-memory-used       (-> sample :memory :total :used)
             ^long pending-finalisations (-> sample :finalization :pending)]
         (if (and (< attempts max-attempts)
@@ -107,7 +107,7 @@
   "The initial evaluation is always un-representative.
   This function throws it away."
   [measured]
-  (pipeline/execute pipeline/time-metric measured)
+  (pipeline/execute pipeline/time-metric measured 1)
   nil)
 
 (defn first-estimate
@@ -117,10 +117,9 @@
   [measured]
   (let [pipeline pipeline/time-metric
         ;; The first evaluation is *always* unrepresentative
-        _ignore  (pipeline/execute pipeline measured)
-        v0       (pipeline/execute pipeline measured)]
-    (long (quot (pipeline/elapsed-time v0)
-                ^long (:eval-count measured)))))
+        _ignore  (pipeline/execute pipeline measured 1)
+        s0       (pipeline/execute pipeline measured 1)]
+    (pipeline/elapsed-time s0)))
 
 
 (defn estimate-eval-count
@@ -149,11 +148,10 @@
    budget
    batch-time-ns]
   (let [est-eval-count (estimate-eval-count
-                               t0
-                               budget
-                               batch-time-ns)]
-    (max 1 (long (quot est-eval-count
-                       ^long (:eval-count measured))))))
+                         t0
+                         budget
+                         batch-time-ns)]
+    est-eval-count))
 
 
 (defn warmup-params
@@ -182,22 +180,21 @@
    measured
    budget
    batch-size]
-  (let [measured-batch (measured/batch measured batch-size)]
-    (loop [eval-count      0
-           elapsed-time-ns 0
-           samples         []]
-      (let [sample          (pipeline/execute pipeline measured-batch)
-            t               (pipeline/elapsed-time sample)
-            elapsed-time-ns (unchecked-add elapsed-time-ns t)
-            eval-count      (unchecked-add eval-count (long (:eval-count sample)))]
-        (if (budget-remaining? budget elapsed-time-ns eval-count)
-          (recur eval-count
-                 elapsed-time-ns
-                 (conj samples sample))
-          {:eval-count      eval-count
-           :elapsed-time-ns elapsed-time-ns
-           :samples         (conj samples sample)
-           :measured-batch  measured-batch})))))
+  (loop [eval-count      0
+         elapsed-time-ns 0
+         samples         []]
+    (let [sample          (pipeline/execute pipeline measured batch-size)
+          t               (pipeline/elapsed-time sample)
+          elapsed-time-ns (unchecked-add elapsed-time-ns t)
+          eval-count      (unchecked-add eval-count (long (:eval-count sample)))]
+      (if (budget-remaining? budget elapsed-time-ns eval-count)
+        (recur eval-count
+               elapsed-time-ns
+               (conj samples sample))
+        {:eval-count      eval-count
+         :elapsed-time-ns elapsed-time-ns
+         :samples         (conj samples sample)
+         :batch-size      batch-size}))))
 
 
 (defn estimate-execution-time
@@ -231,13 +228,12 @@
    batch-size]
   (let [pipeline       (pipeline/with-class-loader-counts
                          (pipeline/with-compilation-time
-                           pipeline/time-metric))
-        measured-batch (measured/batch measured batch-size)]
+                           pipeline/time-metric))]
     (loop [eval-count       0
            elapsed-time-ns  0
            delta-free-iters 0
            samples          []]
-      (let [sample          (pipeline/execute pipeline measured-batch)
+      (let [sample          (pipeline/execute pipeline measured batch-size)
             t               (pipeline/elapsed-time sample)
             elapsed-time-ns (unchecked-add elapsed-time-ns t)
             eval-count      (unchecked-add eval-count (long (:eval-count sample)))
@@ -249,7 +245,7 @@
           {:eval-count      eval-count
            :elapsed-time-ns elapsed-time-ns
            :samples         (conj samples sample)
-           :measured-batch  measured-batch}
+           :batch-size      batch-size}
           (recur eval-count
                  elapsed-time-ns
                  (if (and (zero? cl-counts)

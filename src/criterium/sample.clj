@@ -26,17 +26,27 @@
   Return a sampled data map."
   [pipeline
    measured
-   budget
+   estimation-budget
+   sample-budget
    {:keys [batch-time-ns max-gc-attempts] :as config}]
   (toolkit/throw-away-sample measured)
   (toolkit/force-gc max-gc-attempts)
   (let [t0         (toolkit/first-estimate measured)
         batch-size (toolkit/estimate-batch-size
-                     measured t0 budget batch-time-ns)]
+                     measured t0 estimation-budget batch-time-ns)
+        t1         (toolkit/estimate-execution-time
+                     measured
+                     estimation-budget
+                     batch-size)
+        _          (toolkit/force-gc max-gc-attempts)
+
+        batch-size (toolkit/estimate-batch-size
+                     measured t1 sample-budget batch-time-ns)]
+    (toolkit/force-gc max-gc-attempts)
     (toolkit/sample
       pipeline
       measured
-      budget
+      sample-budget
       batch-size)))
 
 
@@ -45,11 +55,11 @@
   Return a sampled data map."
   [pipeline
    measured
-   ^Budget estimation-budget
-   ^Budget warmup-budget
-   ^Budget sample-budget
+   estimation-budget
+   warmup-budget
+   sample-budget
    {:keys [max-gc-attempts batch-time-ns]
-    :as   config}]
+    :as   _config}]
   ;; Start by running GC until it has nothing to do.
   (toolkit/throw-away-sample measured)
   (toolkit/force-gc max-gc-attempts)

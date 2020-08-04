@@ -11,7 +11,6 @@
 (defrecord Measured
     [^clojure.lang.IFn state-fn
      ^clojure.lang.IFn f
-     ^long eval-count
      expr-fn])
 
 (defn measured?
@@ -41,9 +40,8 @@
   ^Measured
   [state-fn
    f
-   eval-count
    & [expr-fn]]
-  (->Measured state-fn f (long eval-count) expr-fn))
+  (->Measured state-fn f expr-fn))
 
 (defn symbolic
   "Return a symbolic representation of the measured.
@@ -244,7 +242,6 @@
           (vec (keys arg-vals))
           expr
           options)
-       1
        (fn [] ~(list 'quote
                     `(do (let [~@arg-vals]
                            (time ~expr))))))))

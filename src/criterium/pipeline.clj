@@ -24,12 +24,8 @@
     - elapsed time in nanoseconds onto the :elapsed-time-ns key in data.
     - (an examlpe of) the expression value on the :expr-value key.
     - the number of evals on the :eval-count key."
-  [{:keys [state] :as sample} measured]
+  [{:keys [eval-count state] :as sample} measured]
   (let [f                         (:f measured)
-        ;; TODO make eval-count an argument on sample-data
-        ;; rather than use an updated field on measured
-        ;; so we preserve the measured call site.
-        eval-count                (:eval-count measured)
         [elapsed-time expr-value] (f state eval-count)]
     (assoc sample
            :elapsed-time-ns elapsed-time
@@ -166,15 +162,16 @@
      (toolkit/execute
        toolkit/with-time
        (toolkit/measured-expr some-expr))"
-  [pipeline measured]
+  [pipeline measured eval-count]
   {:pre [(measured/measured? measured)]}
   (let [state ((:state-fn measured))
-        sample {:state state}]
+        sample {:state      state
+                :eval-count eval-count}]
     (pipeline sample measured)))
 
 
 (defn sample
-  "Sample by invoking measured using pipeline.
+  "Sample by invoking measured with eval-count using pipeline.
 
   Invokes until time-budget-ns elapsed or eval-budget reached.
 
@@ -184,6 +181,7 @@
   Return a sequence of sample maps."
   [pipeline
    measured
+   eval-count
    {:keys [time-budget-ns
            eval-budget]
     :or   {time-budget-ns 500000000
@@ -194,7 +192,7 @@
            eval-budget    (long eval-budget)
            time-budget-ns (long time-budget-ns)]
       (if (and (pos? eval-budget) (pos? time-budget-ns))
-        (let [sample (execute pipeline measured)
+        (let [sample (execute pipeline measured eval-count)
               t      (long (:time sample))]
           (recur
             (conj samples sample)

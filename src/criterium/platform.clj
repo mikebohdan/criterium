@@ -59,8 +59,7 @@
   (let [state-fn (fn granularity-state-fn [] nil)]
     (measured/measured
       state-fn
-      nanotime-granularity-fn
-      1)))
+      nanotime-granularity-fn)))
 
 
 (defn nanotime-granularity [& [options]]
@@ -87,10 +86,6 @@
       options)))
 ;; (constant-bench)
 
-(def m (measured/measured
-         (fn [] 1)
-         (fn [x] x)
-      1))
 
 (def m (measured/expr 1))
 
@@ -111,10 +106,6 @@
 (defn empty-bench [& [options]]
   (time/measure*
     (measured/expr nil)
-    ;; (measured/measured
-    ;;   (fn [] 0)
-    ;;   (fn [x])
-    ;;   1)
     (merge
       {:limit-time 10}
       options)))

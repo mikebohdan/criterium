@@ -39,15 +39,31 @@
   (sample/one-shot pipeline measured config))
 
 (defmethod sample-data :quick
-  [_ pipeline measured total-budget config _options]
-  (sample/quick pipeline measured total-budget config))
+  [_ pipeline measured total-budget config
+   {:keys [estimation-fraction estimation-period-ns
+           warmup-fraction warmup-period-ns
+           sample-fraction sample-period-ns]
+    :as   options}]
+  (let [^double estimation-frac (or estimation-fraction
+                                    DEFAULT-ESTIMATION-FRACTION)
+        ^double sample-frac     (if sample-fraction
+                                  sample-fraction
+                                  (- 1.0 estimation-frac))
+        estimation-budget       (toolkit/phase-budget
+                                  total-budget
+                                  estimation-period-ns
+                                  estimation-fraction
+                                  estimation-frac)
+        sample-budget           (toolkit/reduce-budget
+                                  estimation-budget)]
+    (sample/quick pipeline measured estimation-budget sample-budget config)))
 
 (defmethod sample-data :full
   [_ pipeline measured total-budget config
    {:keys [estimation-fraction estimation-period-ns
            warmup-fraction warmup-period-ns
            sample-fraction sample-period-ns]
-    :as options}]
+    :as   options}]
   (let [estimation-frac (or estimation-fraction
                             DEFAULT-ESTIMATION-FRACTION)
         warmup-frac     (or warmup-fraction
@@ -67,7 +83,7 @@
                             warmup-period-ns
                             warmup-fraction
                             warmup-frac)
-        sample-budget    (toolkit/reduce-budget
+        sample-budget     (toolkit/reduce-budget
                            estimation-budget
                            warmup-budget)]
     (sample/full
@@ -81,9 +97,9 @@
 
 (defn- pipeline [options]
   (let [kws     (let [pipeline-opt (:pipeline options [])]
-                 (if (= :all pipeline-opt)
-                   (keys pipeline/pipeline-fns)
-                   pipeline-opt))
+                  (if (= :all pipeline-opt)
+                    (keys pipeline/pipeline-fns)
+                    pipeline-opt))
         options (select-keys options [:terminal-fn])]
     (pipeline/pipeline kws options)))
 

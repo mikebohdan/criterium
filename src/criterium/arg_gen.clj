@@ -51,8 +51,7 @@
         ]
     (measured/measured
       (state-fn gen state-fn-state)
-      f
-      1)))
+      f)))
 
 ;; (defn- binding-vars
 ;;   [bindings]
