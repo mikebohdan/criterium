@@ -269,11 +269,6 @@
          :metrics metrics}
       return-samples (assoc :samples samples))))
 
-(def DEFAULT-TIME-BUDGET-NS
-  "Default time budget when no limit specified.
-  100ms should be imperceptible."
-  (* 100 toolkit/MILLISEC-NS))
-
 
 (defn- pipeline-args [options]
   (let [use-metrics    (let [use-metrics (:metrics options [])]
@@ -425,6 +420,7 @@
                            {:time-budget-ns time-budget-ns
                             :eval-budget    eval-budget})]
     (last vals)))
+
 
 (defn measure*
   "Evaluates measured and return metrics on its evaluation.
