@@ -54,6 +54,7 @@
             [criterium
              [eval :as eval]
              [jvm :as jvm]
+             [measured :as measured]
              [toolkit :as toolkit]
              [util :as util]
              [well :as well]]))
@@ -144,24 +145,27 @@
 
 ;;; Execution timing
 
-(defmacro time-expr
+(defn time-expr
   "Returns a map containing execution time and result of specified function."
-  [expr]
-  `(toolkit/instrumented
-    (toolkit/with-garbage-collector-stats
-      (toolkit/with-time
-        (toolkit/with-expr-value
-          ~expr)))))
+  [measured]
+  (let [pline (toolkit/pipeline
+                (toolkit/with-garbage-collector-stats))]
+    (toolkit/sample
+      measured
+      pline
+      {})))
 
-(defmacro time-expr-for-warmup
+(defn time-expr-for-warmup
   "Returns a map containing execution time, change in loaded and unloaded
   class counts, change in compilation time and result of specified function."
-  [expr]
-  `(toolkit/instrumented
-     (toolkit/with-class-loader-counts
-       (toolkit/with-compilation-time
-         (toolkit/with-time
-           ~expr)))))
+  [measured]
+  (let [pline (toolkit/pipeline
+                (toolkit/with-class-loader-counts
+                  (toolkit/with-compilation-time)))]
+    (toolkit/sample
+      measured
+      pline
+      {})))
 
 (defn elapsed-time
   "Helper to return the elapsed time from instrumentation data map."
@@ -187,13 +191,13 @@
 
 (defn execute-expr
   "Time the execution of `n` invocations of `f`. See `execute-expr*`."
-  [n f]
-  (time-expr (eval/execute-fn-n-times f n)))
+  [n measured]
+  (time-expr (measured/batch measured n)))
 
 (defn execute-expr-for-warmup
   "Time the execution of `n` invocations of `f`. See `execute-expr*`."
-  [n f]
-  (time-expr-for-warmup (eval/execute-fn-n-times f n)))
+  [n measured]
+  (time-expr-for-warmup (measured/batch measured n)))
 
 (defn collect-samples
   "Collect samples of invoking f execute-count times.
@@ -201,7 +205,7 @@
   Collects an instrumentation data map for each invocation.  To avoid creating gc'able
   objects during collection, the data for each invocation is stored in an object array.
   The array is returned as the overall value."
-  [sample-count execution-count f gc-before-sample]
+  [sample-count execution-count measured gc-before-sample]
   {:pre [(pos? sample-count)]}
   (let [result (object-array sample-count)]
     (loop [i (long 0)]
@@ -209,7 +213,7 @@
         (do
           (when gc-before-sample
             (toolkit/force-gc *max-gc-attempts*))
-          (aset result i (execute-expr execution-count f))
+          (aset result i (execute-expr execution-count measured))
           (recur (unchecked-inc i)))
         result))))
 
@@ -220,15 +224,15 @@
   "Run expression for the given amount of time to enable JIT compilation.
 
   Returns a vector of execution count, deltas and estimated function
-  execution time."  [warmup-period f]
-  (debug "warmup-for-jit f" f)
-  (let [ignore-first (time-expr-for-warmup (f))
-        deltas-1     (time-expr-for-warmup (f))
+  execution time."  [warmup-period measured]
+  (debug "warmup-for-jit measured" measured)
+  (let [ignore-first (time-expr-for-warmup measured)
+        deltas-1     (time-expr-for-warmup measured)
         t            (max 1 (elapsed-time deltas-1))
         _            (debug "  initial t" t)
         [deltas-n n] (if (< t 100000)           ; 100us
                        (let [n (inc (quot 100000 t))]
-                         [(execute-expr-for-warmup n f) n])
+                         [(execute-expr-for-warmup n measured) n])
                        [deltas-1 1])
         t            (elapsed-time deltas-n)
         p            (/ warmup-period t)
@@ -240,7 +244,7 @@
            deltas-sum (if (= n 1)
                         deltas-1
                         (util/sum deltas-1 deltas-n))]
-      (let [deltas    (execute-expr-for-warmup c f)
+      (let [deltas    (execute-expr-for-warmup c measured)
             sum       (util/sum deltas-sum deltas)
             count     (+ count c)
             elapsed   (elapsed-time sum)
@@ -303,17 +307,19 @@
    This also means that it runs for a while.  It will typically take 70s for a
    quick test expression (less than 1s run time) or 10s plus 60 run times for
    longer running expressions."
-  [sample-count warmup-jit-period target-execution-time f gc-before-sample
+  [sample-count warmup-jit-period target-execution-time measured gc-before-sample
    overhead]
   (toolkit/force-gc *max-gc-attempts*)
   (let [_                   (progress "Warm up for JIT optimisations ...")
         [warmup-n
          deltas
-         estimated-fn-time] (warmup-for-jit warmup-jit-period f)
+         estimated-fn-time] (warmup-for-jit warmup-jit-period measured)
         _                   (progress "Estimate execution count ...")
         warmup-t            (elapsed-time deltas)
         n-exec              (estimate-execution-count
-                              target-execution-time f gc-before-sample
+                              target-execution-time
+                              measured
+                              gc-before-sample
                               estimated-fn-time)
         total-overhead      (long (* (or overhead 0) 1e9 n-exec))
         _                   (progress "Sample ...")
@@ -326,14 +332,14 @@
         samples             (collect-samples
                               sample-count
                               n-exec
-                              f
+                              measured
                               gc-before-sample)
         _                   (progress "Final GC...")
         gc-deltas           (toolkit/force-gc)
         final-gc-time       (elapsed-time gc-deltas)
         sample-times        (->> samples
-                                 (map elapsed-time)
-                                 (map #(- % total-overhead)))
+                               (map elapsed-time)
+                               (map #(- % total-overhead)))
         total               (reduce + 0 sample-times)
         _                   (progress "Checking GC...")
         final-gc-result     (final-gc-warn total final-gc-time)]
@@ -349,7 +355,7 @@
      :overhead          overhead}))
 
 
-(defn run-benchmarks-round-robin
+#_(defn run-benchmarks-round-robin
   "Benchmark multiple expressions in a 'round robin' fashion.  Very
   similar to run-benchmark, except it takes multiple expressions in a
   sequence instead of only one (each element of the sequence should be a
@@ -697,12 +703,13 @@
    This also means that it runs for a while.  It will typically take 70s for a
    fast test expression (less than 1s run time) or 10s plus 60 run times for
    longer running expressions."
-  [f {:keys [num-samples
-             warmup-jit-period
-             target-execution-time
-             gc-before-sample
-             overhead
-             supress-jvm-option-warnings] :as options}]
+  [measured
+   {:keys [num-samples
+           warmup-jit-period
+           target-execution-time
+           gc-before-sample
+           overhead
+           supress-jvm-option-warnings] :as options}]
   (when-not supress-jvm-option-warnings
     (warn-on-suspicious-jvm-options))
   (let [{:keys [num-samples
@@ -716,12 +723,12 @@
                num-samples
                warmup-jit-period
                target-execution-time
-               f
+               measured
                opts
                overhead)]
     (benchmark-stats data opts)))
 
-(defn benchmark-round-robin*
+#_(defn benchmark-round-robin*
   [exprs options]
   (let [opts  (merge *default-benchmark-opts* options)
         times (run-benchmarks-round-robin
@@ -738,9 +745,9 @@
    fast test expression (less than 1s run time) or 10s plus 60 run times for
    longer running expressions."
   [expr options]
-  `(benchmark* (fn [] ~expr) ~options))
+  `(benchmark* (measured/expr ~expr) ~options))
 
-(defmacro benchmark-round-robin
+#_(defmacro benchmark-round-robin
   [exprs options]
   (let [wrap-exprs (fn [exprs]
                      (cons 'list

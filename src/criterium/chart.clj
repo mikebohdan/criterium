@@ -19,47 +19,50 @@
               :logarithmic? false}}))
 
 (defn bin-definition [mn mx n {:keys [delta num-bins]}]
-  (cond
-    (and (nil? delta) (nil? num-bins))
-    (let [n-bins (max 5 (min n (quot n 10) 50))
-          delta (util/sig-figs
-                  (/ (- mx mn) (double n-bins))
-                  1)
-          mn (util/round-down-to mn delta)
-          mx (util/round-up-to mx delta)]
-      {:n-bins n-bins
-       :delta  delta
-       :mn mn
-       :mx mx})
+  (let [delta (double delta)
+        mn (double mn)
+        mx (double mx)]
+    (cond
+      (and (nil? delta) (nil? num-bins))
+      (let [n-bins (max 5 (min n (quot n 10) 50))
+            delta  (util/sig-figs
+                    (/ (- mx mn) (double n-bins))
+                    1)
+            mn     (util/round-down-to mn delta)
+            mx     (util/round-up-to mx delta)]
+        {:n-bins n-bins
+         :delta  delta
+         :mn     mn
+         :mx     mx})
 
-    (nil? delta)
-    (let [n-bins num-bins
-          delta (util/sig-figs
-                  (/ (- mx mn) (double n-bins))
-                  1)
-          mn (util/round-down-to mn delta)
-          mx (util/round-up-to mx delta)]
-      {:n-bins n-bins
-       :delta  delta
-       :mn mn
-       :mx mx})
+      (nil? delta)
+      (let [n-bins num-bins
+            delta  (util/sig-figs
+                    (/ (- mx mn) (double n-bins))
+                    1)
+            mn     (util/round-down-to mn delta)
+            mx     (util/round-up-to mx delta)]
+        {:n-bins n-bins
+         :delta  delta
+         :mn     mn
+         :mx     mx})
 
-    (nil? num-bins)
-    (let [n-bins (quot (- mx mn) delta)
-          mn (util/round-down-to mn delta)
-          mx (util/round-up-to mx delta)]
-      {:n-bins n-bins
-       :delta  delta
-       :mn mn
-       :mx mx})
+      (nil? num-bins)
+      (let [n-bins (quot (- mx mn) delta)
+            mn     (util/round-down-to mn delta)
+            mx     (util/round-up-to mx delta)]
+        {:n-bins n-bins
+         :delta  delta
+         :mn     mn
+         :mx     mx})
 
-    :else
-    (let [mn (util/round-down-to mn delta)
-          mx (util/round-up-to mx delta)]
-      {:n-bins num-bins
-       :delta  (double delta)
-       :mn     mn
-       :mx     mx})))
+      :else
+      (let [mn (util/round-down-to mn delta)
+            mx (util/round-up-to mx delta)]
+        {:n-bins num-bins
+         :delta  (double delta)
+         :mn     mn
+         :mx     mx}))))
 
 
 (defn histogram [vs options]

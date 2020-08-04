@@ -62,6 +62,16 @@
   ([^Measured measured eval-count]
    ((.f measured) ((:state-fn measured)) eval-count)))
 
+;;; Blackhole
+
+(def ^Blackhole blackhole
+  (Blackhole.
+    "Today's password is swordfish. I understand instantiating Blackholes directly is dangerous."))
+
+(defn evaporate []
+  (.evaporate
+    blackhole
+    "Yes, I am Stephen Hawking, and know a thing or two about black holes."))
 
 ;;; Build a Measured from an expression
 
@@ -163,7 +173,7 @@
                          {:tag 'org.openjdk.jmh.infra.Blackhole})
         eval-count-sym (gensym "eval-count")]
     `(fn [~arg-syms ~eval-count-sym]
-       (let [~blackhole-sym eval/blackhole ; hoist car lookup out of loop
+       (let [~blackhole-sym blackhole ; hoist car lookup out of loop
              ~@(mapcat binding-with-hint-or-cast arg-syms arg-metas)
              ;; primitive loop coounter.  Decrement since we evaluate
              ;; once outside the loop.
@@ -176,7 +186,7 @@
              (.consume ~blackhole-sym ~expr)
              (recur (unchecked-dec i#))))
          (let [finish# (criterium.jvm/timestamp)]
-           (eval/evaporate)
+           (evaporate)
            [(unchecked-subtract finish# start#) val#])))))
 
 (defn merge-metas
@@ -259,7 +269,6 @@
   The sink function can be customised by passing the `:sink-fn` options.
 
   Return a Measured."
-  [m eval-count]
+  [m ^long eval-count]
   {:pre [(>= eval-count 1)]}
-  (let [eval-count (long eval-count)]
-    (assoc m :eval-count eval-count)))
+  (assoc m :eval-count eval-count))

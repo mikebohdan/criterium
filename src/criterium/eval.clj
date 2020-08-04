@@ -8,53 +8,53 @@
 
 
 
-(def ^Blackhole blackhole
-  (Blackhole.
-    "Today's password is swordfish. I understand instantiating Blackholes directly is dangerous."))
+;; (def ^Blackhole blackhole
+;;   (Blackhole.
+;;     "Today's password is swordfish. I understand instantiating Blackholes directly is dangerous."))
 
-(defn evaporate []
-  (.evaporate
-    blackhole
-    "Yes, I am Stephen Hawking, and know a thing or two about black holes.")
+;; (defn evaporate []
+;;   (.evaporate
+;;     blackhole
+;;     "Yes, I am Stephen Hawking, and know a thing or two about black holes.")
 
-;;; Mutable place to avoid JIT removing expr evaluation altogether
+;; ;;; Mutable place to avoid JIT removing expr evaluation altogether
 
-  (alter-var-root #'*compiler-options*
-                  assoc :disable-locals-clearing true))
+;;   (alter-var-root #'*compiler-options*
+;;                   assoc :disable-locals-clearing true))
 
-;; We use deftype and definterface to minimise runtime costs
-(definterface SinkOps
-  (^void sink [^Object x])
-  (^void sink [^long x]))
+;; ;; We use deftype and definterface to minimise runtime costs
+;; (definterface SinkOps
+;;   (^void sink [^Object x])
+;;   (^void sink [^long x]))
 
-(deftype Sink
-    [^{:volatile-mutable true :tag long} m
-     ^{:unsynchronized-mutable true :tag long} r
-     ^{:volatile-mutable true :tag long} l1
-     ^{:unsynchronized-mutable true :tag long} l2
-     ^{:unsynchronized-mutable true} obj]
-  SinkOps
-  (^void sink [_ ^Object sv]
-   (let [mm m]
-     (set! r (* r 0x19660D 0x3C6EF35F))
-     (when (zero? (bit-and r mm))
-       (set! obj (WeakReference. sv))
-       (set! m (unchecked-inc (bit-shift-left mm 1))))))
-  (^void sink [_ ^long sv]
-   (let [ll1 l1
-         ll2 l2]
-     (when (= (bit-xor sv ll1) (bit-xor sv ll2))
-       (inc nil)))))
+;; (deftype Sink
+;;     [^{:volatile-mutable true :tag long} m
+;;      ^{:unsynchronized-mutable true :tag long} r
+;;      ^{:volatile-mutable true :tag long} l1
+;;      ^{:unsynchronized-mutable true :tag long} l2
+;;      ^{:unsynchronized-mutable true} obj]
+;;   SinkOps
+;;   (^void sink [_ ^Object sv]
+;;    (let [mm m]
+;;      (set! r (* r 0x19660D 0x3C6EF35F))
+;;      (when (zero? (bit-and r mm))
+;;        (set! obj (WeakReference. sv))
+;;        (set! m (unchecked-inc (bit-shift-left mm 1))))))
+;;   (^void sink [_ ^long sv]
+;;    (let [ll1 l1
+;;          ll2 l2]
+;;      (when (= (bit-xor sv ll1) (bit-xor sv ll2))
+;;        (inc nil)))))
 
-(def ^Sink sink
-  (let [rand (Random. (jvm/timestamp))
-        l1 (.nextLong rand)]
-    (Sink.
-      1
-      (.nextLong rand)
-      l1
-      (inc l1)
-      nil)
+;; (def ^Sink sink
+;;   (let [rand (Random. (jvm/timestamp))
+;;         l1 (.nextLong rand)]
+;;     (Sink.
+;;       1
+;;       (.nextLong rand)
+;;       l1
+;;       (inc l1)
+;;       nil)
   ;; ;; An object which can sink objects.
 
   ;; ;; Used to store the result of each expression, to prevent JIT
@@ -66,7 +66,7 @@
   ;; of the mutable place, which should never happen."
   ;;   ([v]
   ;;    (.sink the-sink v)))
-  ))
+  ;; ))
 
 ;; (let [rand (Random. (jvm/timestamp))
 ;;       l1 (.nextLong rand)
@@ -89,8 +89,8 @@
 ;;     ([v]
 ;;      (.sink the-sink v))))
 
-(alter-var-root #'*compiler-options*
-                assoc :disable-locals-clearing false)
+;; (alter-var-root #'*compiler-options*
+;;                 assoc :disable-locals-clearing false)
 
 ;; (definterface SinkPrimitiveLong
 ;;   )
@@ -128,55 +128,55 @@
 
 ;;; Execution
 
-(defmacro execute-n-times-unrolled
-  "Evaluates `expr` `n` times, each time saving the
-  return value as an Object in `mutable-place`.
+;; (defmacro execute-n-times-unrolled
+;;   "Evaluates `expr` `n` times, each time saving the
+;;   return value as an Object in `mutable-place`.
 
-  Except for the expr evaluation, storage of the expression
-  value is the only overhead.
+;;   Except for the expr evaluation, storage of the expression
+;;   value is the only overhead.
 
-  The JVM is not free to optimize away the evaluations of expr, as the
-  values are saved in `mutable-place`."
-  [expr n]
-  `(do
-     ~@(for [i (range n)]
-         `(set-place mutable-place ~expr))
-     (get-place mutable-place)))  ; use the mutable value for good measure
+;;   The JVM is not free to optimize away the evaluations of expr, as the
+;;   values are saved in `mutable-place`."
+;;   [expr n]
+;;   `(do
+;;      ~@(for [i (range n)]
+;;          `(set-place mutable-place ~expr))
+;;      (get-place mutable-place)))  ; use the mutable value for good measure
 
-(defmacro execute-n-times
-  "Evaluates `expr` `n` times, each time saving the
-  return value as an Object in `mutable-place`.
+;; (defmacro execute-n-times
+;;   "Evaluates `expr` `n` times, each time saving the
+;;   return value as an Object in `mutable-place`.
 
-  Except for the expr evaluation, only a few primitive long arithmetic
-  operations and comparisons to 0, and the storage of the return
-  value, are done during each iteration.
+;;   Except for the expr evaluation, only a few primitive long arithmetic
+;;   operations and comparisons to 0, and the storage of the return
+;;   value, are done during each iteration.
 
-  The JVM is not free to optimize away the evaluations of expr, as the
-  values are saved in `mutable-place`."
-  [expr n]
-  `(do
-     (loop [i# (long (dec ~n))
-            v# ~expr]
-       (set-place mutable-place v#)
-       (if (pos? i#)
-         (recur (unchecked-dec i#) ~expr)
-         v#))
-     (get-place mutable-place)))  ; use the mutable value for good measure
+;;   The JVM is not free to optimize away the evaluations of expr, as the
+;;   values are saved in `mutable-place`."
+;;   [expr n]
+;;   `(do
+;;      (loop [i# (long (dec ~n))
+;;             v# ~expr]
+;;        (set-place mutable-place v#)
+;;        (if (pos? i#)
+;;          (recur (unchecked-dec i#) ~expr)
+;;          v#))
+;;      (get-place mutable-place)))  ; use the mutable value for good measure
 
-(defmacro execute-fn-n-times
-  "Evaluates `(f)` `n` times, each time saving the
-  return value as an Object in `mutable-place`.
+;; (defmacro execute-fn-n-times
+;;   "Evaluates `(f)` `n` times, each time saving the
+;;   return value as an Object in `mutable-place`.
 
-  Except for the call to (f), only a few primitive long arithmetic
-  operations and comparisons to 0, and the storage of the return
-  value, are done during each iteration.
+;;   Except for the call to (f), only a few primitive long arithmetic
+;;   operations and comparisons to 0, and the storage of the return
+;;   value, are done during each iteration.
 
-  The JVM is not free to optimize away the calls to f, as the return
-  values are saved in `mutable-place`."
-  [f n]
-  `(loop [i# (long (dec ~n))
-          v# (~f)]
-     (set-place mutable-place v#)
-     (if (pos? i#)
-       (recur (unchecked-dec i#) (~f))
-       v#)))
+;;   The JVM is not free to optimize away the calls to f, as the return
+;;   values are saved in `mutable-place`."
+;;   [f n]
+;;   `(loop [i# (long (dec ~n))
+;;           v# (~f)]
+;;      (set-place mutable-place v#)
+;;      (if (pos? i#)
+;;        (recur (unchecked-dec i#) (~f))
+;;        v#)))

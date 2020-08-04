@@ -207,10 +207,10 @@
   Returns the actual time waited, in nanoseconds.
   This is CPU intensive, and is for verifying criterium itself.
   It should have good accuracy down to about 10us."
-  [ns]
+  [^long ns]
   (let [start (timestamp)]
     (loop []
-      (let [diff (- (timestamp) start)]
+      (let [diff (unchecked-subtract (timestamp) start)]
         (if (> diff ns)
           diff
           (recur))))))

@@ -7,8 +7,8 @@
   (let [eval-count (volatile! 0)
         m (measured/measured
             (fn [] :arg)
-            (fn [arg n]
-              (vswap! eval-count #(+ n %))
+            (fn [arg ^long n]
+              (vswap! eval-count #(+ n ^long %))
               [::time [arg arg]])
             1
             (fn [] ::symbolic))]
