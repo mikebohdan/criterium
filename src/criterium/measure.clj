@@ -5,7 +5,8 @@
              [measured :as measured]
              [pipeline :as pipeline]
              [toolkit :as toolkit]
-             [sample :as sample]]))
+             [sample :as sample]])
+  (:import [criterium.toolkit Budget]))
 
 
 (def ^Long DEFAULT-TIME-BUDGET-NS
@@ -20,10 +21,11 @@
 (def ^Long DEFAULT-BATCH-TIME-NS
   (* 10 toolkit/MICROSEC-NS))
 
-(def DEFAULT-ESTIMATION-FRACTION 0.1)
-(def DEFAULT-WARMUP-FRACTION 0.2)
+(def ^Double DEFAULT-ESTIMATION-FRACTION 0.1)
+(def ^Double DEFAULT-WARMUP-FRACTION 0.2)
 
-(defn total-budget [limit-time-s limit-eval-count]
+(defn budget-for-limits
+  ^Budget [limit-time-s limit-eval-count]
   (toolkit/budget
     (or limit-time-s DEFAULT-TIME-BUDGET-NS)
     (or limit-eval-count DEFAULT-EVAL-COUNT-BUDGET)))
@@ -49,11 +51,11 @@
   (let [estimation-frac (or estimation-fraction
                             DEFAULT-ESTIMATION-FRACTION)
         warmup-frac     (or warmup-fraction
-                        DEFAULT-WARMUP-FRACTION)
+                            DEFAULT-WARMUP-FRACTION)
         sample-frac     (or sample-fraction
-                        (- 1
-                           estimation-frac
-                           warmup-frac))
+                            (- 1.0
+                               estimation-frac
+                               warmup-frac))
 
         estimation-budget (toolkit/phase-budget
                             total-budget
@@ -112,14 +114,18 @@
         config       {:max-gc-attempts (or max-gc-attempts 3)
                       :batch-time-ns   (or batch-time-ns
                                            DEFAULT-BATCH-TIME-NS)}
-        total-budget (total-budget limit-time-s limit-eval-count)
+        total-budget (budget-for-limits limit-time-s limit-eval-count)
 
         pipeline (pipeline options)
 
         sampled (sample-data
-                       sample-mode pipeline measured total-budget config options)]
+                  sample-mode pipeline measured total-budget config options)]
+    (println :total-budget total-budget
+             (.elapsed-time-ns total-budget)
+             (.eval-count total-budget))
     (report-sampled report-mode sampled options)))
 
 (measure
   (measured/expr 1)
-  {:report-mode :samples})
+  {:report-mode :samples
+   :sample-mode :quick})

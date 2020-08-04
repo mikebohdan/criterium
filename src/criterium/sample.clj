@@ -37,7 +37,7 @@
       pipeline
       measured
       budget
-      1)))
+      batch-size)))
 
 
 (defn full

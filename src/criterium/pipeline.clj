@@ -26,6 +26,9 @@
     - the number of evals on the :eval-count key."
   [{:keys [state] :as sample} measured]
   (let [f                         (:f measured)
+        ;; TODO make eval-count an argument on sample-data
+        ;; rather than use an updated field on measured
+        ;; so we preserve the measured call site.
         eval-count                (:eval-count measured)
         [elapsed-time expr-value] (f state eval-count)]
     (assoc sample

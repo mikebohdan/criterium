@@ -61,8 +61,8 @@
 
 (defn budget-remaining?
   [^Budget budget ^long elapsed-time-ns ^long eval-count]
-  (and (< (.elapsed-time-ns budget) elapsed-time-ns)
-       (< (.eval-count budget) elapsed-time-ns)))
+  (and (< elapsed-time-ns (.elapsed-time-ns budget))
+       (< eval-count (.eval-count budget))))
 
 ;;; Memory management
 
