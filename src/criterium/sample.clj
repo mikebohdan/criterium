@@ -72,21 +72,21 @@
                      batch-size)
         _          (toolkit/force-gc max-gc-attempts)
 
-        batch-size (toolkit/estimate-batch-size
-                     measured t1 warmup-budget batch-time-ns)
-        samples    (toolkit/warmup
-                     measured
-                     warmup-budget
-                     batch-size)
-        t2         (/ (reduce + (map pipeline/elapsed-time samples))
-                      (reduce + (map :num-evals samples)))
-        _          (toolkit/force-gc max-gc-attempts)
+        batch-size        (toolkit/estimate-batch-size
+                            measured t1 warmup-budget batch-time-ns)
+        {:keys [elapsed-time-ns eval-count]}
+        (toolkit/warmup
+          measured
+          warmup-budget
+          batch-size)
+        t2                (/ elapsed-time-ns eval-count)
+        _                 (toolkit/force-gc max-gc-attempts)
 
-        batch-size  (toolkit/estimate-batch-size
-                      measured t2 sample-budget batch-time-ns)
+        batch-size (toolkit/estimate-batch-size
+                     measured t2 sample-budget batch-time-ns)
         sample-data (toolkit/sample
                       pipeline
                       measured
                       sample-budget
                       batch-size)]
-    sample-data))
+       sample-data))

@@ -27,13 +27,13 @@
     (or eval-count-budget Long/MAX_VALUE)))
 
 (defn reduce-budget
-  ^Budget [budget & other-budgets]
+  ^Budget [total-budget & other-budgets]
   (reduce
     (fn [^Budget b ^Budget b1]
       (budget
         (- (.elapsed-time-ns b) (.elapsed-time-ns b1))
         (- (.eval-count b) (.eval-count b1))))
-    budget
+    total-budget
     other-budgets))
 
 (defn phase-budget

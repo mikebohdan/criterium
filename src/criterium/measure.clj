@@ -25,10 +25,10 @@
 (def ^Double DEFAULT-WARMUP-FRACTION 0.2)
 
 (defn budget-for-limits
-  ^Budget [limit-time-s limit-eval-count]
+  ^Budget [limit-time-s limit-eval-count factor]
   (toolkit/budget
-    (or limit-time-s DEFAULT-TIME-BUDGET-NS)
-    (or limit-eval-count DEFAULT-EVAL-COUNT-BUDGET)))
+    (or limit-time-s (* factor DEFAULT-TIME-BUDGET-NS))
+    (or limit-eval-count (* factor DEFAULT-EVAL-COUNT-BUDGET))))
 
 (defmulti sample-data
   (fn [sample-mode pipeline measured total-budget config options]
@@ -129,8 +129,9 @@
                            :point))
         config       {:max-gc-attempts (or max-gc-attempts 3)
                       :batch-time-ns   (or batch-time-ns
-                                           DEFAULT-BATCH-TIME-NS)}
-        total-budget (budget-for-limits limit-time-s limit-eval-count)
+                                           (* 10 DEFAULT-BATCH-TIME-NS))}
+        factor (if (= sample-mode :quick) 1 10)
+        total-budget (budget-for-limits limit-time-s limit-eval-count factor)
 
         pipeline (pipeline options)
 
@@ -144,4 +145,4 @@
 (measure
   (measured/expr 1)
   {:report-mode :samples
-   :sample-mode :quick})
+   :sample-mode :full})
