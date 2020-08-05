@@ -60,6 +60,7 @@
    sample-budget
    {:keys [max-gc-attempts batch-time-ns]
     :as   _config}]
+  {:pre [pipeline]}
   ;; Start by running GC until it has nothing to do.
   (toolkit/throw-away-sample measured)
   (toolkit/force-gc max-gc-attempts)

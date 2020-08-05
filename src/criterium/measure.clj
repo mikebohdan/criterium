@@ -1,11 +1,11 @@
 (ns criterium.measure
   "Opinionated measure function."
   (:require [criterium
-             [jvm :as jvm]
              [measured :as measured]
              [pipeline :as pipeline]
              [toolkit :as toolkit]
-             [sample :as sample]])
+             [sample :as sample]
+             [sampled-stats :as sampled-stats]])
   (:import [criterium.toolkit Budget]))
 
 
@@ -31,17 +31,16 @@
     (or limit-eval-count (* factor DEFAULT-EVAL-COUNT-BUDGET))))
 
 (defmulti sample-data
-  (fn [sample-mode pipeline measured total-budget config options]
+  (fn [sample-mode _pipeline _measured _total-budget _config _options]
     sample-mode))
 
 (defmethod sample-data :one-shot
-  [_ pipeline measured total-budget config _options]
+  [_ pipeline measured _total-budget config _options]
   (sample/one-shot pipeline measured config))
 
 (defmethod sample-data :quick
   [_ pipeline measured total-budget config
    {:keys [estimation-fraction estimation-period-ns
-           warmup-fraction warmup-period-ns
            sample-fraction sample-period-ns]
     :as   options}]
   (let [^double estimation-frac (or estimation-fraction
@@ -100,16 +99,29 @@
                   (if (= :all pipeline-opt)
                     (keys pipeline/pipeline-fns)
                     pipeline-opt))
-        options (select-keys options [:terminal-fn])]
-    (pipeline/pipeline kws options)))
+        terminal-kw (get options :terminal :elapsed-time-ns)
+        options {:terminal-fn (pipeline/terminal-fns terminal-kw)}
+        metrics (conj kws terminal-kw)]
+    [(pipeline/pipeline kws options) metrics]))
 
-(defmulti report-sampled
-  (fn [report-mode sampled options]
-    report-mode))
+(defmulti process-samples
+  (fn [process-mode sampled metrics options]
+    process-mode))
 
-(defmethod report-sampled :samples
-  [report-mode sampled options]
+(defmethod process-samples :samples
+  ;; mode to just return the samples
+  [process-mode sampled metrics options]
   sampled)
+
+(defmethod process-samples :stats
+  ;; mode to just return the samples
+  [process-mode sampled metrics options]
+  (let [])
+  (sampled-stats/sample-stats
+    metrics
+    (:batch-size sampled)
+    (:samples sampled)
+    options))
 
 (defn measure
   [measured
@@ -117,32 +129,22 @@
            limit-time-s limit-eval-count
            max-gc-attempts
            batch-time-ns
-           report-mode]
+           process-mode]
     :as   options}]
-  (let [sample-mode  (or sample-mode
-                         (if (or limit-time-s limit-eval-count)
-                           :full
-                           :quick))
-        report-mode  (or report-mode
-                         (if (or limit-time-s limit-eval-count)
-                           :interval
-                           :point))
-        config       {:max-gc-attempts (or max-gc-attempts 3)
-                      :batch-time-ns   (or batch-time-ns
-                                           (* 10 DEFAULT-BATCH-TIME-NS))}
-        factor (if (= sample-mode :quick) 1 10)
-        total-budget (budget-for-limits limit-time-s limit-eval-count factor)
-
-        pipeline (pipeline options)
-
-        sampled (sample-data
-                  sample-mode pipeline measured total-budget config options)]
-    (println :total-budget total-budget
-             (.elapsed-time-ns total-budget)
-             (.eval-count total-budget))
-    (report-sampled report-mode sampled options)))
-
-(measure
-  (measured/expr 1)
-  {:report-mode :samples
-   :sample-mode :full})
+  (let [sample-mode     (or sample-mode
+                            (if (or limit-time-s limit-eval-count)
+                              :full
+                              :quick))
+        process-mode    (or process-mode
+                            (if (= :one-shot sample-mode)
+                              :samples
+                              :stats))
+        config          {:max-gc-attempts (or max-gc-attempts 3)
+                         :batch-time-ns   (or batch-time-ns
+                                              (* 10 DEFAULT-BATCH-TIME-NS))}
+        factor          (if (= sample-mode :quick) 1 10)
+        total-budget    (budget-for-limits limit-time-s limit-eval-count factor)
+        [pline metrics] (pipeline options)
+        sampled         (sample-data
+                          sample-mode pline measured total-budget config options)]
+    (process-samples process-mode sampled metrics options)))

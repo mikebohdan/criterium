@@ -128,7 +128,7 @@
 
 
 (def terminal-fns
-  {:time-metric time-metric})
+  {:elapsed-time-ns time-metric})
 
 (def pipeline-fns
   {:class-loader       with-class-loader-counts
@@ -148,6 +148,7 @@
   (reduce
     (fn [pipeline pipeline-kw]
       (let [f (pipeline-fns pipeline-kw)]
+        (assert f)
         (f pipeline)))
     terminal-fn
     pipeline-kws))
@@ -209,6 +210,7 @@
 (defn divide
   "Divide values across samples."
   [sample divisor]
+  {:pre [(some? divisor) (number? divisor) (not= 0 divisor)]}
   (walk/postwalk
     #(cond
        (integer? %) (quot % divisor)
