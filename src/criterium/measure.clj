@@ -1,7 +1,9 @@
 (ns criterium.measure
   "Opinionated measure function."
   (:require [criterium
+             [format :as format]
              [measured :as measured]
+             [output :as output]
              [pipeline :as pipeline]
              [toolkit :as toolkit]
              [sample :as sample]
@@ -16,7 +18,7 @@
 
 (def ^Long DEFAULT-EVAL-COUNT-BUDGET
   "Default eval count budget when no limit specified."
-  10000)
+  1000000)
 
 (def ^Long DEFAULT-BATCH-TIME-NS
   (* 10 toolkit/MICROSEC-NS))
@@ -27,8 +29,14 @@
 (defn budget-for-limits
   ^Budget [limit-time-s limit-eval-count factor]
   (toolkit/budget
-    (or limit-time-s (* factor DEFAULT-TIME-BUDGET-NS))
-    (or limit-eval-count (* factor DEFAULT-EVAL-COUNT-BUDGET))))
+    (or (and limit-time-s (* limit-time-s toolkit/SEC-NS))
+        (if limit-eval-count
+          Long/MAX_VALUE
+          (* factor DEFAULT-TIME-BUDGET-NS)))
+    (or limit-eval-count
+        (if limit-time-s
+          Long/MAX_VALUE
+          (* factor DEFAULT-EVAL-COUNT-BUDGET)))))
 
 (defmulti sample-data
   (fn [sample-mode _pipeline _measured _total-budget _config _options]
@@ -54,6 +62,7 @@
                                   estimation-fraction
                                   estimation-frac)
         sample-budget           (toolkit/reduce-budget
+                                  total-budget
                                   estimation-budget)]
     (sample/quick pipeline measured estimation-budget sample-budget config)))
 
@@ -83,8 +92,17 @@
                             warmup-fraction
                             warmup-frac)
         sample-budget     (toolkit/reduce-budget
-                           estimation-budget
-                           warmup-budget)]
+                            total-budget
+                            estimation-budget
+                            warmup-budget)]
+    (output/progress
+      "total-budget" total-budget)
+    (output/progress
+      "estimation-budget" estimation-budget)
+    (output/progress
+      "warmup-budget" warmup-budget)
+    (output/progress
+      "sample-budget" sample-budget)
     (sample/full
       pipeline
       measured
@@ -139,11 +157,17 @@
                             (if (= :one-shot sample-mode)
                               :samples
                               :stats))
+        _ (output/progress "Modes:  " sample-mode " process" process-mode)
         config          {:max-gc-attempts (or max-gc-attempts 3)
                          :batch-time-ns   (or batch-time-ns
                                               (* 10 DEFAULT-BATCH-TIME-NS))}
-        factor          (if (= sample-mode :quick) 1 10)
+        factor          (if (= sample-mode :quick) 1 100)
         total-budget    (budget-for-limits limit-time-s limit-eval-count factor)
+        _ (output/progress
+            "Limits:  time"
+            (format/format-value :time-ns (.elapsed-time-ns total-budget))
+            " evaluations"
+            (format/format-value :count (.eval-count total-budget)))
         [pline metrics] (pipeline options)
         sampled         (sample-data
                           sample-mode pline measured total-budget config options)]

@@ -21,7 +21,7 @@
     (< value 1)    [1e3 "ms"]
     :else          [1 "s"]))
 
-(defmethod scale :ns
+(defmethod scale :time-ns
   [_ value]
   (cond
     (< value 1000) [1 "ns"]
@@ -52,7 +52,12 @@
   [_ value]
   (format "%d" value))
 
-(defmethod format-value :time
+ (defmethod format-value :time
+  [dimension value]
+  (let [[scale unit] (scale dimension value)]
+    (format "%3.3g %s" (double (* scale value)) unit)))
+
+(defmethod format-value :time-ns
   [dimension value]
   (let [[scale unit] (scale dimension value)]
     (format "%3.3g %s" (double (* scale value)) unit)))

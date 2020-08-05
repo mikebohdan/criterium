@@ -1,6 +1,7 @@
 (ns criterium.toolkit
   "Functions used to implement benchmark measurements."
   (:require [criterium
+             [format :as format]
              [jvm :as jvm]
              [measured :as measured]
              [pipeline :as pipeline]]))
@@ -48,21 +49,38 @@
     (cond
       (and period-ns fraction)
       (min ^long period-ns
-           (long (quot (.elapsed-time-ns total-budget) ^double fraction)))
+           (long (* (.elapsed-time-ns total-budget) ^double fraction)))
 
       period-ns period-ns
-      fraction (long (quot (.elapsed-time-ns total-budget) ^double fraction))
+      fraction (long (* (.elapsed-time-ns total-budget) ^double fraction))
 
-      :else (long (quot (.elapsed-time-ns total-budget) default-fraction)))
+      :else (long (* (.elapsed-time-ns total-budget) default-fraction)))
     (cond
-      fraction (long (quot (.eval-count total-budget) ^double fraction))
-      (nil? period-ns) (long (quot (.eval-count total-budget) default-fraction))
+      fraction (long (* (.eval-count total-budget) ^double fraction))
+      (nil? period-ns) (long (* (.eval-count total-budget) default-fraction))
       :else Long/MAX_VALUE)))
 
 (defn budget-remaining?
   [^Budget budget ^long elapsed-time-ns ^long eval-count]
   (and (< elapsed-time-ns (.elapsed-time-ns budget))
        (< eval-count (.eval-count budget))))
+
+(defmethod clojure.core/print-method Budget
+  [^Budget budget ^java.io.Writer writer]
+  (if *print-readably*
+    (.write writer
+            (str "#<Budget " (.elapsed-time-ns budget) " " (.eval-count budget) ">"))
+    (.write writer
+            (str "Budget "
+                 (format/format-value :time-ns (.elapsed-time-ns budget))
+                 " "
+                 (.eval-count budget)))))
+
+(defmethod clojure.pprint/simple-dispatch Budget
+  [^Budget budget]
+  (clojure.pprint/pprint {:elapsed-time-ns (.elapsed-time-ns budget)
+                          :eval-count      (.eval-count budget)}))
+
 
 ;;; Memory management
 
@@ -130,16 +148,21 @@
   (let [t0        (long t0)
         n-est     (long (quot (.elapsed-time-ns budget) t0))
         n-avail   (min (.eval-count budget) n-est)
-        n-desired (max 1 (long (quot batch-time-ns t0)))]
+        n-desired (max 2 (long (quot batch-time-ns t0)))]
     (cond
-      (<= n-avail 1)
-      1
+      (<= n-avail 2)
+      2
 
       (< n-avail (* 10 n-desired))
-      (max 1 (quot n-avail 10))
+      (max 2 (quot n-avail 10))
 
       :else
-      n-desired)))
+      (loop [n-desired n-desired]
+        ;; reduce to less than a predicted 1000 batches
+        (if (or (< (quot (.elapsed-time-ns budget) (* t0 n-desired)) 1000)
+                (< (quot (.eval-count budget) n-desired) 1000))
+          n-desired
+          (recur (* n-desired 10)))))))
 
 (defn estimate-batch-size
   "Estimate batch-size for the given budget and batch execution-time."
@@ -187,7 +210,8 @@
           t               (pipeline/elapsed-time sample)
           elapsed-time-ns (unchecked-add elapsed-time-ns t)
           eval-count      (unchecked-add eval-count (long (:eval-count sample)))]
-      (if (budget-remaining? budget elapsed-time-ns eval-count)
+      (if (or (budget-remaining? budget elapsed-time-ns eval-count)
+              (< (count samples) 2))
         (recur eval-count
                elapsed-time-ns
                (conj samples sample))

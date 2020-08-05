@@ -8,7 +8,7 @@
 (defn stats-for [path batch-size samples opts]
   (let [vs            (mapv (metric/path-accessor path) samples)
         tail-quantile (:tail-quantile opts 0.025)
-         ;; _ (println "path" path "vs" vs)
+        ;; _ (println "path" path "vs" vs)
         stats         (stats/bootstrap-bca
                         (mapv double vs)
                         (juxt

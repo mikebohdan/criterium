@@ -4,6 +4,7 @@
   (:require [criterium
              [measure :as measure]
              [measured :as measured]
+             [output :as output]
              [report :as report]]))
 
 
@@ -30,12 +31,13 @@
   are :time, :garbage-collector, :finalization, :memory, :runtime-memory,
   :compilation, and :class-loader."
   [measured options]
-  (let [result (measure/measure measured options)]
-    (vreset! last-time* result)
-    (if (:stats result)
-      (report/print-stats result options)
-      (report/print-metrics result))
-    (:expr-value result)))
+  (output/with-progress-reporting (:verbose options)
+    (let [result (measure/measure measured options)]
+      (vreset! last-time* result)
+      (if (:stats result)
+        (report/print-stats result options)
+        (report/print-metrics result))
+      (:expr-value result))))
 
 (defmacro time
   "Evaluates expr and prints the time it took.
