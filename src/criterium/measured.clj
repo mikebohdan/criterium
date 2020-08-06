@@ -3,8 +3,7 @@
   (:require [criterium
              [eval :as eval]
              [util :as util]])
-  (:import [criterium.measured Helpers]
-           [org.openjdk.jmh.infra Blackhole]))
+  (:import [org.openjdk.jmh.infra Blackhole]))
 
 ;;; Measured type
 
