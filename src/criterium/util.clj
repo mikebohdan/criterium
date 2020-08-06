@@ -94,3 +94,64 @@
   {:added "1.1"}
   [f form]
   (walk (partial postwalk f) f form))
+
+
+(defn missing-spec
+  [missing-fn [namespace sep as-sym sep refs]]
+  (let [f (fn [namespace ref] `(intern '~namespace '~ref ~missing-fn))]
+    [namespace as-sym
+     (condp = sep
+       nil    nil
+       :as    nil
+       :refer (mapv (partial f namespace) refs))]))
+
+
+(defn unload-ns [ns-sym alias-sym]
+  (ns-unalias *ns* alias-sym)
+  (remove-ns ns-sym)
+  ;; no need to remove from *loaded-libs*, since never loaded
+  ;; via require.
+  ;; (dosync
+  ;;   (commute
+  ;;     (var-get #'clojure.core/*loaded-libs*)
+  ;;     #(remove (fn [x] (= x ns-sym)) %)))
+  )
+
+(def optional-nses (volatile! #{}))
+
+(defn has-optional-ns? [ns-sym]
+  (contains? @optional-nses ns-sym))
+
+
+(defmacro optional-require
+  "Optionally require a namespace."
+  [missing-fn & specs]
+  (let [defs (mapv (partial missing-spec missing-fn) specs)
+        orig-ns (ns-name *ns*)]
+    `(do
+       ~@(for [[namespace as-sym missing-defs] defs]
+           `(do
+              (when (and (find-ns '~namespace)
+                         (ns-resolve '~as-sym 'stub))
+                (unload-ns '~namespace '~as-sym))
+              (try
+                (require '[~namespace :as ~as-sym])
+                (vswap! optional-nses conj '~namespace)
+                true
+                (catch Exception _#
+                  (ns ~namespace)
+                  (intern '~namespace '~'stub true)
+                  ~@missing-defs
+                  (in-ns '~orig-ns)
+                  (require
+                    '[~namespace :as ~as-sym])
+                  nil)
+                ))))))
+
+(comment
+  (optional-require
+    (constantly nil)
+    [ab :as ab :refer [a b]])
+  (optional-require
+    (constantly nil)
+    [criterium.stats :as stats :refer [well]]))
