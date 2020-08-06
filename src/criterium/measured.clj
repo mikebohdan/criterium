@@ -1,7 +1,6 @@
 (ns criterium.measured
   "Defines the Measured type."
   (:require [criterium
-             [eval :as eval]
              [util :as util]])
   (:import [org.openjdk.jmh.infra Blackhole]))
 
