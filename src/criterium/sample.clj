@@ -14,11 +14,7 @@
   Return a sampled data map."
   [pipeline measured {:keys [max-gc-attempts] :as _config}]
   (toolkit/force-gc max-gc-attempts)
-  (toolkit/sample
-    pipeline
-    measured
-    (toolkit/budget Long/MAX_VALUE 1)
-    1))
+  (pipeline/execute pipeline measured 1))
 
 
 (defn quick
