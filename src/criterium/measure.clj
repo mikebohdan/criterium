@@ -134,12 +134,14 @@
 (defmethod process-samples :stats
   ;; mode to just return the samples
   [process-mode sampled metrics options]
-  (let [])
-  (sampled-stats/sample-stats
-    metrics
-    (:batch-size sampled)
-    (:samples sampled)
-    options))
+  (let [res (sampled-stats/sample-stats
+              metrics
+              (:batch-size sampled)
+              (:samples sampled)
+              options)]
+    (if (or (:histogram options) (:include-samples options))
+      (assoc res :samples (:samples sampled))
+      res)))
 
 (defn measure
   [measured

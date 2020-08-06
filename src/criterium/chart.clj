@@ -5,6 +5,7 @@
   (:require [com.hypirion.clj-xchart :as c]
             [criterium
              [format :as format]
+             [pipeline :as pipeline]
              [toolkit :as toolkit]
              [util :as util]]))
 
@@ -19,7 +20,7 @@
               :logarithmic? false}}))
 
 (defn bin-definition [mn mx n {:keys [delta num-bins]}]
-  (let [delta (double delta)
+  (let [delta (when delta (double delta))
         mn (double mn)
         mx (double mx)]
     (cond
@@ -122,7 +123,7 @@
         upper-limit (+ mean (* 2 (Math/sqrt variance)))
         vs (->>
              samples
-             (mapv toolkit/elapsed-time)
+             (mapv pipeline/elapsed-time)
              (mapv #(/ % (double batch-size)))
              (filterv #(< % upper-limit))
              (mapv #(* % scale)))

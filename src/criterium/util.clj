@@ -97,8 +97,8 @@
 
 
 (defn missing-spec
-  [missing-fn [namespace sep as-sym sep refs]]
-  (let [f (fn [namespace ref] `(intern '~namespace '~ref ~missing-fn))]
+  [[namespace sep as-sym sep refs]]
+  (let [f (fn [namespace ref] `(intern '~namespace '~ref))]
     [namespace as-sym
      (condp = sep
        nil    nil
@@ -106,16 +106,16 @@
        :refer (mapv (partial f namespace) refs))]))
 
 
-(defn unload-ns [ns-sym alias-sym]
+(defn unload-ns
+  "Remove currently aliased namespace."
+  [ns-sym alias-sym]
   (ns-unalias *ns* alias-sym)
   (remove-ns ns-sym)
-  ;; no need to remove from *loaded-libs*, since never loaded
-  ;; via require.
-  ;; (dosync
-  ;;   (commute
-  ;;     (var-get #'clojure.core/*loaded-libs*)
-  ;;     #(remove (fn [x] (= x ns-sym)) %)))
-  )
+  (dosync
+    (commute
+      (var-get #'clojure.core/*loaded-libs*)
+      disj
+      ns-sym)))
 
 (def optional-nses (volatile! #{}))
 
@@ -125,14 +125,14 @@
 
 (defmacro optional-require
   "Optionally require a namespace."
-  [missing-fn & specs]
-  (let [defs (mapv (partial missing-spec missing-fn) specs)
+  [& specs]
+  (let [defs    (mapv missing-spec specs)
         orig-ns (ns-name *ns*)]
     `(do
        ~@(for [[namespace as-sym missing-defs] defs]
            `(do
               (when (and (find-ns '~namespace)
-                         (ns-resolve '~as-sym 'stub))
+                         (ns-resolve '~namespace 'stub))
                 (unload-ns '~namespace '~as-sym))
               (try
                 (require '[~namespace :as ~as-sym])
@@ -147,6 +147,10 @@
                     '[~namespace :as ~as-sym])
                   nil)
                 ))))))
+
+(defn assert-optional-ns [ns-sym message]
+  (when-not (has-optional-ns? ns-sym)
+    (throw (ex-info message {:missing-ns ns-sym}))))
 
 (comment
   (optional-require
