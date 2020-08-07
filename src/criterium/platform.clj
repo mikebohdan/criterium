@@ -1,10 +1,9 @@
 (ns criterium.platform
   "Platform characterisation"
   (:require [criterium
-             [eval :as eval]
              [jvm :as jvm]
+             [measure :as measure]
              [measured :as measured]
-             [time :as time]
              [toolkit :as toolkit]]))
 
 
@@ -28,7 +27,7 @@
 
 
 (defn nanotime-latency [& [options]]
-  (time/measure*
+  (measure/measure
     ;;(nanotime-latency-measured (long n))
     (measured/expr (jvm/timestamp))
     (merge
@@ -63,7 +62,7 @@
 
 
 (defn nanotime-granularity [& [options]]
-  (time/measure*
+  (measure/measure
     (nanotime-granularity-measured)
     (merge
       {:limit-time 10}
@@ -73,7 +72,7 @@
 
 ;; Minimum measured time
 (defn constant-bench [& [options]]
-  (time/measure*
+  (measure/measure
     (measured/expr 1)
     ;; (measured/measured
     ;;   (fn [] 1)
@@ -93,8 +92,8 @@
           m
           100))
 
-(require 'no.disassemble)
 (comment
+  (require 'no.disassemble)
   (clojure.pprint/pprint
     (println (no.disassemble/disassemble-str (:f m)))
     (println (no.disassemble/disassemble-str (:f mb)))
@@ -104,7 +103,7 @@
     ))
 
 (defn empty-bench [& [options]]
-  (time/measure*
+  (measure/measure
     (measured/expr nil)
     (merge
       {:limit-time 10}

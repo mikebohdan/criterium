@@ -6,6 +6,7 @@
              [rose-tree :as rose]]
             [criterium
              [jvm :as jvm]
+             [measure :as measure]
              [measured :as measured]
              [toolkit :as toolkit]]))
 
@@ -148,11 +149,11 @@
 
   ((:state-fn m))
 
-  (criterium.time/measure* m {:limit-time 1})
-  (dissoc (criterium.time/measure* m {:limit-evals 100}) :samples)
-  (dissoc (criterium.time/measure* nth-bench {:limit-time 1}) :samples)
-  (dissoc (criterium.time/measure* vec-nth-bench {:limit-time 1}) :samples)
-  (criterium.time/measure* m {})
+  (criterium.measure/measure m {:limit-time 1})
+  (dissoc (criterium.measure/measure m {:limit-evals 100}) :samples)
+  (dissoc (criterium.measure/measure nth-bench {:limit-time 1}) :samples)
+  (dissoc (criterium.measure/measure vec-nth-bench {:limit-time 1}) :samples)
+  (criterium.measure/measure m {})
   )
 
 (def g (gen/bind

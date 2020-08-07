@@ -50,5 +50,5 @@
        (/ (* (gamma-fn e1) (gamma-fn e2))
           (* (gamma-fn a1) (gamma-fn a2))))))
 
-(mellin-transform 1 1 1 0 1)
-(mellin-transform 3 1 2 0 1)
+;; (mellin-transform 1 1 1 0 1)
+;; (mellin-transform 3 1 2 0 1)

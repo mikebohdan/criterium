@@ -3,7 +3,6 @@
   (:refer-clojure :exclude [time])
   (:require [criterium
              [chart :as chart]
-             [eval :as eval]
              [format :as format]
              [jvm :as jvm]
              [measured :as measured]
@@ -446,76 +445,76 @@
 ;;     `(measure* (measured/expr ~expr) ~options)))
 
 
-(defn time*
-  "Evaluates expr and prints the time it took.
-  Return the value of expr.
+;; (defn time*
+;;   "Evaluates expr and prints the time it took.
+;;   Return the value of expr.
 
-  The timing info is available as a data structure by calling last-time.
+;;   The timing info is available as a data structure by calling last-time.
 
-  The :times option can be passed an integer specifying how many times to evaluate the
-  expression.  The default is 1.  If a value greater than 1 is specified, then
-  the value of the expression is not returned.
+;;   The :times option can be passed an integer specifying how many times to evaluate the
+;;   expression.  The default is 1.  If a value greater than 1 is specified, then
+;;   the value of the expression is not returned.
 
-  The :metrics option accepts either :all, for all metrics, or a sequence of metric
-  keyword selectors. Valid metrics
-  are :time, :garbage-collector, :finalization, :memory, :runtime-memory,
-  :compilation, and :class-loader."
-  [measured options]
-  (let [result (measure* measured (assoc options :return-samples true))]
-    (vreset! last-time* result)
-    (if (:num-samples result)
-      (print-stats result options)
-      (print-metrics result))
-    (:expr-value result)))
+;;   The :metrics option accepts either :all, for all metrics, or a sequence of metric
+;;   keyword selectors. Valid metrics
+;;   are :time, :garbage-collector, :finalization, :memory, :runtime-memory,
+;;   :compilation, and :class-loader."
+;;   [measured options]
+;;   (let [result (measure* measured (assoc options :return-samples true))]
+;;     (vreset! last-time* result)
+;;     (if (:num-samples result)
+;;       (print-stats result options)
+;;       (print-metrics result))
+;;     (:expr-value result)))
 
-(defmacro time
-  "Evaluates expr and prints the time it took.
-  Return the value of expr.
+;; (defmacro time
+;;   "Evaluates expr and prints the time it took.
+;;   Return the value of expr.
 
-  The timing info is available as a data structure by calling last-time.
+;;   The timing info is available as a data structure by calling last-time.
 
-  The :times option can be passed an integer specifying how many times to evaluate the
-  expression.  The default is 1.  If a value greater than 1 is specified, then
-  the value of the expression is not returned.
+;;   The :times option can be passed an integer specifying how many times to evaluate the
+;;   expression.  The default is 1.  If a value greater than 1 is specified, then
+;;   the value of the expression is not returned.
 
-  The :metrics option accepts either :all, for all metrics, or a sequence of metric
-  keyword selectors. Valid metrics
-  are :time, :garbage-collector, :finalization, :memory, :runtime-memory,
-  :compilation, and :class-loader."
-  [expr & options]
-  (let [options          (apply hash-map options)
-        ;; n                (:times options 1)
-        ;; use-metrics      (let [use-metrics (:metrics options [:time])]
-        ;;                    (if (= :all use-metrics) (keys metrics) use-metrics))
-        ;; measured-fn-form (measured-expr expr)
-        ;; f-sym            (gensym "f")
-        ;; state-sym        (gensym "state")
-        ]
-    `(time* (measured/expr ~expr) ~options)
-    ;; `(let [measured-fn# ~measured-fn-form
-    ;;        state-fn#    (:state-fn measured-fn#)
-    ;;        ~state-sym   (state-fn#)
-    ;;        ~f-sym       (:f measured-fn#)
-    ;;        vals#        (toolkit/instrumented
-    ;;                       ~(reduce wrap-for-metric
-    ;;                                (if (= 1 n)
-    ;;                                  `(toolkit/with-expr-value (~f-sym ~state-sym))
-    ;;                                  `(toolkit/with-expr
-    ;;                                     (eval/execute-n-times (~f-sym ~state-sym) ~n)))
-    ;;                                use-metrics))
-    ;;        deltas#      (toolkit/deltas (dissoc vals# :expr-value))]
-    ;;    (vreset! last-time* deltas#)
-    ;;    (print-metrics deltas#)
-    ;;    (:expr-value vals#))
-    ))
+;;   The :metrics option accepts either :all, for all metrics, or a sequence of metric
+;;   keyword selectors. Valid metrics
+;;   are :time, :garbage-collector, :finalization, :memory, :runtime-memory,
+;;   :compilation, and :class-loader."
+;;   [expr & options]
+;;   (let [options          (apply hash-map options)
+;;         ;; n                (:times options 1)
+;;         ;; use-metrics      (let [use-metrics (:metrics options [:time])]
+;;         ;;                    (if (= :all use-metrics) (keys metrics) use-metrics))
+;;         ;; measured-fn-form (measured-expr expr)
+;;         ;; f-sym            (gensym "f")
+;;         ;; state-sym        (gensym "state")
+;;         ]
+;;     `(time* (measured/expr ~expr) ~options)
+;;     ;; `(let [measured-fn# ~measured-fn-form
+;;     ;;        state-fn#    (:state-fn measured-fn#)
+;;     ;;        ~state-sym   (state-fn#)
+;;     ;;        ~f-sym       (:f measured-fn#)
+;;     ;;        vals#        (toolkit/instrumented
+;;     ;;                       ~(reduce wrap-for-metric
+;;     ;;                                (if (= 1 n)
+;;     ;;                                  `(toolkit/with-expr-value (~f-sym ~state-sym))
+;;     ;;                                  `(toolkit/with-expr
+;;     ;;                                     (eval/execute-n-times (~f-sym ~state-sym) ~n)))
+;;     ;;                                use-metrics))
+;;     ;;        deltas#      (toolkit/deltas (dissoc vals# :expr-value))]
+;;     ;;    (vreset! last-time* deltas#)
+;;     ;;    (print-metrics deltas#)
+;;     ;;    (:expr-value vals#))
+;;     ))
 
-;; (time (inc 1))
+;; ;; (time (inc 1))
 
 
-(defn last-time
-  "Return the data from the last time invocation."
-  []
-  @last-time*)
+;; (defn last-time
+;;   "Return the data from the last time invocation."
+;;   []
+;;   @last-time*)
 
 
 ;; (time (inc 2) :metrics :all)

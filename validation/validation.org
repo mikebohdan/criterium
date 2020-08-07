@@ -277,11 +277,11 @@ that it is zero for both terminal functions.
   (def measured-one (toolkit/measured-expr 1))
   (toolkit/invoke-measured measured-one)  ; initial function allocation
   (toolkit/total-memory
-    (time/measure*
+    (measure/measure
       measured-one
       {:metrics [:memory :with-expr-value]}))
   (toolkit/total-memory
-    (time/measure*
+    (measure/measure
       measured-one
       {:metrics [:memory]}))
 #+end_src
@@ -293,7 +293,7 @@ allocation.
   (def measured-one (toolkit/measured-expr 1))
   (toolkit/invoke-measured measured-one)  ; initial function allocation
   (toolkit/total-memory
-    (time/measure*
+    (measure/measure
       measured-one
       {:metrics :all}))
 #+end_src

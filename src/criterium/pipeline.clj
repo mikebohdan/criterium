@@ -171,35 +171,36 @@
     (pipeline sample measured)))
 
 
-(defn sample
-  "Sample by invoking measured with eval-count using pipeline.
+;; (defn sample
+;;   "Sample by invoking measured with eval-count using pipeline.
 
-  Invokes until time-budget-ns elapsed or eval-budget reached.
+;;   Invokes until time-budget-ns elapsed or eval-budget reached.
 
-  Collects a sample data map for each invocation.  Map keys are
-  determined by the pipeline.
+;;   Collects a sample data map for each invocation.  Map keys are
+;;   determined by the pipeline.
 
-  Return a sequence of sample maps."
-  [pipeline
-   measured
-   eval-count
-   {:keys [time-budget-ns
-           eval-budget]
-    :or   {time-budget-ns 500000000
-           eval-budget    1000000}
-    :as   _options}]
-  (let [eval-count (long (:eval-count measured))]
-    (loop [samples        []
-           eval-budget    (long eval-budget)
-           time-budget-ns (long time-budget-ns)]
-      (if (and (pos? eval-budget) (pos? time-budget-ns))
-        (let [sample (execute pipeline measured eval-count)
-              t      (long (:time sample))]
-          (recur
-            (conj samples sample)
-            (unchecked-subtract eval-budget eval-count)
-            (unchecked-subtract time-budget-ns t)))
-        samples))))
+;;   Return a sequence of sample maps."
+;;   [pipeline
+;;    measured
+;;    eval-count
+;;    {:keys [time-budget-ns
+;;            eval-budget]
+;;     :or   {time-budget-ns 500000000
+;;            eval-budget    1000000}
+;;     :as   _options}]
+;;   (let [eval-count (long eval-count)]
+;;     (loop [samples        []
+;;            eval-budget    (long eval-budget)
+;;            time-budget-ns (long time-budget-ns)]
+;;       (if (and (pos? eval-budget) (pos? time-budget-ns))
+;;         (let [sample (execute pipeline measured eval-count)
+;;               _ (println "sample" sample)
+;;               t      (long (:elapsed-time-ns sample))]
+;;           (recur
+;;             (conj samples sample)
+;;             (unchecked-subtract eval-budget eval-count)
+;;             (unchecked-subtract time-budget-ns t)))
+;;         samples))))
 
 
 (defn total

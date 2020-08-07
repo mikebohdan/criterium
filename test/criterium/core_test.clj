@@ -32,30 +32,3 @@
           [1.395522860870968 []]
           [(* 0.0013859776344426547 0.0013859776344426547) []]
           67108864))))
-
-(deftest bootstrap-test
-  (is (= [1 0.0 [1.0 1.0]]
-         (bootstrap (take 20 (repeatedly (constantly 1)))
-                    criterium.stats/mean
-                    100
-                    criterium.well/well-rng-1024a)))
-  (is (=  [ [1 0.0 [1.0 1.0]] [0.0 0.0 [0.0 0.0]]]
-          (bootstrap (take 20 (repeatedly (constantly 1)))
-                     (juxt criterium.stats/mean criterium.stats/variance)
-                     100
-                     criterium.well/well-rng-1024a))))
-
-(deftest bootstrap-bca-test
-  (let [ci 0.95]
-    (is (= [1 [1 1]]
-           (bootstrap-bca (take 20 (repeatedly (constantly 1)))
-                          criterium.stats/mean
-                          100
-                          [0.5 ci (- 1.0 ci)]
-                          criterium.well/well-rng-1024a)))
-    (is (=  [ [1 [1 1]] [0.0 [0.0 0.0]]]
-            (bootstrap-bca (take 20 (repeatedly (constantly 1)))
-                           (juxt criterium.stats/mean criterium.stats/variance)
-                           100
-                           [0.5 ci (- 1.0 ci)]
-                           criterium.well/well-rng-1024a)))))

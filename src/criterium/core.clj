@@ -52,9 +52,9 @@
   (:use criterium.stats)
   (:require [clojure.set :as set]
             [criterium
-             [eval :as eval]
              [jvm :as jvm]
              [measured :as measured]
+             [pipeline :as pipeline]
              [toolkit :as toolkit]
              [util :as util]
              [well :as well]]))
@@ -148,8 +148,8 @@
 (defn time-expr
   "Returns a map containing execution time and result of specified function."
   [measured]
-  (let [pline (toolkit/pipeline
-                (toolkit/with-garbage-collector-stats))]
+  (let [pline (pipeline/pipeline
+                (pipeline/with-garbage-collector-stats))]
     (toolkit/sample
       measured
       pline
@@ -159,9 +159,9 @@
   "Returns a map containing execution time, change in loaded and unloaded
   class counts, change in compilation time and result of specified function."
   [measured]
-  (let [pline (toolkit/pipeline
-                (toolkit/with-class-loader-counts
-                  (toolkit/with-compilation-time)))]
+  (let [pline (pipeline/pipeline
+                (pipeline/with-class-loader-counts
+                  (pipeline/with-compilation-time)))]
     (toolkit/sample
       measured
       pline

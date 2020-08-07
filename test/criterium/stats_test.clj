@@ -75,7 +75,7 @@
                   1000000)]
            (bootstrap-estimate v)))
 
-  (dissoc (criterium.time/measure* m {}) :state))
+  (dissoc (criterium.measure/measure m {}) :state))
 
 (deftest bootstrap-estimate-scale-test
   (is (= [1e-9 [1e-8 1e-8]]
@@ -122,3 +122,31 @@
     (test-max-error 2.0 (quantile 0.75 [0 1 1.5 2 3]) max-error))
   (is (= 5.0 (quantile 0.05 (range 0 101))))
   (is (= 95.0 (quantile 0.95 (range 0 101)))))
+
+
+(deftest bootstrap-test
+  (is (= [1 0.0 [1.0 1.0]]
+         (bootstrap (take 20 (repeatedly (constantly 1)))
+                    criterium.stats/mean
+                    100
+                    criterium.well/well-rng-1024a)))
+  (is (=  [ [1 0.0 [1.0 1.0]] [0.0 0.0 [0.0 0.0]]]
+          (bootstrap (take 20 (repeatedly (constantly 1)))
+                     (juxt criterium.stats/mean criterium.stats/variance)
+                     100
+                     criterium.well/well-rng-1024a))))
+
+(deftest bootstrap-bca-test
+  (let [ci 0.95]
+    (is (= [1 [1 1]]
+           (bootstrap-bca (take 20 (repeatedly (constantly 1)))
+                          criterium.stats/mean
+                          100
+                          [0.5 ci (- 1.0 ci)]
+                          criterium.well/well-rng-1024a)))
+    (is (=  [ [1 [1 1]] [0.0 [0.0 0.0]]]
+            (bootstrap-bca (take 20 (repeatedly (constantly 1)))
+                           (juxt criterium.stats/mean criterium.stats/variance)
+                           100
+                           [0.5 ci (- 1.0 ci)]
+                           criterium.well/well-rng-1024a)))))

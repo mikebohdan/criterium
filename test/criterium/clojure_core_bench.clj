@@ -4,7 +4,7 @@
              [criterium
               [arg-gen :as arg-gen]
               [measured :as measured]
-              [time :as time]]))
+              [measure :as measure]]))
 
 ;;; arg-gen a constant
 
@@ -14,7 +14,7 @@
 
 
 (comment
-  (criterium.time/measure*
+  (criterium.measure/measure
     (constant-bench 10)
     {:limit-time 10})
   )
@@ -68,7 +68,7 @@
         xs (range 1 (inc n))
         ys (reduce
              (fn [res m]
-               (conj res (-> (criterium.time/measure*
+               (conj res (-> (criterium.measure/measure
                               m
                               {:limit-time 10})
                             :stats :time :mean first)))
@@ -92,7 +92,7 @@
 
 
 (comment
-  (criterium.time/measure*
+  (criterium.measure/measure
     (identity-bench 10000)
     {:limit-time 10}))
 
@@ -103,7 +103,7 @@
     (inc i)))
 
 (comment
-  (criterium.time/measure*
+  (criterium.measure/measure
     (inc-bench 10000)
     {:limit-time 10}))
 
@@ -119,26 +119,26 @@
 
   (def v (v-n 5))
 
-  (criterium.time/measure*
+  (criterium.measure/measure
     (measured/expr
       (nth (nth (nth (nth v 1) 2) 0) 1))
     {:limit-time  10
      :limit-evals 1000000000})
 
-  (criterium.time/measure*
+  (criterium.measure/measure
     (measured/expr
       (nth (nth (nth v 1) 2) 0))
     {:limit-time  10
      :limit-evals 1000000000})  ;; 13.23813842438487
 
-  (criterium.time/measure*
+  (criterium.measure/measure
     (measured/expr
       (nth (nth v 1) 2))
     {:limit-time  10
      :limit-evals 1000000000})  ; 13.60222827768907
 
   (def v [0 1 2 3 4 5 6 7 8 9])
-  (criterium.time/measure*
+  (criterium.measure/measure
     (measured/expr
       (nth v 2)
       {:arg-metas [{} {:tag 'int}]}
@@ -146,7 +146,7 @@
     {:limit-time  10
      :limit-evals 1000000000})
 
-  (criterium.time/measure*
+  (criterium.measure/measure
     (measured/expr
       (.nth v 2)
       #_{:arg-metas [{:tag clojure.lang.Indexed}
@@ -154,7 +154,7 @@
     {:limit-time  10
      :limit-evals 1000000000})
 
-  (criterium.time/measure*
+  (criterium.measure/measure
     (measured/expr
       (.nth ^clojure.lang.Indexed (.nth v 2) 1)
       {:arg-metas [{:tag clojure.lang.Indexed}
@@ -170,7 +170,7 @@
                  {:tag long}
                  {:tag long}]}))
 
-  (criterium.time/measure*
+  (criterium.measure/measure
     (measured/expr
       (.nth [0 1 2 3 4 5 6 7 8 9] 9)
       {:arg-metas [{:tag clojure.lang.Indexed}
@@ -179,7 +179,7 @@
     {:limit-time  10
      :limit-evals 1000000000}) ; 12.833147195100894
 
-  (criterium.time/measure*
+  (criterium.measure/measure
     (measured/expr
       (nth [0 1 2 3 4 5 6 7 8 9] 9)
       {:arg-metas [{:tag clojure.lang.Indexed}
@@ -204,7 +204,7 @@
           xs      (range 1 (inc n))
           ys      (reduce
                (fn [res m]
-                 (conj res (-> (criterium.time/measure*
+                 (conj res (-> (criterium.measure/measure
                                 m
                                 {:limit-time 10})
                               :stats :time :mean first)))
@@ -281,7 +281,7 @@
     ))
 
 (comment
-  (criterium.time/measure*
+  (criterium.measure/measure
     (nth-bench 10000)
     {:limit-time 10})
 
@@ -320,11 +320,11 @@
 ;;     (vec-nth v i)))
 
 (comment
-  (criterium.time/measure*
+  (criterium.measure/measure
     (nth-bench 10000)
     {:limit-time 10})
 
-  (criterium.time/measure*
+  (criterium.measure/measure
     (vec-nth-bench 10000)
     {:limit-time 10})
 
@@ -333,11 +333,11 @@
     (no.disassemble/disassemble-str
       (:f (nth-bench 10000))))
 
-  (criterium.time/measure*
+  (criterium.measure/measure
     (nth-bench 10)
     {:limit-time 10})
 
-  (criterium.time/measure*
+  (criterium.measure/measure
     (vec-nth-bench 10000)
     {:limit-time 10})
 
@@ -358,11 +358,11 @@
       (let [x (clojure.java.api.Clojure/read "(fn [v i] (.nth ^clojure.lang.Indexed v i))")]
         (eval x))))
 
-  (criterium.time/measure*
+  (criterium.measure/measure
     (vec-nth-bench 10)
     {:limit-time 10})
 
-  (criterium.time/measure*
+  (criterium.measure/measure
     (measured/expr
       (.nth [0 1 2 3] 3))
     {:limit-time 10}))
@@ -397,7 +397,7 @@
         ;; measured (measured/expr (.nth [1 2 3] 2))
         ]
     (def m measured)
-    (criterium.time/measure*
+    (criterium.measure/measure
       measured
       {:limit-time  10
        :limit-evals 10000000000}))
@@ -406,17 +406,17 @@
                           ))
   (dotimes [i 1000]
     (->
-      (criterium.toolkit/instrumented
-        mb
-        (criterium.toolkit/with-time))
+      (criterium.toolkit/sample
+        (criterium.pipeline/time-metric)
+        mb)
       :time
       (/ 100000.0)))
 
   (dotimes [i 100000]
     (->
-      (criterium.toolkit/instrumented
-        m
-        (criterium.toolkit/with-time))
+      (criterium.toolkit/sample
+        (criterium.pipeline/time-metric)
+        m)
       :time))
 
   (let [v        [1 2 3]
@@ -425,31 +425,31 @@
                    (nth v 2))
         measured (measured/measured state-fn f 1)]
     (def m measured)
-    (criterium.time/measure*
+    (criterium.measure/measure
       measured
       {:limit-time  10
        :limit-evals 10000000000}))
 
-  (criterium.time/measure*
+  (criterium.measure/measure
     m
     {:limit-time  10
      :limit-evals 10000000000})
 
 
-  (criterium.time/measure*
+  (criterium.measure/measure
     (criterium.toolkit/measured-batch
       (vector-destructure-bench 3)
       1000)
     {:limit-time 10})
 
-  (criterium.time/measure*
+  (criterium.measure/measure
     (vector-explicit-destructure-bench 3)
     {:limit-time 10})
 
 
   (criterium.chart/view
     (criterium.chart/time-histogram
-      (criterium.time/measure*
+      (criterium.measure/measure
         (vec-nth-bench 10000)
         {:limit-time     1
          :return-samples true}))))
