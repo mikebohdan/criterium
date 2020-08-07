@@ -1,0 +1,143 @@
+#+STARTUP: inlineimages header
+#+PROPERTY: header-args :cache yes :exports both
+
+
+#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="https://unpkg.com/purecss@2.0.3/build/pure-min.css" integrity="sha384-cg6SkqEOCV1NbJoCu11+bm0NvBRc8IYLRGXkmNrqUBfTjmMYwNKPWBTIKyw9mHNJ" crossorigin="anonymous"/>
+#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="css/criterium.css" />
+
+#+begin_src clojure :results value silent
+(require 'criterium)
+(require '[criterium
+           [chart :as chart]
+           [jvm :as jvm]
+           [platform :as platform]
+           [time :as time]
+           [toolkit :as toolkit]])
+#+end_src
+
+* Microbenchmark with Criterium
+
+If you want to know how a single part of your code base performs, you
+can turn to ~clojure.core/time~
+
+** Clojure's built in ~time~ macro
+
+We can use clojure's build in ~time~ macro to time an arbitrary
+expression.
+
+#+begin_src clojure :results output
+(clojure.core/time (Thread/sleep 1))
+#+end_src
+
+#+RESULTS:
+: "Elapsed time: 1.42248 msecs"
+
+
+That may look inaccurate, but ~Thread/sleep~ doesn't have great accuracy.
+
+Let's try something a little simpler, like timing a constant
+expression.
+
+#+begin_src clojure :results output
+(clojure.core/time 1)
+#+end_src
+
+#+RESULTS:
+: "Elapsed time: 0.10276 msecs"
+
+Hundreds of microseconds for a constant is a little large.  This is
+effectively a one-shot measurement, and the first time the JIT runs
+enything, it takes much longer than on subsequent runs.
+
+** Criterium ~time~
+
+Criterium provides a ~time~ macro that we can use as a replacement for
+clojure core's ~time~.  For quick functions, it provides much
+different answers
+
+#+begin_src clojure :results output
+(criterium/time 1)
+#+end_src
+
+#+RESULTS:
+:                         Elapsed Time: 2.29 ± 0.110 ns
+
+There are 7 orders of magnitude difference here.  Criterium's time by
+default does some warmup on quick functions to activate the JIT
+compiler.  We can tell Criterium to use a one shot measurement.
+
+#+begin_src clojure :results output
+(criterium/time 1 :sample-mode :one-shot)
+#+end_src
+
+#+RESULTS:
+:                     Elapsed time: 235 ns
+
+We see there is now just a 3 order of magnitude difference.
+
+Clojure's ~time~ stops timing as an argument to a prn call.  We can see
+the difference by creating a slightly modified version of clojure's
+~time~.
+
+#+begin_src clojure :results output
+(do
+  (defmacro ttime
+    [expr]
+    `(let [start#  (. System (nanoTime))
+           ret#    ~expr
+           finish# (. System (nanoTime))]
+       (prn (str "Elapsed time: " (/ (double (- finish# start#)) 1000000.0) " msecs"))
+       ret#))
+  (ttime 1))
+#+end_src
+
+#+RESULTS:
+: "Elapsed time: 3.12E-4 msecs"
+
+This is now much more comparable, being the same order of magnitude as
+criterium's one-shot sample.
+
+
+
+
+
+
+
+
+The remaining difference is due to how criterium lifts constants out of
+the timing loop.
+
+Secondly it
+evaluates the constants within the expression within the timing.
+
+
+
+
+Criterium achieves this by running multiple iterations for quick
+expressions.  It only does this when it can without creating an
+appreciable lag (100ms).
+
+
+
+
+
+
+** Controlling how hard criterium tries to get an answer
+
+Often I see people putting their expressions in a loop, and then
+adjusting the number of iterations to run to give an answer in a
+reasonable time.
+
+We can achieve the same effect by using the `:limit-time` options to
+criterium's ~time~, to limit the time in seconds that criterium will
+use.
+
+
+#+begin_src clojure :results output
+  (criterium.time/time 1 :limit-time 1)
+#+end_src
+
+#+RESULTS:
+:                     Elapsed time: 45.0 ns
+
+In this case Criterium displays a mean and variance.
