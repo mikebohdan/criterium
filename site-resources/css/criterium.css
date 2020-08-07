@@ -43,4 +43,12 @@ a:focus code {
     max-width: 800px;
     margin-bottom: 50px;
     line-height: 1.6em;
+
+
+.example {
+    background-color: #e6e6e6;
+}
+
+.src {
+    background-color: #e6e6e6;
 }

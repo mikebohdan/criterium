@@ -18,7 +18,7 @@
         ("css"
          :base-directory ,(concat
                            (or (file-name-directory buffer-file-name) "./")
-                           "../site-resourcs/css")
+                           "../site-resources/css/")
 
          :base-extension "css"
          :publishing-directory ,(concat
