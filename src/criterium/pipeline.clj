@@ -140,18 +140,22 @@
 
 
 (defn pipeline
-  "Build a pipeline by specifying pipeline keywords.
+  "Build a pipeline by specifying pipeline function keywords.
 
   Returns a pipeline."
-  [pipeline-kws & [{:keys [terminal-fn]
-                    :or   {terminal-fn time-metric}}]]
-  (reduce
-    (fn [pipeline pipeline-kw]
-      (let [f (pipeline-fns pipeline-kw)]
-        (assert f)
-        (f pipeline)))
-    terminal-fn
-    pipeline-kws))
+  [pipeline-fn-kws & [{:keys [terminal-fn-kw]
+                       :or   {terminal-fn-kw :elapsed-time-ns}}]]
+  (let [terminal-fn (terminal-fns terminal-fn-kw)]
+    (when-not terminal-fn
+      (throw (ex-info "Unknown terminal function" {:terminal-fn-kw terminal-fn-kw})))
+    (reduce
+      (fn [pipeline pipeline-kw]
+        (let [f (pipeline-fns pipeline-kw)]
+          (when-not f
+            (throw (ex-info "Unknown pipeline function" {:pipeline-kw pipeline-kw})))
+          (f pipeline)))
+      terminal-fn
+      pipeline-fn-kws)))
 
 
 (defn execute

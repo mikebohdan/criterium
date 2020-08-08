@@ -151,26 +151,28 @@
   (let [pline (pipeline/pipeline
                 (pipeline/with-garbage-collector-stats))]
     (toolkit/sample
-      measured
       pline
-      {})))
+      measured
+      (toolkit/budget 1 1)
+      1)))
 
 (defn time-expr-for-warmup
   "Returns a map containing execution time, change in loaded and unloaded
   class counts, change in compilation time and result of specified function."
-  [measured]
-  (let [pline (pipeline/pipeline
-                (pipeline/with-class-loader-counts
-                  (pipeline/with-compilation-time)))]
+  [measured eval-count]
+  (let [pline (pipeline/with-class-loader-counts
+                (pipeline/with-compilation-time
+                  pipeline/time-metric))]
     (toolkit/sample
-      measured
       pline
-      {})))
+      measured
+      (toolkit/budget 1 1)
+      eval-count)))
 
-(defn elapsed-time
-  "Helper to return the elapsed time from instrumentation data map."
-  [data]
-  (-> data :time :elapsed))
+;; (defn elapsed-time
+;;   "Helper to return the elapsed time from instrumentation data map."
+;;   [data]
+;;   (-> data :time :elapsed))
 
 
 ;;; Memory management
@@ -197,7 +199,7 @@
 (defn execute-expr-for-warmup
   "Time the execution of `n` invocations of `f`. See `execute-expr*`."
   [n measured]
-  (time-expr-for-warmup (measured/batch measured n)))
+  (time-expr-for-warmup measured n))
 
 (defn collect-samples
   "Collect samples of invoking f execute-count times.
@@ -224,37 +226,42 @@
   "Run expression for the given amount of time to enable JIT compilation.
 
   Returns a vector of execution count, deltas and estimated function
-  execution time."  [warmup-period measured]
+  execution time."
+  [warmup-period measured]
+  {:pre [(measured/measured? measured)]}
   (debug "warmup-for-jit measured" measured)
-  (let [ignore-first (time-expr-for-warmup measured)
-        deltas-1     (time-expr-for-warmup measured)
-        t            (max 1 (elapsed-time deltas-1))
+  (let [ignore-first (time-expr-for-warmup measured 1)
+        deltas-1     (time-expr-for-warmup measured 1)
+        _ (println "deltas-1" deltas-1)
+        t            (max 1 (pipeline/elapsed-time deltas-1))
         _            (debug "  initial t" t)
         [deltas-n n] (if (< t 100000)           ; 100us
                        (let [n (inc (quot 100000 t))]
                          [(execute-expr-for-warmup n measured) n])
                        [deltas-1 1])
-        t            (elapsed-time deltas-n)
+        t            (pipeline/elapsed-time deltas-n)
         p            (/ warmup-period t)
-        c            (long (max 1 (* n (/ p 5))))]
+        c            (long (max 1 (* n (/ p 5))))
+        ]
     (debug "  using t" t "for n" n)
     (debug "  using execution-count" c)
     (loop [count      n
            delta-free 0
            deltas-sum (if (= n 1)
-                        deltas-1
-                        (util/sum deltas-1 deltas-n))]
+                        (:samples deltas-1)
+                        (pipeline/total (:samples deltas-1)
+                                        (:samples deltas-n)))]
       (let [deltas    (execute-expr-for-warmup c measured)
-            sum       (util/sum deltas-sum deltas)
+            sum       (util/sum (:samples deltas-sum) (:samples deltas))
             count     (+ count c)
-            elapsed   (elapsed-time sum)
+            elapsed   (pipeline/elapsed-time sum)
             cl-counts (-> deltas :class-loader :loaded-count)
             comp-time (-> deltas :compilation :compilation-time)]
         (if (pos? cl-counts)
           (debug "  classes loaded before" count "iterations"))
         (if (pos? comp-time)
           (debug "  compilation occurred before" count "iterations"))
-        ;; (debug "elapsed-time" elapsed "count" count)
+        ;; (debug "pipeline/elapsed-time" elapsed "count" count)
         (if (and (> delta-free 2) (> elapsed warmup-period))
           (let [estimated-fn-time (max 1 (quot elapsed count))]
             (progress "estimated-fn-time"
@@ -281,7 +288,7 @@
     (when gc-before-sample
       (toolkit/force-gc *max-gc-attempts*))
     (let [deltas    (execute-expr-for-warmup n f)
-          t         (elapsed-time deltas)
+          t         (pipeline/elapsed-time deltas)
           ;; It is possible for small n and a fast expression to get
           ;; t=0 nsec.  This is likely due to how (System/nanoTime)
           ;; quantizes the time on some systems.
@@ -309,13 +316,14 @@
    longer running expressions."
   [sample-count warmup-jit-period target-execution-time measured gc-before-sample
    overhead]
+  {:pre [(measured/measured? measured)]}
   (toolkit/force-gc *max-gc-attempts*)
   (let [_                   (progress "Warm up for JIT optimisations ...")
         [warmup-n
          deltas
          estimated-fn-time] (warmup-for-jit warmup-jit-period measured)
         _                   (progress "Estimate execution count ...")
-        warmup-t            (elapsed-time deltas)
+        warmup-t            (pipeline/elapsed-time deltas)
         n-exec              (estimate-execution-count
                               target-execution-time
                               measured
@@ -336,9 +344,9 @@
                               gc-before-sample)
         _                   (progress "Final GC...")
         gc-deltas           (toolkit/force-gc)
-        final-gc-time       (elapsed-time gc-deltas)
+        final-gc-time       (pipeline/elapsed-time gc-deltas)
         sample-times        (->> samples
-                               (map elapsed-time)
+                               (map pipeline/elapsed-time)
                                (map #(- % total-overhead)))
         total               (reduce + 0 sample-times)
         _                   (progress "Checking GC...")
@@ -432,8 +440,8 @@
                      samples         (map :sample data-seq)
                      _               (progress "Final GC...")
                      gc-deltas       (toolkit/force-gc *max-gc-attempts*)
-                     final-gc-time   (elapsed-time gc-deltas)
-                     sample-times    (map elapsed-time samples)
+                     final-gc-time   (pipeline/elapsed-time gc-deltas)
+                     sample-times    (map pipeline/elapsed-time samples)
                      total           (reduce + 0 sample-times)
                      ;; TBD: Doesn't make much sense to attach final
                      ;; GC warning to the expression that happened
@@ -544,7 +552,7 @@
   "Calculate a conservative estimate of the timing loop overhead."
   []
   (let [bm (benchmark*
-             (fn [] 1)
+             (measured/expr 1)
              {:warmup-jit-period           (* 10 s-to-ns)
               :num-samples                 10
               :target-execution-time       (* 0.5 s-to-ns)
@@ -710,6 +718,7 @@
            gc-before-sample
            overhead
            supress-jvm-option-warnings] :as options}]
+  {:pre [(measured/measured? measured)]}
   (when-not supress-jvm-option-warnings
     (warn-on-suspicious-jvm-options))
   (let [{:keys [num-samples
@@ -765,7 +774,7 @@
 (defmacro quick-benchmark
   "Benchmark an expression. Less rigorous benchmark (higher uncertainty)."
   [expr options]
-  `(quick-benchmark* (fn [] ~expr) ~options))
+  `(quick-benchmark* (measured/expr ~expr) ~options))
 
 
 ;;; Reporting

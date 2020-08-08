@@ -35,7 +35,8 @@
     (let [result (measure/measure measured options)]
       (vreset! last-time* result)
       (if (:stats result)
-        (report/print-stats result options)
+        (do (report/print-stats result options)
+            (report/print-jvm-event-stats result options))
         (report/print-metrics result))
       (:expr-value result))))
 

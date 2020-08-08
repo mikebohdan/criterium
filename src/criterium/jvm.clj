@@ -118,7 +118,7 @@
     "Return the garbage collection counts and times for the JVM instance.
 
     Returns a sequence of maps each with :name, :count, :name keys,
-    for each of the system garbace collectors, and for their total,
+    for each of the system garbage collectors, and for their total,
     with the keyword :total."
     []
     (let [stats (reduce

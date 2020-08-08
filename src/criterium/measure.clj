@@ -39,13 +39,53 @@
           Long/MAX_VALUE
           (* factor DEFAULT-EVAL-COUNT-BUDGET)))))
 
+
+
+(defn- pipeline-spec
+  "Return a pipeline spec for the given user specified options.
+  Recognizes :pipeline-fn-kws and terminal-fn-kw options.
+  Specifying :all for :pipeline-fn-kws uses all known pipeline functions."
+  [options]
+  (let [pipeline-fn-kws (let [pipeline-opt (:pipeline-fn-kws options [])]
+                          (if (= :all pipeline-opt)
+                            (keys pipeline/pipeline-fns)
+                            pipeline-opt))
+        terminal-fn-kw  (get options :terminal-fn-kw :elapsed-time-ns)]
+    {:pipeline-fn-kws pipeline-fn-kws
+     :terminal-fn-kw  terminal-fn-kw}))
+
+(defn pipeline-metrics
+  "Return a sequence of all metrics produced by a pipeline with the
+  given spec."
+  [{:keys [pipeline-fn-kws terminal-fn-kw] :as _spec}]
+  (conj pipeline-fn-kws terminal-fn-kw))
+
+(defn- pipeline-from-spec
+  [{:keys [pipeline-fn-kws terminal-fn-kw] :as _spec}
+   extra-pipeline-fn-kws]
+  (pipeline/pipeline
+    (into pipeline-fn-kws extra-pipeline-fn-kws)
+    {:terminal-fn-kw terminal-fn-kw}))
+
+;; (defn- pipeline [options]
+;;   (let [kws     (let [pipeline-opt (:pipeline options [])]
+;;                   (if (= :all pipeline-opt)
+;;                     (keys pipeline/pipeline-fns)
+;;                     pipeline-opt))
+;;         terminal-kw (get options :terminal :elapsed-time-ns)
+;;         options {:terminal-fn (pipeline/terminal-fns terminal-kw)}
+;;         metrics (conj kws terminal-kw)]
+;;     [(pipeline/pipeline kws options) metrics]))
+
+
 (defmulti sample-data
-  (fn [sample-mode _pipeline _measured _total-budget _config _options]
+  (fn [sample-mode _pipeline-spec _measured _total-budget _config _options]
     sample-mode))
 
 (defmethod sample-data :one-shot
-  [_ pipeline measured _total-budget config _options]
-  (sample/one-shot pipeline measured config))
+  [_ pipeline-spec measured _total-budget config _options]
+  (let [pipeline (pipeline-from-spec pipeline-spec [])]
+    (sample/one-shot pipeline measured config)))
 
 ;; (defmethod sample-data :quick
 ;;   [_ pipeline measured total-budget config
@@ -68,12 +108,16 @@
 ;;     (sample/quick pipeline measured estimation-budget sample-budget config)))
 
 (defmethod sample-data :full
-  [_ pipeline measured total-budget config
+  [_ pipeline-spec measured total-budget config
    {:keys [estimation-fraction estimation-period-ns
            warmup-fraction warmup-period-ns
            sample-fraction sample-period-ns]
     :as   options}]
-  (let [estimation-frac (or estimation-fraction
+  (let [pipeline        (pipeline-from-spec
+                          pipeline-spec
+                          [:compilation-time
+                           :garbage-collector])
+        estimation-frac (or estimation-fraction
                             DEFAULT-ESTIMATION-FRACTION)
         warmup-frac     (or warmup-fraction
                             DEFAULT-WARMUP-FRACTION)
@@ -113,16 +157,6 @@
       config)))
 
 
-(defn- pipeline [options]
-  (let [kws     (let [pipeline-opt (:pipeline options [])]
-                  (if (= :all pipeline-opt)
-                    (keys pipeline/pipeline-fns)
-                    pipeline-opt))
-        terminal-kw (get options :terminal :elapsed-time-ns)
-        options {:terminal-fn (pipeline/terminal-fns terminal-kw)}
-        metrics (conj kws terminal-kw)]
-    [(pipeline/pipeline kws options) metrics]))
-
 (defmulti process-samples
   (fn [process-mode sampled metrics options]
     process-mode))
@@ -140,7 +174,11 @@
               metrics
               (:batch-size sampled)
               (:samples sampled)
-              options)]
+              options)
+        res  (assoc
+               res
+               :jvm-event-stats
+               (sampled-stats/jvm-event-stats (:samples sampled)))]
     (if (or (:histogram options) (:include-samples options))
       (assoc res :samples (:samples sampled))
       res)))
@@ -174,7 +212,13 @@
             (format/format-value :time-ns (.elapsed-time-ns total-budget))
             " evaluations"
             (format/format-value :count (.eval-count total-budget)))
-        [pline metrics] (pipeline options)
+        pipeline-spec   (pipeline-spec options)
+        metrics         (pipeline-metrics pipeline-spec)
         sampled         (sample-data
-                          sample-mode pline measured total-budget config options)]
+                          sample-mode
+                          pipeline-spec
+                          measured
+                          total-budget
+                          config
+                          options)]
     (process-samples process-mode sampled metrics options)))

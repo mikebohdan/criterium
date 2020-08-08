@@ -5,16 +5,6 @@
 #+HTML_HEAD: <link rel="stylesheet" type="text/css" href="https://unpkg.com/purecss@2.0.3/build/pure-min.css" integrity="sha384-cg6SkqEOCV1NbJoCu11+bm0NvBRc8IYLRGXkmNrqUBfTjmMYwNKPWBTIKyw9mHNJ" crossorigin="anonymous"/>
 #+HTML_HEAD: <link rel="stylesheet" type="text/css" href="css/criterium.css" />
 
-#+begin_src clojure :results value silent
-(require 'criterium)
-(require '[criterium
-           [chart :as chart]
-           [jvm :as jvm]
-           [platform :as platform]
-           [time :as time]
-           [toolkit :as toolkit]])
-#+end_src
-
 * Microbenchmark with Criterium
 
 If you want to know how a single part of your code base performs, you
@@ -56,6 +46,7 @@ clojure core's ~time~.  For quick functions, it provides much
 different answers
 
 #+begin_src clojure :results output
+(require 'criterium)
 (criterium/time 1)
 #+end_src
 

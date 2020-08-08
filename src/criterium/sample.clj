@@ -57,7 +57,7 @@
    sample-budget
    {:keys [max-gc-attempts batch-time-ns]
     :as   _config}]
-  {:pre [pipeline]}
+  {:pre [pipeline (measured/measured? measured)]}
   ;; Start by running GC until it has nothing to do.
   (toolkit/throw-away-sample measured)
   (toolkit/force-gc max-gc-attempts)
@@ -71,8 +71,8 @@
         _          (toolkit/force-gc max-gc-attempts)
 
         batch-size (toolkit/estimate-batch-size
-                            measured t1 warmup-budget batch-time-ns)
-        {:keys [elapsed-time-ns eval-count]}
+                     measured t1 warmup-budget batch-time-ns)
+        {:keys [elapsed-time-ns eval-count] :as warmup-data}
         (toolkit/warmup
           measured
           warmup-budget
@@ -81,14 +81,17 @@
         _          (toolkit/force-gc max-gc-attempts)
 
 
-        batch-size  (toolkit/estimate-batch-size
+        batch-size (toolkit/estimate-batch-size
                      measured t2 sample-budget batch-time-ns)
-        _           (output/progress "Batch-size:" batch-size
-                                     t2 sample-budget batch-time-ns)
+        _          (output/progress "Batch-size:" batch-size
+                                    t2 sample-budget batch-time-ns)
 
-        sample-data (toolkit/sample
-                      pipeline
-                      measured
-                      sample-budget
-                      batch-size)]
-    sample-data))
+        sample-data   (toolkit/sample
+                        pipeline
+                        measured
+                        sample-budget
+                        batch-size)
+        final-gc-data (toolkit/force-gc max-gc-attempts)]
+    (assoc sample-data
+           :warmup warmup-data
+           :final-gc final-gc-data)))

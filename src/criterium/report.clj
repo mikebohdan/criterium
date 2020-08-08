@@ -51,3 +51,19 @@
   (doseq [[k v] metrics]
     (when ((set (keys metric/metric-paths)) k)
       (print (format/format-metric k v)))))
+
+(defn print-jvm-event-stat
+  [title
+   {:keys [total-time-ns sample-count] :as _stat}]
+  (when (pos? total-time-ns)
+    (println title "ran for"
+             (format/format-value :time-ns total-time-ns)
+             "affecting"
+             sample-count
+             "samples")))
+
+(defn print-jvm-event-stats
+  [{:keys [jvm-event-stats] :as _result} _options]
+  (let [{:keys [compilation garbage-collection]} jvm-event-stats]
+    (print-jvm-event-stat "JIT compilation" compilation)
+    (print-jvm-event-stat "Garbage collection" garbage-collection)))

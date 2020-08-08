@@ -98,3 +98,26 @@
          :batch-size batch-size
          :metrics metrics}
       return-samples (assoc :samples samples))))
+
+
+(defn jvm-event-stats
+  "Return the stats for JIT compilation and garbage-collection."
+  [samples]
+  (reduce
+    (fn [stats sample]
+      (let [update-stat (fn [stat time-ns]
+                          (if (pos? time-ns)
+                            (-> stat
+                               (update :total-time-ns + time-ns)
+                               (update :sample-count inc))
+                            stat))
+            compilation (-> sample :compilation :compilation-time)
+            gc          (-> sample :garbage-collector :total :time)]
+        (-> stats
+           (update :compilation update-stat compilation)
+           (update :garbage-collection update-stat gc))))
+    {:compilation        {:total-time-ns 0
+                          :sample-count  0}
+     :garbage-collection {:total-time-ns 0
+                          :sample-count  0}}
+    samples))

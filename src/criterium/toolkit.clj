@@ -203,6 +203,7 @@
    measured
    budget
    batch-size]
+  {:pre [(measured/measured? measured)]}
   (loop [eval-count      0
          elapsed-time-ns 0
          samples         []]
