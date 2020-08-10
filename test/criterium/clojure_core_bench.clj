@@ -93,7 +93,7 @@
 
 (comment
   (criterium.measure/measure
-    (identity-bench 10000)
+    (identity-bench 100)
     {:limit-time 10}))
 
 ;;; inc

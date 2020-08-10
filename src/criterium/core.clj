@@ -52,6 +52,7 @@
   (:use criterium.stats)
   (:require [clojure.set :as set]
             [criterium
+             [budget :as budget]
              [jvm :as jvm]
              [measured :as measured]
              [pipeline :as pipeline]
@@ -153,7 +154,7 @@
     (toolkit/sample
       pline
       measured
-      (toolkit/budget 1 1)
+      (budget/budget 1 1)
       1)))
 
 (defn time-expr-for-warmup
@@ -166,7 +167,7 @@
     (toolkit/sample
       pline
       measured
-      (toolkit/budget 1 1)
+      (budget/budget 1 1)
       eval-count)))
 
 ;; (defn elapsed-time

@@ -1,10 +1,11 @@
 (ns criterium.toolkit
   "Functions used to implement benchmark measurements."
   (:require [criterium
-             [format :as format]
+             [budget :as budget]
              [jvm :as jvm]
              [measured :as measured]
-             [pipeline :as pipeline]]))
+             [pipeline :as pipeline]])
+  (:import [criterium.budget Budget]))
 
 
 (set! *unchecked-math* :warn-on-boxed)
@@ -13,74 +14,6 @@
 (def ^Long MICROSEC-NS 1000)
 (def ^Long MILLISEC-NS 1000000)
 (def ^Long SEC-NS 1000000000)
-
-;;; Budget
-
-(deftype Budget
-    [^long elapsed-time-ns
-     ^long eval-count])
-
-(defn budget
-  "Return a budget given possibly nil values for the specification"
-  [^long time-budget-ns ^long eval-count-budget]
-  (Budget.
-    (or time-budget-ns Long/MAX_VALUE)
-    (or eval-count-budget Long/MAX_VALUE)))
-
-(defn reduce-budget
-  ^Budget [total-budget & other-budgets]
-  (reduce
-    (fn [^Budget b ^Budget b1]
-      (budget
-        (- (.elapsed-time-ns b) (.elapsed-time-ns b1))
-        (- (.eval-count b) (.eval-count b1))))
-    total-budget
-    other-budgets))
-
-(defn phase-budget
-  "Return a budget for a measurement phase, given a total budget.
-  The phase-period-ns is an optional limit on the time budget,
-  The phase fraction is a fraction to apply to the total budget."
-  ^Budget [^Budget total-budget
-           period-ns
-           fraction
-           ^double default-fraction]
-  (budget
-    (cond
-      (and period-ns fraction)
-      (min ^long period-ns
-           (long (* (.elapsed-time-ns total-budget) ^double fraction)))
-
-      period-ns period-ns
-      fraction (long (* (.elapsed-time-ns total-budget) ^double fraction))
-
-      :else (long (* (.elapsed-time-ns total-budget) default-fraction)))
-    (cond
-      fraction (long (* (.eval-count total-budget) ^double fraction))
-      (nil? period-ns) (long (* (.eval-count total-budget) default-fraction))
-      :else Long/MAX_VALUE)))
-
-(defn budget-remaining?
-  [^Budget budget ^long elapsed-time-ns ^long eval-count]
-  (and (< elapsed-time-ns (.elapsed-time-ns budget))
-       (< eval-count (.eval-count budget))))
-
-(defmethod clojure.core/print-method Budget
-  [^Budget budget ^java.io.Writer writer]
-  (if *print-readably*
-    (.write writer
-            (str "#<Budget " (.elapsed-time-ns budget) " " (.eval-count budget) ">"))
-    (.write writer
-            (str "Budget "
-                 (format/format-value :time-ns (.elapsed-time-ns budget))
-                 " "
-                 (.eval-count budget)))))
-
-(defmethod clojure.pprint/simple-dispatch Budget
-  [^Budget budget]
-  (clojure.pprint/pprint {:elapsed-time-ns (.elapsed-time-ns budget)
-                          :eval-count      (.eval-count budget)}))
-
 
 ;;; Memory management
 
@@ -186,7 +119,7 @@
    {:keys [warmup-period-ns target-batch-time-ns]
     :or   {warmup-fraction 10}
     :as   options}]
-  (let [warmup-budget        (phase-budget budget warmup-period-ns warmup-fraction)
+  (let [warmup-budget        (budget/phase-budget budget warmup-period-ns warmup-fraction)
         ^long est-eval-count (estimate-eval-count
                                t0
                                (merge
@@ -211,7 +144,7 @@
           t               (pipeline/elapsed-time sample)
           elapsed-time-ns (unchecked-add elapsed-time-ns t)
           eval-count      (unchecked-add eval-count (long (:eval-count sample)))]
-      (if (or (budget-remaining? budget elapsed-time-ns eval-count)
+      (if (or (budget/budget-remaining? budget elapsed-time-ns eval-count)
               (< (count samples) 2))
         (recur eval-count
                elapsed-time-ns
@@ -221,6 +154,10 @@
          :samples         (conj samples sample)
          :batch-size      batch-size}))))
 
+
+(defn execution-time-from-batch
+  ^long [^long elapsed-time-ns ^long eval-count]
+  (max 1 (long (quot elapsed-time-ns eval-count))))
 
 (defn estimate-execution-time
   "Return an initial estimate for the execution time of a measured function.
@@ -233,14 +170,16 @@
   elapsed time to time-budget-ns."
   ^long [measured budget batch-size]
   (let [pipeline          pipeline/time-metric
-        {:keys [samples]} (sample
-                             pipeline
-                             measured
-                             budget
-                             batch-size)
+        {:keys [elapsed-time-ns eval-count samples] :as xxxx}
+        (sample
+          pipeline
+          measured
+          budget
+          batch-size)
         ^long n           (:eval-count (first samples))]
-    (long (quot ^long (reduce min (map pipeline/elapsed-time samples))
-                n))))
+    ;; (long (quot ^long (reduce min (map pipeline/elapsed-time samples))
+    ;;             n))
+    (execution-time-from-batch elapsed-time-ns eval-count)))
 
 
 (defn warmup
@@ -266,7 +205,7 @@
             ^long comp-time (-> sample :compilation :compilation-time)
             ]
         (if (and (> delta-free-iters 2)
-                 (not (budget-remaining? budget elapsed-time-ns eval-count)))
+                 (not (budget/budget-remaining? budget elapsed-time-ns eval-count)))
           {:eval-count      eval-count
            :elapsed-time-ns elapsed-time-ns
            :samples         (conj samples sample)

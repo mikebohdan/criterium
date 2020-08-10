@@ -36,7 +36,8 @@
       (vreset! last-time* result)
       (if (:stats result)
         (do (report/print-stats result options)
-            (report/print-jvm-event-stats result options))
+            (report/print-jvm-event-stats result options)
+            (report/print-final-gc-warnings result options))
         (report/print-metrics result))
       (:expr-value result))))
 

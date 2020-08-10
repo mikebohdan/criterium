@@ -5,7 +5,7 @@
              [output :as output]
              [pipeline :as pipeline]
              [toolkit :as toolkit]])
-  (:import [criterium.toolkit Budget]))
+  (:import [criterium.budget Budget]))
 
 
 (defn one-shot
@@ -77,7 +77,7 @@
           measured
           warmup-budget
           batch-size)
-        t2         (long (/ elapsed-time-ns eval-count))
+        t2         (max 1 (long (/ elapsed-time-ns eval-count)))
         _          (toolkit/force-gc max-gc-attempts)
 
 

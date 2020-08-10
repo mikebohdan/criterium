@@ -1,14 +1,14 @@
 (ns criterium.measure
   "Opinionated measure function."
   (:require [criterium
+             [budget :as budget]
              [format :as format]
-             [measured :as measured]
              [output :as output]
              [pipeline :as pipeline]
              [toolkit :as toolkit]
              [sample :as sample]
              [sampled-stats :as sampled-stats]])
-  (:import [criterium.toolkit Budget]))
+  (:import [criterium.budget Budget]))
 
 
 (def ^Long DEFAULT-TIME-BUDGET-NS
@@ -28,7 +28,7 @@
 
 (defn budget-for-limits
   ^Budget [limit-time-s limit-eval-count factor]
-  (toolkit/budget
+  (budget/budget
     (or (and limit-time-s (* limit-time-s toolkit/SEC-NS))
         (if limit-eval-count
           Long/MAX_VALUE
@@ -126,17 +126,17 @@
                                estimation-frac
                                warmup-frac))
 
-        estimation-budget (toolkit/phase-budget
+        estimation-budget (budget/phase-budget
                             total-budget
                             estimation-period-ns
                             estimation-fraction
                             estimation-frac)
-        warmup-budget     (toolkit/phase-budget
+        warmup-budget     (budget/phase-budget
                             total-budget
                             warmup-period-ns
                             warmup-fraction
                             warmup-frac)
-        sample-budget     (toolkit/reduce-budget
+        sample-budget     (budget/subtract
                             total-budget
                             estimation-budget
                             warmup-budget)]

@@ -96,8 +96,8 @@
                         `(gen/return ~binding-vars)
                         (reverse pairs))
         options {}
-        _ (println "eaxmple-state form"
-                   `((state-fn ~binding-gens (state-fn-state 2 nil))))
+        ;; _ (println "eaxmple-state form"
+        ;;            `((state-fn ~binding-gens (state-fn-state 2 nil))))
         example-state (eval `((state-fn ~binding-gens (state-fn-state 2 nil))))
         types (mapv type example-state)
         arg-metas (mapv measured/tag-meta types)
