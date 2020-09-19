@@ -46,12 +46,13 @@ clojure core's ~time~.  For quick functions, it provides much
 different answers
 
 #+begin_src clojure :results output
-(require 'criterium)
-(criterium/time 1)
+(do
+  (require 'criterium)
+  (criterium/time 1))
 #+end_src
 
 #+RESULTS:
-:                         Elapsed Time: 2.29 ± 0.110 ns
+:                         Elapsed Time: 1.11 ± 0.247 ns
 
 There are 7 orders of magnitude difference here.  Criterium's time by
 default does some warmup on quick functions to activate the JIT
@@ -125,7 +126,8 @@ use.
 
 
 #+begin_src clojure :results output
-  (criterium.time/time 1 :limit-time 1)
+;;(require 'criterium.time)
+;;(criterium.time/time 1 :limit-time 1)
 #+end_src
 
 #+RESULTS:

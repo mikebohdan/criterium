@@ -1,0 +1,4 @@
+{:name     "criterium"
+ :version  "0.5.0-alpha1"
+ :jar-name #profile {:thin #join [#ref [:name] "-" #ref [:version] "-thin.jar"]}
+ :aliases  #profile {:jar [:clj-xchart :test.check]}}
