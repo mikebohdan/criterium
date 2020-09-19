@@ -1,0 +1,30 @@
+#mj {:project #include "project.edn"
+     :targets
+     #merge
+     [#default-targets [:pom :clean :jar :install :deploy]
+      {:lint     {:invoker :shell
+                  :args    ["clj-kondo" "--lint" "src"]}
+       :fmt      {:invoker   :clojure
+                  :deps      {cljfmt {:mvn/version "0.6.4"}}
+                  :main      cljfmt.main
+                  :main-args ["check"]
+                  :options   {:out             :inherit
+                              :forward-options false}}
+       :api-doc  {:doc     "Generate API documentation from sources."
+                  :invoker :clojure
+                  :aliases []
+                  :deps    {codox {:mvn/version "0.10.6"}}
+                  :options {:forward-options false
+                            :out             :inherit}
+                  :expr    (do (require '[codox.main :as codox])
+                               (codox/generate-docs
+                                 {:metadata    {:doc/format :markdown}
+                                  :output-path "../doc/0.5/api"
+                                  :source-uri  "https://github.com/hugoduncan/criterium/blob/{version}/{filepath}#L{line}"
+                                  :version     #ref [:project :version]}))}
+       :test     {:doc     "Run tests"
+                  :invoker :clojure
+                  :aliases [:kaocha]
+                  :main    kaocha.runner
+                  :options {:out             :inherit
+                            :forward-options false}}}]}

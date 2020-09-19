@@ -1,16 +1,9 @@
-{:deps {org.openjdk.jmh/jmh-core {:mvn/version "1.23"}}
- :aliases
- {:clj-xchart {:extra-deps
-               {com.hypirion/clj-xchart {:mvn/version "0.2.0"}}}
-  :test.check {:extra-deps
-               {org.clojure/test.check {:mvn/version "1.0.0"}}}
-  :kaocha     {:extra-deps
-               {lambdaisland/kaocha           {:mvn/version "1.0.641"}
-                lambdaisland/kaocha-cloverage {:mvn/version "1.0-45"}}
-               :main-opts ["-m" "kaocha.runner"]}
-  :codox {:extra-deps {codox {:mvn/version "0.10.6"}}
-          :extra-paths ["script"]
-          :main-opts ["-m" "codox"]
-          }}
-
- }
+{:deps    {criterium/criterium {:mvn/version "0.5.0-alpha1-SNAPSHOT"}
+           criterium/arg-gen   {:mvn/version "0.5.0-alpha1-SNAPSHOT"}
+           criterium/chart     {:mvn/version "0.5.0-alpha1-SNAPSHOT"}}
+ :aliases {:dev        {:override-deps
+                        {criterium/criterium {:local/root "criterium"}
+                         criterium/arg-gen   {:local/root "criterium.arg-gen"}
+                         criterium/chart     {:local/root "criterium.chart"}}}
+           :extra-deps {lambdaisland/kaocha           {:mvn/version "1.0.641"}
+                        lambdaisland/kaocha-cloverage {:mvn/version "1.0-45"}}}}

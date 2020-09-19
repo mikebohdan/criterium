@@ -1,5 +1,6 @@
 (ns criterium.budget
-  (:require [clojure.spec.alpha :as s]
+  (:require [clojure.pprint :as pprint]
+            [clojure.spec.alpha :as s]
             [criterium
              [domain :as domain]
              [format :as format]]))
@@ -18,7 +19,7 @@
 
 (defn budget
   "Return a budget given possibly nil values for the specification"
-  [^long elapsed-time-ns ^long eval-count]
+  [elapsed-time-ns eval-count]
   {:pre [(s/valid? ::domain/elapsed-time-ns elapsed-time-ns)
          (s/valid? ::domain/eval-count elapsed-time-ns)]}
   (->Budget
@@ -92,10 +93,10 @@
                  (.eval-count budget)
                  " evals"))))
 
-(defmethod clojure.pprint/simple-dispatch Budget
+(defmethod pprint/simple-dispatch Budget
   [^Budget budget]
-  (clojure.pprint/pprint {:elapsed-time-ns (.elapsed-time-ns budget)
-                          :eval-count      (.eval-count budget)}))
+  (pprint/pprint {:elapsed-time-ns (.elapsed-time-ns budget)
+                  :eval-count      (.eval-count budget)}))
 
 (s/fdef budget?
   :args (s/cat :x any?)

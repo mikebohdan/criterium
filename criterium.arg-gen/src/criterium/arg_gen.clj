@@ -21,8 +21,7 @@
 
 (defn state-fn-state [max-size seed]
   (let [[created-seed rng] (make-rng seed)
-        size-seq           (gen/make-size-range-seq max-size)
-        ]
+        size-seq           (gen/make-size-range-seq max-size)]
     (volatile! {:created-seed created-seed
                 :rng rng
                 :size-seq size-seq})))
@@ -96,7 +95,7 @@
                         `(gen/return ~binding-vars)
                         (reverse pairs))
         options {}
-        ;; _ (println "eaxmple-state form"
+        ;; _ (prn "eaxmple-state form"
         ;;            `((state-fn ~binding-gens (state-fn-state 2 nil))))
         example-state (eval `((state-fn ~binding-gens (state-fn-state 2 nil))))
         types (mapv type example-state)
@@ -154,14 +153,13 @@
   (dissoc (criterium.measure/measure nth-bench {:limit-time 1}) :samples)
   (dissoc (criterium.measure/measure vec-nth-bench {:limit-time 1}) :samples)
   (criterium.measure/measure m {})
-  )
 
-(def g (gen/bind
-    (gen/vector gen/int 1 100000)
-    (fn [v]
-      (gen/bind
-        (gen/choose 0 (dec (count v)))
-        (fn [i] (gen/return [v i])))))
-  )
+  (def g (gen/bind
+             (gen/vector gen/int 1 100000)
+           (fn [v]
+             (gen/bind
+                 (gen/choose 0 (dec (count v)))
+               (fn [i] (gen/return [v i])))))
+    ))
 
 ;; (gen/generate g)

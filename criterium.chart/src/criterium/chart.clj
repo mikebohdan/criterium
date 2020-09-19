@@ -49,7 +49,7 @@
          :mx     mx})
 
       (nil? num-bins)
-      (let [n-bins (quot (- mx mn) delta)
+      (let [n-bins (int (quot (- mx mn) delta))
             mn     (util/round-down-to mn delta)
             mx     (util/round-up-to mx delta)]
         {:n-bins n-bins

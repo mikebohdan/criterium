@@ -1,0 +1,5 @@
+{:name        "criterium"
+ :version-map #include "../version.edn"
+ :version     #version-string #ref [:version-map]
+ :jar-name    #profile {:thin #join [#ref [:name] "-" #ref [:version] "-thin.jar"]}
+ :aliases     #profile {:jar [:clj-xchart :test.check]}}

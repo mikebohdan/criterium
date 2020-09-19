@@ -2,7 +2,6 @@
   (:require [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as sgen]
             [clojure.spec.test.alpha :as stest]
-            [clojure.test :refer [deftest is]]
             [clojure.test.check
              [clojure-test :refer [defspec]]
              [generators :as gen]
