@@ -4,8 +4,7 @@
              [measured :as measured]
              [output :as output]
              [pipeline :as pipeline]
-             [toolkit :as toolkit]])
-  (:import [criterium.budget Budget]))
+             [toolkit :as toolkit]]))
 
 
 (defn one-shot

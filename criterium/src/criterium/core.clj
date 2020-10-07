@@ -1,22 +1,3 @@
-;;;; Copyright (c) Hugo Duncan. All rights reserved.
-
-;;;; The use and distribution terms for this software are covered by the
-;;;; Eclipse Public License 1.0 (http://opensource.org/licenses/eclipse-1.0.php)
-;;;; which can be found in the file epl-v10.html at the root of this distribution.
-;;;; By using this software in any fashion, you are agreeing to be bound by
-;;;; the terms of this license.
-;;;; You must not remove this notice, or any other, from this software.
-
-
-;;;; Criterium - measures expression computation time over multiple invocations
-
-;;;; Inspired by Brent Broyer's
-;;;; http://www.ellipticgroup.com/html/benchmarkingArticle.html
-;;;; and also Haskell's Criterion
-
-;;;; Unlike java solutions, this can benchmark general expressions rather than
-;;;; just functions.
-
 (ns ^{:author "Hugo Duncan"
       :see-also
       [["http://github.com/hugoduncan/criterium" "Source code"]
@@ -49,13 +30,13 @@
 
   See http://hackage.haskell.org/package/criterion for a Haskell benchmarking
   library that applies many of the same statistical techniques."
-  (:use criterium.stats)
   (:require [clojure.set :as set]
             [criterium
              [budget :as budget]
              [jvm :as jvm]
              [measured :as measured]
              [pipeline :as pipeline]
+             [stats :as stats]
              [toolkit :as toolkit]
              [util :as util]
              [well :as well]]))
@@ -231,18 +212,18 @@
   [warmup-period measured]
   {:pre [(measured/measured? measured)]}
   (debug "warmup-for-jit measured" measured)
-  (let [ignore-first (time-expr-for-warmup measured 1)
-        deltas-1     (time-expr-for-warmup measured 1)
-        _ (println "deltas-1" deltas-1)
-        t            (max 1 (pipeline/elapsed-time deltas-1))
-        _            (debug "  initial t" t)
-        [deltas-n n] (if (< t 100000)           ; 100us
-                       (let [n (inc (quot 100000 t))]
+  (let [_ignore-first (time-expr-for-warmup measured 1)
+        deltas-1      (time-expr-for-warmup measured 1)
+        _             (println "deltas-1" deltas-1)
+        t             (max 1 (pipeline/elapsed-time deltas-1))
+        _             (debug "  initial t" t)
+        [deltas-n n]  (if (< t 100000)           ; 100us
+                        (let [n (inc (quot 100000 t))]
                          [(execute-expr-for-warmup n measured) n])
                        [deltas-1 1])
-        t            (pipeline/elapsed-time deltas-n)
-        p            (/ warmup-period t)
-        c            (long (max 1 (* n (/ p 5))))
+        t             (pipeline/elapsed-time deltas-n)
+        p             (/ warmup-period t)
+        c             (long (max 1 (* n (/ p 5))))
         ]
     (debug "  using t" t "for n" n)
     (debug "  using execution-count" c)
@@ -258,9 +239,9 @@
             elapsed   (pipeline/elapsed-time sum)
             cl-counts (-> deltas :class-loader :loaded-count)
             comp-time (-> deltas :compilation :compilation-time)]
-        (if (pos? cl-counts)
+        (when (pos? cl-counts)
           (debug "  classes loaded before" count "iterations"))
-        (if (pos? comp-time)
+        (when (pos? comp-time)
           (debug "  compilation occurred before" count "iterations"))
         ;; (debug "pipeline/elapsed-time" elapsed "count" count)
         (if (and (> delta-free 2) (> elapsed warmup-period))
@@ -539,8 +520,8 @@
   [data]
   (progress "Finding outliers ...")
   (reduce (apply partial add-outlier
-                 (apply boxplot-outlier-thresholds
-                        ((juxt first last) (quartiles (sort data)))))
+                 (apply stats/boxplot-outlier-thresholds
+                        ((juxt first last) (stats/quartiles (sort data)))))
           (outlier-count 0 0 0 0)
           data))
 
@@ -604,13 +585,13 @@
   [values sample-count execution-count opts]
   (let [outliers      (outliers values)
         tail-quantile (:tail-quantile opts)
-        stats         (bootstrap-bca
+        stats         (stats/bootstrap-bca
                         (map double values)
                         (juxt
-                          mean
-                          variance
-                          (partial quantile tail-quantile)
-                          (partial quantile (- 1.0 tail-quantile)))
+                         stats/mean
+                          stats/variance
+                          (partial stats/quantile tail-quantile)
+                          (partial stats/quantile (- 1.0 tail-quantile)))
                         (:bootstrap-size opts)
                         [0.5 tail-quantile (- 1.0 tail-quantile)]
                         well/well-rng-1024a)
@@ -619,22 +600,22 @@
                         (second stats)
                         sample-count)
         sqr           (fn [x] (* x x))
-        m             (mean (map double values))
-        s             (Math/sqrt (variance (map double values)))]
+        m             (stats/mean (map double values))
+        s             (Math/sqrt (stats/variance (map double values)))]
     {:outliers         outliers
-     :mean             (scale-bootstrap-estimate
+     :mean             (stats/scale-bootstrap-estimate
                          (first stats) (/ 1e-9 execution-count))
-     :sample-mean      (scale-bootstrap-estimate
+     :sample-mean      (stats/scale-bootstrap-estimate
                          [m [(- m (* 3 s)) (+ m (* 3 s))]]
                          (/ 1e-9 execution-count))
-     :variance         (scale-bootstrap-estimate
+     :variance         (stats/scale-bootstrap-estimate
                          (second stats) (sqr (/ 1e-9 execution-count)))
-     :sample-variance  (scale-bootstrap-estimate
+     :sample-variance  (stats/scale-bootstrap-estimate
                          [ (sqr s) [0 0]]
                          (sqr (/ 1e-9 execution-count)))
-     :lower-q          (scale-bootstrap-estimate
+     :lower-q          (stats/scale-bootstrap-estimate
                          (nth stats 2) (/ 1e-9 execution-count))
-     :upper-q          (scale-bootstrap-estimate
+     :upper-q          (stats/scale-bootstrap-estimate
                          (nth stats 3) (/ 1e-9 execution-count))
      :outlier-variance analysis
      :tail-quantile    (:tail-quantile opts)

@@ -8,8 +8,7 @@
              [properties :as prop]]
             [criterium
              [budget :as budget]
-             [domain :as domain]])
-  (:import [criterium.budget Budget]))
+             [domain :as domain]]))
 
 (alias 'stc 'clojure.spec.test.check)
 

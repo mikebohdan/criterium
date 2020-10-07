@@ -5,9 +5,9 @@
              [format :as format]
              [output :as output]
              [pipeline :as pipeline]
-             [toolkit :as toolkit]
              [sample :as sample]
-             [sampled-stats :as sampled-stats]])
+             [sampled-stats :as sampled-stats]
+             [toolkit :as toolkit]])
   (:import [criterium.budget Budget]))
 
 
@@ -67,16 +67,6 @@
     (into pipeline-fn-kws extra-pipeline-fn-kws)
     {:terminal-fn-kw terminal-fn-kw}))
 
-;; (defn- pipeline [options]
-;;   (let [kws     (let [pipeline-opt (:pipeline options [])]
-;;                   (if (= :all pipeline-opt)
-;;                     (keys pipeline/pipeline-fns)
-;;                     pipeline-opt))
-;;         terminal-kw (get options :terminal :elapsed-time-ns)
-;;         options {:terminal-fn (pipeline/terminal-fns terminal-kw)}
-;;         metrics (conj kws terminal-kw)]
-;;     [(pipeline/pipeline kws options) metrics]))
-
 
 (defmulti sample-data
   (fn [sample-mode _pipeline-spec _measured _total-budget _config _options]
@@ -112,7 +102,7 @@
    {:keys [estimation-fraction estimation-period-ns
            warmup-fraction warmup-period-ns
            sample-fraction sample-period-ns]
-    :as   options}]
+    :as   _options}]
   (let [pipeline        (pipeline-from-spec
                           pipeline-spec
                           [:compilation-time
@@ -158,17 +148,17 @@
 
 
 (defmulti process-samples
-  (fn [process-mode sampled metrics options]
+  (fn [process-mode _sampled _metrics _options]
     process-mode))
 
 (defmethod process-samples :samples
   ;; mode to just return the samples
-  [process-mode sampled metrics options]
+  [_process-mode sampled _metrics _options]
   sampled)
 
 (defmethod process-samples :stats
   ;; mode to just return the samples
-  [process-mode sampled metrics options]
+  [_process-mode sampled metrics options]
   (output/progress "Num samples" (count (:samples sampled)))
   (let [res (sampled-stats/sample-stats
               metrics

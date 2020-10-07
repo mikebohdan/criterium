@@ -3,8 +3,7 @@
   (:require [criterium
              [jvm :as jvm]
              [measure :as measure]
-             [measured :as measured]
-             [toolkit :as toolkit]]))
+             [measured :as measured]]))
 
 
 ;;; nanoTime latency
@@ -92,9 +91,9 @@
           m
           100))
 
-(comment
+#_(comment
   (require 'no.disassemble)
-  (clojure.pprint/pprint
+  (pprint/pprint
     (println (no.disassemble/disassemble-str (:f m)))
     (println (no.disassemble/disassemble-str (:f mb)))
     (println (no.disassemble/disassemble-str nanotime-latency-fn))

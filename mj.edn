@@ -27,35 +27,38 @@
                                   "/doc-src/publish.el\") (org-publish-all))"]]
                  :options {:out :inherit}}
 
-       :modules {:invoker :modules
-                 :modules #ref [:modules]}
-       :build   {:doc     "Build all"
-                 :invoker :modules
-                 :modules #ref [:modules]
-                 :args    ["build"]
-                 :self    false}
-       :lint    {:doc     "Lint source"
-                 :invoker :modules
-                 :modules #ref [:modules]
-                 :args    ["lint"]
-                 :self    false}
-       :fmt     {:doc     "Check source formatting"
-                 :invoker :modules
-                 :modules #ref [:modules]
-                 :args    ["fmt"]
-                 :self    false}
-       :test    {:doc     "Run tests"
-                 :invoker :modules
-                 :modules #ref [:modules]
-                 :args    ["test"]
-                 :self    false}
-       :clean   {:doc     "Clean generated files"
-                 :invoker :modules
-                 :modules #ref [:modules]
-                 :args    ["clean"]
-                 :self    false}
-       :deploy  {:doc     "Deploy to clojars"
-                 :invoker :modules
-                 :modules #ref [:modules]
-                 :args    ["deploy"]
-                 :self    false}}]}
+       :modules       {:invoker :modules
+                       :modules #ref [:modules]}
+       :build-install {:doc     "pom, jar and install project"
+                       :invoker :chain
+                       :targets [:pom :jar :install]}
+       :build         {:doc     "Build all"
+                       :invoker :modules
+                       :modules #ref [:modules]
+                       :args    ["build-install"]
+                       :self    false}
+       :lint          {:doc     "Lint source"
+                       :invoker :modules
+                       :modules #ref [:modules]
+                       :args    ["lint"]
+                       :self    false}
+       :fmt           {:doc     "Check source formatting"
+                       :invoker :modules
+                       :modules #ref [:modules]
+                       :args    ["fmt"]
+                       :self    false}
+       :test          {:doc     "Run tests"
+                       :invoker :modules
+                       :modules #ref [:modules]
+                       :args    ["test"]
+                       :self    false}
+       :clean         {:doc     "Clean generated files"
+                       :invoker :modules
+                       :modules #ref [:modules]
+                       :args    ["clean"]
+                       :self    false}
+       :deploy        {:doc     "Deploy to clojars"
+                       :invoker :modules
+                       :modules #ref [:modules]
+                       :args    ["deploy"]
+                       :self    false}}]}

@@ -9,9 +9,9 @@
 
 (ns criterium.jvm
   "JVM data accessors"
-  (:require [criterium
-             [util :as util]]
-            [clojure.string :as string])
+  (:require [clojure.string :as string]
+            [criterium
+             [util :as util]])
   (:import [java.lang.management
             GarbageCollectorMXBean
             ManagementFactory
@@ -102,7 +102,9 @@
     (let [pool-usaage (for [^MemoryPoolMXBean pool pools]
                         [(.getName pool) (memory-usage (.getUsage pool))])
           sum         (reduce util/sum (map second pool-usaage))]
-      (into {} pool-usaage))))
+      (assoc
+       (into {} pool-usaage)
+       :total sum))))
 
 
 (let [beans (.. ManagementFactory getGarbageCollectorMXBeans)

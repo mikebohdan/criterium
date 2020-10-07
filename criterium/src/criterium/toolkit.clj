@@ -49,8 +49,8 @@
   [max-attempts next-fn]
   (fn [data measured]
     (-> data
-       (force-gc max-attempts)
-       (next-fn data measured))))
+        (force-gc max-attempts)
+        (next-fn data measured))))
 
 
 ;;; Timing
@@ -119,7 +119,8 @@
    {:keys [warmup-period-ns target-batch-time-ns]
     :or   {warmup-fraction 10}
     :as   options}]
-  (let [warmup-budget        (budget/phase-budget budget warmup-period-ns warmup-fraction)
+  (let [warmup-budget        (budget/phase-budget
+                              budget warmup-period-ns warmup-fraction)
         ^long est-eval-count (estimate-eval-count
                                t0
                                (merge
@@ -170,13 +171,14 @@
   elapsed time to time-budget-ns."
   ^long [measured budget batch-size]
   (let [pipeline          pipeline/time-metric
-        {:keys [elapsed-time-ns eval-count samples] :as xxxx}
+        {:keys [elapsed-time-ns eval-count _samples]}
         (sample
           pipeline
           measured
           budget
           batch-size)
-        ^long n           (:eval-count (first samples))]
+        ;; ^long n           (:eval-count (first samples))
+        ]
     ;; (long (quot ^long (reduce min (map pipeline/elapsed-time samples))
     ;;             n))
     (execution-time-from-batch elapsed-time-ns eval-count)))

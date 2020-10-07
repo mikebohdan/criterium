@@ -33,8 +33,8 @@
             (is (integer? (:i val))))))))
   (testing "arg-gen/measured can specify a test.check size"
     (let [m (arg-gen/measured
-              {:size 3} [i gen/small-integer]
-              i)]
+             {:size 3} [i gen/small-integer]
+             i)]
       (testing "which generates a state fn that generates values that respect size"
         (let [[iv] ((:state-fn m))]
           (is (integer? iv))

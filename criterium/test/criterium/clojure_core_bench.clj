@@ -4,7 +4,8 @@
              [criterium
               [arg-gen :as arg-gen]
               [measured :as measured]
-              [measure :as measure]]))
+              [measure :as measure]
+              [stats :as stats]]))
 
 ;;; arg-gen a constant
 
@@ -25,7 +26,7 @@
   "Expand to call  f recursively n times with the initial argument, init."
   [n f init]
   (reduce
-    (fn [expr n]
+    (fn [expr _n]
       `(~f ~expr))
     init
     (range n)))
@@ -76,12 +77,12 @@
              ms)
         lr (criterium.stats/linear-regression xs ys)
         ;; _ (println {:xs xs :ys ys})
-        c  (criterium.chart/xy-chart xs ys)
+        ;;c  (criterium.chart/xy-chart xs ys)
         ]
     (println "Regression" lr)
     ;; (println {:xs xs :ys ys})
     ;; (println :hello)
-     (criterium.chart/view c)
+     ;;(criterium.chart/view c)
     ))
 
 (comment

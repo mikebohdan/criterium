@@ -5,10 +5,9 @@
              [util :as util]]))
 
 (util/optional-require
-  [criterium.chart :as chart :refer [histogram view]])
+  '[criterium.chart :as chart :refer [histogram view]])
 
-
-(defn print-stat [path {:keys [mean variance] :as stat}]
+(defn print-stat [path {:keys [mean variance] :as _stat}]
   (let [{:keys [dimension label]} (metric/metric-format path)
         [scale units] (format/scale dimension (first mean))]
     (println
@@ -18,7 +17,7 @@
               (* scale 3 (Math/sqrt (first variance)))
               units))))
 
-(defn view-histogram [{:keys [samples batch-size stats] :as result} path]
+(defn view-histogram [{:keys [samples batch-size stats] :as _result} path]
   (util/assert-optional-ns
     'criterium.chart
     "Please add com.hypirion/clj-xchart to the classpath to enable histograms")
@@ -33,12 +32,12 @@
              (mapv #(* % scale)))
         chart-options {:title label
                        :value-label (str "value [" units"]")}]
-    (criterium.chart/view
-      (criterium.chart/histogram
-        vs
-        chart-options))))
+    (view
+     (histogram
+      vs
+      chart-options))))
 
-(defn print-stats [result {:keys [histogram] :as options}]
+(defn print-stats [result {:keys [histogram] :as _options}]
   (doseq [metric (:metrics result)]
     (doseq [path (metric/metric-paths metric)]
       (let [stat (get-in (:stats result) path)]

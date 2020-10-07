@@ -45,7 +45,7 @@
   "Return a symbolic representation of the measured.
   Provides a way to introspect how the measured will be executed."
   [measured]
-  (if-let [expr-fn (:expr-fn measured)]
+  (when-let [expr-fn (:expr-fn measured)]
     (expr-fn)))
 
 (defn invoke
@@ -62,7 +62,7 @@
 
 (def ^Blackhole blackhole
   (Blackhole.
-    "Today's password is swordfish. I understand instantiating Blackholes directly is dangerous."))
+   "Today's password is swordfish. I understand instantiating Blackholes directly is dangerous."))
 
 (defn evaporate []
   (.evaporate
@@ -150,8 +150,8 @@
 (defn cast-fn
   "Return a cast function givent a tag."
   [tag]
-  (if (and (symbol? tag)
-           (#{'long 'int 'double 'float} tag))
+  (when (and (symbol? tag)
+             (#{'long 'int 'double 'float} tag))
     tag))
 
 (defn binding-with-hint-or-cast
@@ -209,7 +209,7 @@
   (TYPE-NAME-CONVERSIONS t t))
 
 (defn tag-meta [^Class t]
-  (if t
+  (when t
     (let [type-name (-> (.getCanonicalName ^Class t)
                        symbol
                        type-name-conversion)]
