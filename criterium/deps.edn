@@ -1,5 +1,6 @@
-{:deps    {org.openjdk.jmh/jmh-core {:mvn/version "1.23"}}
+{:deps    {org.openjdk.jmh/jmh-core {:mvn/version "1.23"}
+           org.clojure/clojure {:mvn/version "1.10.1"}}
  :aliases {:kaocha {:extra-deps
                     {lambdaisland/kaocha           {:mvn/version "1.0.641"}
                      lambdaisland/kaocha-cloverage {:mvn/version "1.0-45"}
-                     org.clojure/test.check        {:mvn/version "1.0.0"}}}}}
+                     org.clojure/test.check        {:mvn/version "1.1.0"}}}}}

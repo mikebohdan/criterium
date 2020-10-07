@@ -12,19 +12,19 @@
 
 (alias 'stc 'clojure.spec.test.check)
 
-(s/def ::budget/budget (s/with-gen ::budget/budget
-                         #(sgen/fmap
-                            budget/budget*
-                            (sgen/tuple
-                              (s/gen ::domain/elapsed-time-ns)
-                              (s/gen ::domain/eval-count)))))
+;; (s/def ::budget/budget (s/with-gen ::budget/budget
+;;                           #(sgen/fmap
+;;                             budget/budget*
+;;                             (sgen/tuple
+;;                              (s/gen ::domain/elapsed-time-ns)
+;;                              (s/gen ::domain/eval-count)))))
 
 ;; spec can't instrument functions with primitives, so explicitly
 ;; list the ones that can be instrumented.
 (stest/instrument
   [`budget/add
    `budget/subtract
-   `budget/budget?
+   ;; `budget/budget?
    `budget/budget
    `budget/budget*])
 

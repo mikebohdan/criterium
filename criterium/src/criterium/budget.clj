@@ -1,6 +1,7 @@
 (ns criterium.budget
   (:require [clojure.pprint :as pprint]
             [clojure.spec.alpha :as s]
+            [clojure.spec.gen.alpha :as sgen]
             [criterium
              [domain :as domain]
              [format :as format]]))
@@ -17,17 +18,27 @@
   [x]
   (instance? Budget x))
 
+(defn elapsed-time-ns
+  "Return the elapsed time budget in ns."
+  ^long [^Budget b]
+  (.elapsed-time-ns b))
+
+(defn eval-count
+  "Return the eval-count budget."
+  ^long [^Budget b]
+  (.eval-count b))
+
 (defn budget
   "Return a budget given possibly nil values for the specification"
-  [elapsed-time-ns eval-count]
+  ^Budget [elapsed-time-ns eval-count]
   {:pre [(s/valid? ::domain/elapsed-time-ns elapsed-time-ns)
          (s/valid? ::domain/eval-count elapsed-time-ns)]}
   (->Budget
     (or elapsed-time-ns Long/MAX_VALUE)
     (or eval-count Long/MAX_VALUE)))
 
-(defn budget*
-  [[elapsed-time-ns eval-count]]
+(defn ^:no-doc budget*
+  ^Budget [[elapsed-time-ns eval-count]]
   (budget elapsed-time-ns eval-count))
 
 (defn add
@@ -98,14 +109,22 @@
   (pprint/pprint {:elapsed-time-ns (.elapsed-time-ns budget)
                   :eval-count      (.eval-count budget)}))
 
+
 (s/fdef budget?
   :args (s/cat :x any?)
   :ret boolean?
   :fn #(= (:ret %) (instance? Budget (-> % :args :x))))
 
-(s/def ::budget (s/and budget?
-                         (comp nat-int? (fn [^Budget b] (.elapsed-time-ns b)))
-                         (comp nat-int? (fn [^Budget b] (.eval-count b)))))
+(s/def ::budget
+  (s/with-gen
+    (s/and budget?
+           (comp nat-int? (fn [^Budget b] (.elapsed-time-ns b)))
+           (comp nat-int? (fn [^Budget b] (.eval-count b))))
+    #(sgen/fmap
+      budget*
+      (sgen/tuple
+       (s/gen ::domain/elapsed-time-ns)
+       (s/gen ::domain/eval-count)))))
 
 (s/fdef budget
   :args (s/cat :elapsed-time-ns ::domain/elapsed-time-ns
@@ -123,40 +142,40 @@
 (s/fdef add
   :args (s/and (s/cat :budgets (s/+ ::budget))
                #(< (reduce + (map
-                               (fn [^Budget b] (double (.elapsed-time-ns b)))
-                               (:budgets %)))
+                              (fn [b] (double (elapsed-time-ns b)))
+                              (:budgets %)))
                    Long/MAX_VALUE)
                #(< (reduce + (map
-                               (fn [^Budget b] (double (.eval-count b)))
-                               (:budgets %)))
+                              (fn [b] (double (eval-count b)))
+                              (:budgets %)))
                    Long/MAX_VALUE))
   :ret ::budget
   :fn (s/and #(= (.elapsed-time-ns (:ret %))
                  (reduce + (map
-                             (fn [^Budget b] (.elapsed-time-ns b))
-                             (-> % :args :budgets))))
+                            (fn [b] (elapsed-time-ns b))
+                            (-> % :args :budgets))))
              #(= (.eval-count (:ret %))
                  (reduce + (map
-                             (fn [^Budget b] (.eval-count b))
-                             (-> % :args :budgets))))))
+                            (fn [b] (eval-count b))
+                            (-> % :args :budgets))))))
 
 
 (s/fdef subtract
   :args (s/and (s/cat :budgets (s/+ ::budget))
                #(>= (reduce - (map
-                               (fn [^Budget b] (double (.elapsed-time-ns b)))
+                               (fn [b] (double (elapsed-time-ns b)))
                                (:budgets %)))
                    0)
                #(>= (reduce - (map
-                               (fn [^Budget b] (double (.eval-count b)))
+                               (fn [b] (double (eval-count b)))
                                (:budgets %)))
                    0))
   :ret ::budget
   :fn (s/and #(= (.elapsed-time-ns (:ret %))
                  (reduce - (map
-                             (fn [^Budget b] (.elapsed-time-ns b))
-                             (-> % :args :budgets) )))
+                            (fn [b] (elapsed-time-ns b))
+                            (-> % :args :budgets) )))
              #(= (.eval-count (:ret %))
                  (reduce - (map
-                             (fn [^Budget b] (.eval-count b))
-                             (-> % :args :budgets) )))))
+                            (fn [b] (eval-count b))
+                            (-> % :args :budgets) )))))
