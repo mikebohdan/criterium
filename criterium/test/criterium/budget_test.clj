@@ -1,14 +1,12 @@
 (ns criterium.budget-test
   (:require [clojure.spec.alpha :as s]
-            [clojure.spec.gen.alpha :as sgen]
             [clojure.spec.test.alpha :as stest]
             [clojure.test.check
              [clojure-test :refer [defspec]]
              [generators :as gen]
              [properties :as prop]]
             [criterium
-             [budget :as budget]
-             [domain :as domain]]))
+             [budget :as budget]]))
 
 (alias 'stc 'clojure.spec.test.check)
 
@@ -24,7 +22,7 @@
 (stest/instrument
   [`budget/add
    `budget/subtract
-   ;; `budget/budget?
+   `budget/budget?
    `budget/budget
    `budget/budget*])
 

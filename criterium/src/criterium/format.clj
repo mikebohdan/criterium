@@ -6,10 +6,10 @@
   "Scale value with given dimensions keyword.
   Return a [scale units] tuple.
   scale is a multiplicative factor. units is a string."
-  (fn [dimension value] dimension))
+  (fn [dimension _value] dimension))
 
 (defmethod scale :default
-  [_ value]
+  [_ _value]
   [1 ""])
 
 (defmethod scale :time

@@ -167,20 +167,20 @@
   [arg-syms expr & [{:keys [arg-metas]}]]
   (let [blackhole-sym  (with-meta (gensym "blachole")
                          {:tag 'org.openjdk.jmh.infra.Blackhole})
-        eval-count-sym (gensym "eval-count")]
-    `(fn [~arg-syms ~eval-count-sym]
-       (let [~blackhole-sym blackhole ; hoist car lookup out of loop
+        eval-count-sym  (gensym "eval-count")]
+    `(fn [~arg-syms ~(with-meta eval-count-sym {:tag 'long})]
+       (let [~blackhole-sym blackhole ; hoist cast lookup out of loop
              ~@(mapcat binding-with-hint-or-cast arg-syms arg-metas)
              ;; primitive loop coounter.  Decrement since we evaluate
              ;; once outside the loop.
-             n#             (unchecked-dec (long ~eval-count-sym))
+             n#             (long (unchecked-dec ~eval-count-sym))
              start#         (criterium.jvm/timestamp)
              val#           ~expr]      ; evaluate once to get a return value
          (loop [i# n#]
            (when (pos? i#)
              ;; don't use a local inside the loop, to avoid locals clearing
              (.consume ~blackhole-sym ~expr)
-             (recur (unchecked-dec i#))))
+             (recur (long (unchecked-dec i#)))))
          (let [finish# (criterium.jvm/timestamp)]
            (evaporate)
            [(unchecked-subtract finish# start#) val#])))))

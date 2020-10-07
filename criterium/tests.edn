@@ -5,19 +5,23 @@
           :test-paths           ["test"]
           :skip-meta            [:very-slow]}]
 
- :plugins                            [:kaocha.plugin/randomize
-                                      :kaocha.plugin/filter
-                                      :kaocha.plugin/capture-output
-                                      :kaocha.plugin/profiling
-                                      :kaocha.plugin/cloverage]
- :cloverage/opts {}
+ :plugins                            #profile {:default     [:kaocha.plugin/randomize
+                                                             :kaocha.plugin/filter
+                                                             :kaocha.plugin/capture-output
+                                                             :kaocha.plugin/profiling
+                                                             :kaocha.plugin/cloverage]
+                                               :no-coverage [:kaocha.plugin/randomize
+                                                             :kaocha.plugin/filter
+                                                             :kaocha.plugin/capture-output
+                                                             :kaocha.plugin/profiling]}
+ :cloverage/opts                     {}
  :capture-output?                    #profile {:default true
-                                               :dots true
-                                               :debug false}
- :reporter                           #profile {:dots kaocha.report/dots
-                                               :default kaocha.report/documentation
+                                               :dots    true
+                                               :debug   false}
+ :reporter                           #profile {:dots     kaocha.report/dots
+                                               :default  kaocha.report/documentation
                                                :progress kaocha.report.progress/report
-                                               :debug kaocha.report/debug}
+                                               :debug    kaocha.report/debug}
  :kaocha.plugin.randomize/randomize? true
  :kaocha.plugin.profiling/count      10
  :kaocha.plugin.profiling/profiling? #profile {:default false

@@ -3,8 +3,7 @@
             [clojure.test.check
              [clojure-test :refer [defspec]]
              [generators :as gen]
-             [properties :as prop]]
-            [clojure.test :refer [deftest is testing]]))
+             [properties :as prop]]))
 
 
 (defspec format-non-dimensional-value-test

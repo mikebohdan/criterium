@@ -1,14 +1,14 @@
 (ns criterium.time
   "Provides an augmented time macro for simple timing of expressions"
   (:refer-clojure :exclude [time])
-  (:require [criterium
-             [chart :as chart]
-             [format :as format]
-             [jvm :as jvm]
-             [measured :as measured]
-             [stats :as stats]
-             [toolkit :as toolkit]
-             [well :as well]]))
+  ;; (:require [criterium
+  ;;            [format :as format]
+  ;;            [jvm :as jvm]
+  ;;            [measured :as measured]
+  ;;            [stats :as stats]
+  ;;            [toolkit :as toolkit]
+  ;;            [well :as well]])
+  )
 
 (def last-time* (volatile! nil))
 
@@ -568,7 +568,7 @@
 ;; Execution error (ArithmeticException) at criterium.stats/mean (stats.clj:37).
 ;; Divide by zero
 
-(comment
+#_(comment
 
   (time 1)
 

@@ -101,50 +101,50 @@
   [_ pipeline-spec measured total-budget config
    {:keys [estimation-fraction estimation-period-ns
            warmup-fraction warmup-period-ns
-           sample-fraction sample-period-ns]
+           sample-fraction _sample-period-ns]
     :as   _options}]
   (let [pipeline        (pipeline-from-spec
-                          pipeline-spec
-                          [:compilation-time
-                           :garbage-collector])
+                         pipeline-spec
+                         [:compilation-time
+                          :garbage-collector])
         estimation-frac (or estimation-fraction
                             DEFAULT-ESTIMATION-FRACTION)
         warmup-frac     (or warmup-fraction
                             DEFAULT-WARMUP-FRACTION)
-        sample-frac     (or sample-fraction
-                            (- 1.0
-                               estimation-frac
-                               warmup-frac))
+        _sample-frac    (or sample-fraction
+                             (- 1.0
+                                estimation-frac
+                                warmup-frac))
 
         estimation-budget (budget/phase-budget
-                            total-budget
-                            estimation-period-ns
-                            estimation-fraction
-                            estimation-frac)
+                           total-budget
+                           estimation-period-ns
+                           estimation-fraction
+                           estimation-frac)
         warmup-budget     (budget/phase-budget
-                            total-budget
-                            warmup-period-ns
-                            warmup-fraction
-                            warmup-frac)
+                           total-budget
+                           warmup-period-ns
+                           warmup-fraction
+                           warmup-frac)
         sample-budget     (budget/subtract
-                            total-budget
-                            estimation-budget
-                            warmup-budget)]
+                           total-budget
+                           estimation-budget
+                           warmup-budget)]
     (output/progress
-      "total-budget" total-budget)
+     "total-budget" total-budget)
     (output/progress
-      "estimation-budget" estimation-budget)
+     "estimation-budget" estimation-budget)
     (output/progress
-      "warmup-budget" warmup-budget)
+     "warmup-budget" warmup-budget)
     (output/progress
-      "sample-budget" sample-budget)
+     "sample-budget" sample-budget)
     (sample/full
-      pipeline
-      measured
-      estimation-budget
-      warmup-budget
-      sample-budget
-      config)))
+     pipeline
+     measured
+     estimation-budget
+     warmup-budget
+     sample-budget
+     config)))
 
 
 (defmulti process-samples

@@ -72,7 +72,6 @@ http://www.iro.umontreal.ca/~panneton/WELLRNG.html"
        (aset state new-index
              (bit-xor (bit-xor (mat0-neg -11 z0) (mat0-neg -7 z1))
                       (mat0-neg -13 z2)))
-       (let  []
-         (lazy-seq
-          (cons (unsign (* (aget state new-index) fact))
-                (well-rng-1024a state new-index)))))))
+       (lazy-seq
+        (cons (unsign (* (aget state new-index) fact))
+              (well-rng-1024a state new-index))))))

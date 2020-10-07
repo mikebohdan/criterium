@@ -1,12 +1,9 @@
 (ns criterium.toolkit-test
-  (:require [clojure.test :refer [deftest is]]
-            [clojure.test.check
+  (:require [clojure.test.check
              [clojure-test :refer [defspec]]
              [generators :as gen]
              [properties :as prop]]
             [criterium
-             [measured :as measured]
-             [pipeline :as pipeline]
              [toolkit :as toolkit]]))
 
 

@@ -62,7 +62,7 @@
                [(+ m (/ delta kp1))
                 (+ q (/ (* k (sqr delta)) kp1))
                 kp1]))]
-     (let [[m q k] (reduce update-estimates [0.0 0.0 0] data)]
+     (let [[_ q k] (reduce update-estimates [0.0 0.0 0] data)]
        (/ q (- k df))))))
 
 (defn variance*
@@ -344,8 +344,7 @@ descending order (so the last element of coefficients is the constant term)."
    so you can use juxt to pass multiple statistics.
    http://en.wikipedia.org/wiki/Bootstrapping_(statistics)"
   [data statistic size rng-factory]
-  (let [samples   (bootstrap-sample data statistic size rng-factory)
-        transpose (fn [data] (apply map vector data))]
+  (let [samples   (bootstrap-sample data statistic size rng-factory)]
     (if (vector? (first samples))
       (map bootstrap-estimate samples)
       (bootstrap-estimate samples))))
@@ -371,8 +370,8 @@ descending order (so the last element of coefficients is the constant term)."
   [c-k h-k data deviates]
   (lazy-seq
     (cons
-     (* c-k (+ (take 1 data) (* h-k (take 1 deviates))))
-     (if-let [n (next data)]
+     (* c-k (+ (first data) (* h-k (first deviates))))
+     (when-let [n (next data)]
        (smoothed-sample c-k h-k n (next deviates))))))
 
 (defn gaussian-weight
