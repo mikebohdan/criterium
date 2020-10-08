@@ -68,7 +68,7 @@
     (print-jvm-event-stat "Garbage collection" garbage-collection)))
 
 (defn print-final-gc-warnings
-  [{:keys [final-gc samples] :as _result} _options]
+  [{:keys [samples] :as _result} _options]
   (let [total (reduce + (map (comp :time :total :garbage-collection) samples))]
     (when (pos? total)
       (println "Final GC" (format/format-value :time-ns total)))))

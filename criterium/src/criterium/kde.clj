@@ -39,7 +39,7 @@
   [nu gamma zeta theta z]
   (let [tan-theta (Math/tan theta)
         cos-theta (Math/cos theta)
-        sin-theta (Math/sin theta)
+        ;; sin-theta (Math/sin theta)
         a1 (/ (* zeta zeta) (* gamma gamma cos-theta cos-theta))
         a2 (/ (* zeta zeta) (* gamma gamma cos-theta cos-theta))
         e1 (+ a1 (* zeta (- z 1)))

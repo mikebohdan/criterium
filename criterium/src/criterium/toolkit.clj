@@ -43,14 +43,14 @@
           samples)))))
 
 
-(defn with-force-gc
-  "Pipeline function to Force garbage collection.
-  Attempls GC up to max-attempt times before execution."
-  [max-attempts next-fn]
-  (fn [data measured]
-    (-> data
-        (force-gc max-attempts)
-        (next-fn data measured))))
+;; (defn with-force-gc
+;;   "Pipeline function to Force garbage collection.
+;;   Attempls GC up to max-attempt times before execution."
+;;   [max-attempts next-fn]
+;;   (fn [data measured]
+;;     (-> data
+;;         (force-gc max-attempts)
+;;         (next-fn data measured))))
 
 
 ;;; Timing
@@ -99,8 +99,7 @@
 
 (defn estimate-batch-size
   "Estimate batch-size for the given budget and batch execution-time."
-  [measured
-   t0
+  [t0
    budget
    batch-time-ns]
   (let [est-eval-count (estimate-eval-count
@@ -110,25 +109,24 @@
     est-eval-count))
 
 
-(defn warmup-params
-  "Estimate budget and batch-size for warmup"
-  [measured
-   t0
-   budget
-   warmup-fraction
-   {:keys [warmup-period-ns target-batch-time-ns]
-    :or   {warmup-fraction 10}
-    :as   options}]
-  (let [warmup-budget        (budget/phase-budget
-                              budget warmup-period-ns warmup-fraction)
-        ^long est-eval-count (estimate-eval-count
-                               t0
-                               (merge
-                                 warmup-budget
-                                 (select-keys options [:target-batch-time-ns])))
-        batch-size           (max 1 (long (quot est-eval-count
-                                          ^long (:eval-count measured))))]
-    [warmup-budget batch-size]))
+;; (defn warmup-params
+;;   "Estimate budget and batch-size for warmup"
+;;   [measured
+;;    t0
+;;    budget
+;;    warmup-fraction
+;;    {:keys [warmup-period-ns]
+;;     :as   options}]
+;;   (let [warmup-budget        (budget/phase-budget
+;;                               budget warmup-period-ns warmup-fraction default-fraction)
+;;         ^long est-eval-count (estimate-eval-count
+;;                                t0
+;;                                (merge
+;;                                  warmup-budget
+;;                                  (select-keys options [:target-batch-time-ns])))
+;;         batch-size           (max 1 (long (quot est-eval-count
+;;                                           ^long (:eval-count measured))))]
+;;     [warmup-budget batch-size]))
 
 
 (defn sample

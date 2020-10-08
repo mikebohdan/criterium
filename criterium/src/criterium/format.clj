@@ -6,7 +6,8 @@
   "Scale value with given dimensions keyword.
   Return a [scale units] tuple.
   scale is a multiplicative factor. units is a string."
-  (fn [dimension _value] dimension))
+  #_{:clj-kondo/ignore [:unused-binding]}
+  (fn [dimension value] dimension))
 
 (defmethod scale :default
   [_ _value]
@@ -46,7 +47,8 @@
 
 (defmulti format-value
   "Format value to 3 significant figures in an appropriate unit for the scale."
-  (fn [dimension _value] dimension))
+  #_{:clj-kondo/ignore [:unused-binding]}
+  (fn [dimension value] dimension))
 
 (defmethod format-value :default
   [_ value]
@@ -69,7 +71,9 @@
 
 
 
-(defmulti format-metric (fn [metric _val] metric))
+(defmulti format-metric
+  #_{:clj-kondo/ignore [:unused-binding]}
+  (fn [metric val] metric))
 
 (defmethod format-metric :elapsed-time-ns
   [_ val]

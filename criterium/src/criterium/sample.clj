@@ -29,7 +29,7 @@
   (toolkit/force-gc max-gc-attempts)
   (let [t0         (toolkit/first-estimate measured)
         batch-size (toolkit/estimate-batch-size
-                     measured t0 estimation-budget batch-time-ns)
+                    t0 estimation-budget batch-time-ns)
         t1         (toolkit/estimate-execution-time
                      measured
                      estimation-budget
@@ -37,7 +37,7 @@
         _          (toolkit/force-gc max-gc-attempts)
 
         batch-size (toolkit/estimate-batch-size
-                     measured t1 sample-budget batch-time-ns)]
+                    t1 sample-budget batch-time-ns)]
     (toolkit/force-gc max-gc-attempts)
     (toolkit/sample
       pipeline
@@ -62,7 +62,7 @@
   (toolkit/force-gc max-gc-attempts)
   (let [t0         (toolkit/first-estimate measured)
         batch-size (toolkit/estimate-batch-size
-                     measured t0 estimation-budget batch-time-ns)
+                    t0 estimation-budget batch-time-ns)
         t1         (toolkit/estimate-execution-time
                      measured
                      estimation-budget
@@ -70,7 +70,7 @@
         _          (toolkit/force-gc max-gc-attempts)
 
         batch-size (toolkit/estimate-batch-size
-                     measured t1 warmup-budget batch-time-ns)
+                    t1 warmup-budget batch-time-ns)
         {:keys [elapsed-time-ns eval-count] :as warmup-data}
         (toolkit/warmup
           measured
@@ -81,7 +81,7 @@
 
 
         batch-size (toolkit/estimate-batch-size
-                     measured t2 sample-budget batch-time-ns)
+                    t2 sample-budget batch-time-ns)
         _          (output/progress "Batch-size:" batch-size
                                     t2 sample-budget batch-time-ns)
 

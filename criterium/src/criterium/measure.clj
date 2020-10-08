@@ -69,7 +69,8 @@
 
 
 (defmulti sample-data
-  (fn [sample-mode _pipeline-spec _measured _total-budget _config _options]
+  #_{:clj-kondo/ignore [:unused-binding]}
+  (fn [sample-mode pipeline-spec measured total-budget config options]
     sample-mode))
 
 (defmethod sample-data :one-shot
@@ -148,7 +149,8 @@
 
 
 (defmulti process-samples
-  (fn [process-mode _sampled _metrics _options]
+  #_{:clj-kondo/ignore [:unused-binding]}
+  (fn [process-mode sampled metrics options]
     process-mode))
 
 (defmethod process-samples :samples

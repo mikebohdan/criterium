@@ -283,7 +283,7 @@ descending order (so the last element of coefficients is the constant term)."
 
 (defn bca-nonparametric-eval
   "Calculate bootstrap values for given estimate and samples"
-  [n size data z-alpha estimate samples jack-samples]
+  [size z-alpha estimate samples jack-samples]
   (let [z0 (normal-quantile
             (/ (count (filter (partial > estimate) samples)) size))
         jack-mean (mean jack-samples)
@@ -309,8 +309,7 @@ descending order (so the last element of coefficients is the constant term)."
   See http://lib.stat.cmu.edu/S/bootstrap.funs for Efron's original
    implementation."
   [data statistic size alpha rng-factory]
-  (let [n (count data)
-        data (sort data)
+  (let [data (sort data)
         estimate (statistic data)
         samples (bootstrap-sample data statistic size rng-factory)
         jack-samples (jacknife data statistic)
@@ -318,16 +317,14 @@ descending order (so the last element of coefficients is the constant term)."
         z-alpha (map normal-quantile alpha)]
     (if (vector? estimate)
       (map
-       (partial bca-nonparametric-eval n size data z-alpha)
+       (partial bca-nonparametric-eval size z-alpha)
        estimate samples jack-samples)
-      (bca-nonparametric-eval
-       n size data z-alpha estimate samples jack-samples))))
+      (bca-nonparametric-eval size z-alpha estimate samples jack-samples))))
 
 (defn bca-to-estimate
-  [alpha bca-estimate]
+  [bca-estimate]
   [(first (first bca-estimate))
    (next (first bca-estimate))])
-
 
 (defn bootstrap-bca
   "Bootstrap a statistic. Statistic can produce multiple statistics as a vector
@@ -336,8 +333,8 @@ descending order (so the last element of coefficients is the constant term)."
   [data statistic size alpha rng-factory]
   (let [bca (bca-nonparametric data statistic size alpha rng-factory)]
     (if (vector? bca)
-      (bca-to-estimate alpha bca)
-      (map (partial bca-to-estimate alpha) bca))))
+      (bca-to-estimate bca)
+      (map bca-to-estimate bca))))
 
 (defn bootstrap
   "Bootstrap a statistic. Statistic can produce multiple statistics as a vector
