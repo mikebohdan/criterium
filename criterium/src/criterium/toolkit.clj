@@ -40,7 +40,7 @@
                      (< new-memory-used 0)))
           (recur (conj samples sample)
                  (inc attempts))
-          samples)))))
+          (conj samples sample))))))
 
 
 ;; (defn with-force-gc

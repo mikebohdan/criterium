@@ -1,7 +1,10 @@
 (ns criterium.util)
 
 
-(defn- safe-keys [m]
+(defn- safe-keys
+  [m]
+  (assert (or (map? m) (nil? m)) (pr-str m))
+  {:pre [(or (map? m) (nil? m))]}
   (dissoc m :state :expr-value))
 
 (defn- merge-fn [op]

@@ -129,14 +129,14 @@
 
 (defn time-expr
   "Returns a map containing execution time and result of specified function."
-  [measured]
-  (let [pline (pipeline/pipeline
-                (pipeline/with-garbage-collector-stats))]
+  [measured n]
+  (let [pline (pipeline/with-garbage-collector-stats
+                pipeline/time-metric)]
     (toolkit/sample
       pline
       measured
-      (budget/budget 1 1)
-      1)))
+      (budget/budget Long/MAX_VALUE n)
+      n)))
 
 (defn time-expr-for-warmup
   "Returns a map containing execution time, change in loaded and unloaded
@@ -163,6 +163,7 @@
   "If the final GC execution time is significant compared to
   the runtime, then the runtime should maybe include this time."
   [execution-time final-gc-time]
+  (prn :execution-time execution-time :final-gc-time final-gc-time)
   (let [fractional-time (/ final-gc-time execution-time)
         is-significant? (> fractional-time *final-gc-problem-threshold*)]
     (when is-significant?
@@ -176,7 +177,7 @@
 (defn execute-expr
   "Time the execution of `n` invocations of `f`. See `execute-expr*`."
   [n measured]
-  (time-expr (measured/batch measured n)))
+  (time-expr measured n))
 
 (defn execute-expr-for-warmup
   "Time the execution of `n` invocations of `f`. See `execute-expr*`."
@@ -199,7 +200,7 @@
             (toolkit/force-gc *max-gc-attempts*))
           (aset result i (execute-expr execution-count measured))
           (recur (unchecked-inc i)))
-        result))))
+        (reduce #(into %1 (:samples %2)) [] result)))))
 
 
 ;;; Compilation
@@ -225,16 +226,20 @@
         p             (/ warmup-period t)
         c             (long (max 1 (* n (/ p 5))))
         ]
+    (println "deltas-n" deltas-n)
     (debug "  using t" t "for n" n)
     (debug "  using execution-count" c)
     (loop [count      n
            delta-free 0
            deltas-sum (if (= n 1)
-                        (:samples deltas-1)
-                        (pipeline/total (:samples deltas-1)
-                                        (:samples deltas-n)))]
-      (let [deltas    (execute-expr-for-warmup c measured)
-            sum       (util/sum (:samples deltas-sum) (:samples deltas))
+                        (pipeline/total (:samples deltas-1))
+                        (pipeline/total
+                         (into (:samples deltas-1)
+                               (:samples deltas-n))))]
+      (let [deltas    (pipeline/total
+                       (:samples
+                        (execute-expr-for-warmup c measured)))
+            sum       (util/sum deltas-sum deltas)
             count     (+ count c)
             elapsed   (pipeline/elapsed-time sum)
             cl-counts (-> deltas :class-loader :loaded-count)
@@ -269,7 +274,8 @@
   (loop [n (max 1 (long (/ period (max 1 estimated-fn-time) 5)))]
     (when gc-before-sample
       (toolkit/force-gc *max-gc-attempts*))
-    (let [deltas    (execute-expr-for-warmup n f)
+    (let [deltas    (pipeline/total
+                     (:samples (execute-expr-for-warmup n f)))
           t         (pipeline/elapsed-time deltas)
           ;; It is possible for small n and a fast expression to get
           ;; t=0 nsec.  This is likely due to how (System/nanoTime)
@@ -318,6 +324,11 @@
                               "exec-count" n-exec \newline
                               "overhead[s]" overhead \newline
                               "total-overhead[ns]" total-overhead)
+        _ (println
+                              "Running with\n sample-count" sample-count \newline
+                              "exec-count" n-exec \newline
+                              "overhead[s]" overhead \newline
+                              "total-overhead[ns]" total-overhead)
         _                   (toolkit/force-gc *max-gc-attempts*)
         samples             (collect-samples
                               sample-count
@@ -325,14 +336,19 @@
                               measured
                               gc-before-sample)
         _                   (progress "Final GC...")
-        gc-deltas           (toolkit/force-gc)
+        gc-deltas           (pipeline/total (toolkit/force-gc 3))
+        _ (println :gc-deltas gc-deltas)
         final-gc-time       (pipeline/elapsed-time gc-deltas)
+        _ (println :samples samples)
         sample-times        (->> samples
                                (map pipeline/elapsed-time)
                                (map #(- % total-overhead)))
         total               (reduce + 0 sample-times)
         _                   (progress "Checking GC...")
         final-gc-result     (final-gc-warn total final-gc-time)]
+    (println "XX"
+             :total total
+             :samples samples)
     {:execution-count   n-exec
      :sample-count      sample-count
      :sample-times      sample-times
@@ -599,9 +615,11 @@
                         (first stats)
                         (second stats)
                         sample-count)
+        _ (println "AA")
         sqr           (fn [x] (* x x))
         m             (stats/mean (map double values))
         s             (Math/sqrt (stats/variance (map double values)))]
+    (prn :m m :s s)
     {:outliers         outliers
      :mean             (stats/scale-bootstrap-estimate
                          (first stats) (/ 1e-9 execution-count))
@@ -641,6 +659,7 @@
 
 (defn benchmark-stats
   [data opts]
+  (prn :data data)
   (let [execution-count  (:execution-count data)
         sample-count     (:sample-count data)
         time-samples     (:sample-times data)
@@ -649,6 +668,7 @@
                            sample-count
                            execution-count
                            opts)
+        _ (println "YYYY")
         gc-count-samples (map
                            #(-> % :garbage-collector :total :count)
                            (:samples data))
@@ -661,6 +681,7 @@
                            sample-count
                            execution-count
                            opts)]
+    (println "BB")
     (merge data
            {:execution-time  time-stats
             :gc-stats        gc-stats
@@ -717,6 +738,7 @@
                measured
                opts
                overhead)]
+    (println "bbbb")
     (benchmark-stats data opts)))
 
 #_(defn benchmark-round-robin*
