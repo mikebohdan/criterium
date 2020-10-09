@@ -6,9 +6,7 @@
              [rose-tree :as rose]]
             [criterium
              [jvm :as jvm]
-             [measure :as measure]
-             [measured :as measured]
-             [toolkit :as toolkit]]))
+             [measured :as measured]]))
 
 
 ;; from c.t.check (private)
@@ -85,7 +83,7 @@
     {})"
   [{:keys [size seed arg-metas]
     :or   {size 100 seed nil}
-    :as   options}
+    :as   _options}
    bindings & body]
   (let [pairs (partition 2 bindings)
         binding-vars (mapv first pairs)
@@ -94,7 +92,6 @@
                           `(gen/bind ~code (fn [~sym] ~curr)))
                         `(gen/return ~binding-vars)
                         (reverse pairs))
-        options {}
         ;; _ (prn "eaxmple-state form"
         ;;            `((state-fn ~binding-gens (state-fn-state 2 nil))))
         example-state (eval `((state-fn ~binding-gens (state-fn-state 2 nil))))
@@ -128,7 +125,7 @@
       `(measured* ~bindings ~@body))))
 
 
-(comment
+#_(comment
   (def m (for-all [i (gen/choose 0 1000000000000000000)]
            (inc i)))
 

@@ -1,6 +1,6 @@
 (ns criterium.chart-test
   (:require [criterium.chart :as chart]
-            [clojure.test :refer [deftest is testing]]))
+            [clojure.test :refer [deftest is]]))
 
 (deftest bin-defintiion-test
   (is (= {:n-bins 5 :delta 2.0 :mn 0.0 :mx 10.0}

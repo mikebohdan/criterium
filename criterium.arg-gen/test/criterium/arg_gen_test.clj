@@ -12,7 +12,7 @@
 (deftest measured-test
   (testing "arg-gen/measured"
     (let [m (arg-gen/measured
-              [v (gen/vector gen/small-integer 1 10)
+             [v (gen/vector gen/small-integer 1 10)
                i (gen/choose 0 (dec (count v)))]
               {:v v :i i})]
       (testing "creates a measured"
@@ -32,17 +32,21 @@
             (is (vector? (:v val)))
             (is (integer? (:i val))))))))
   (testing "arg-gen/measured can specify a test.check size"
-    (let [m (arg-gen/measured
-             {:size 3} [i gen/small-integer]
-             i)]
+    (let [m
+          #_:clj-kondo/ignore
+          (arg-gen/measured
+           {:size 3} [i gen/small-integer]
+           i)]
       (testing "which generates a state fn that generates values that respect size"
         (let [[iv] ((:state-fn m))]
           (is (integer? iv))
           (is (<= -3 iv 3))))))
   (testing "arg-gen/measured can specify a test.check seed"
-    (let [m (arg-gen/measured
-              {:seed 12345} [i gen/small-integer]
-              i)]
+    (let [m
+          #_:clj-kondo/ignore
+          (arg-gen/measured
+           {:seed 12345} [i gen/small-integer]
+           i)]
       (testing "which generates a state fn that generates stable values"
         (let [vs (repeatedly 10 (:state-fn m))]
           (is (every? (comp integer? first) vs))

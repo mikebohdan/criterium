@@ -163,7 +163,6 @@
   "If the final GC execution time is significant compared to
   the runtime, then the runtime should maybe include this time."
   [execution-time final-gc-time]
-  (prn :execution-time execution-time :final-gc-time final-gc-time)
   (let [fractional-time (/ final-gc-time execution-time)
         is-significant? (> fractional-time *final-gc-problem-threshold*)]
     (when is-significant?
@@ -212,7 +211,7 @@
   execution time."
   [warmup-period measured]
   {:pre [(measured/measured? measured)]}
-  (debug "warmup-for-jit measured" measured)
+  ;; (debug "warmup-for-jit measured" measured)
   (let [_ignore-first (time-expr-for-warmup measured 1)
         deltas-1      (time-expr-for-warmup measured 1)
         _             (println "deltas-1" deltas-1)
@@ -226,7 +225,6 @@
         p             (/ warmup-period t)
         c             (long (max 1 (* n (/ p 5))))
         ]
-    (println "deltas-n" deltas-n)
     (debug "  using t" t "for n" n)
     (debug "  using execution-count" c)
     (loop [count      n
@@ -313,42 +311,32 @@
         _                   (progress "Estimate execution count ...")
         warmup-t            (pipeline/elapsed-time deltas)
         n-exec              (estimate-execution-count
-                              target-execution-time
-                              measured
-                              gc-before-sample
-                              estimated-fn-time)
+                             target-execution-time
+                             measured
+                             gc-before-sample
+                             estimated-fn-time)
         total-overhead      (long (* (or overhead 0) 1e9 n-exec))
         _                   (progress "Sample ...")
         _                   (debug
-                              "Running with\n sample-count" sample-count \newline
-                              "exec-count" n-exec \newline
-                              "overhead[s]" overhead \newline
-                              "total-overhead[ns]" total-overhead)
-        _ (println
-                              "Running with\n sample-count" sample-count \newline
-                              "exec-count" n-exec \newline
-                              "overhead[s]" overhead \newline
-                              "total-overhead[ns]" total-overhead)
+                             "Running with\n sample-count" sample-count \newline
+                             "exec-count" n-exec \newline
+                             "overhead[s]" overhead \newline
+                             "total-overhead[ns]" total-overhead)
         _                   (toolkit/force-gc *max-gc-attempts*)
         samples             (collect-samples
-                              sample-count
-                              n-exec
-                              measured
-                              gc-before-sample)
+                             sample-count
+                             n-exec
+                             measured
+                             gc-before-sample)
         _                   (progress "Final GC...")
         gc-deltas           (pipeline/total (toolkit/force-gc 3))
-        _ (println :gc-deltas gc-deltas)
         final-gc-time       (pipeline/elapsed-time gc-deltas)
-        _ (println :samples samples)
         sample-times        (->> samples
-                               (map pipeline/elapsed-time)
-                               (map #(- % total-overhead)))
+                                 (map pipeline/elapsed-time)
+                                 (map #(- % total-overhead)))
         total               (reduce + 0 sample-times)
         _                   (progress "Checking GC...")
-        final-gc-result     (final-gc-warn total final-gc-time)]
-    (println "XX"
-             :total total
-             :samples samples)
+        _final-gc-result    (final-gc-warn total final-gc-time)]
     {:execution-count   n-exec
      :sample-count      sample-count
      :sample-times      sample-times
@@ -615,11 +603,9 @@
                         (first stats)
                         (second stats)
                         sample-count)
-        _ (println "AA")
         sqr           (fn [x] (* x x))
         m             (stats/mean (map double values))
         s             (Math/sqrt (stats/variance (map double values)))]
-    (prn :m m :s s)
     {:outliers         outliers
      :mean             (stats/scale-bootstrap-estimate
                          (first stats) (/ 1e-9 execution-count))
@@ -642,7 +628,7 @@
 
 (defn gc-sample-stats
   "Compute sample statistics for the given GC data."
-  [counts times sample-count execution-count opts]
+  [counts times sample-count execution-count _opts]
   (let [num-with-gc          (->> counts (filter pos?) count)
         total-num-gcs        (reduce + counts)
         frac-samples-with-gc (/ num-with-gc (count counts))
@@ -659,7 +645,6 @@
 
 (defn benchmark-stats
   [data opts]
-  (prn :data data)
   (let [execution-count  (:execution-count data)
         sample-count     (:sample-count data)
         time-samples     (:sample-times data)
@@ -668,7 +653,6 @@
                            sample-count
                            execution-count
                            opts)
-        _ (println "YYYY")
         gc-count-samples (map
                            #(-> % :garbage-collector :total :count)
                            (:samples data))
@@ -681,7 +665,6 @@
                            sample-count
                            execution-count
                            opts)]
-    (println "BB")
     (merge data
            {:execution-time  time-stats
             :gc-stats        gc-stats
@@ -702,9 +685,9 @@
                         (some #(re-find #"TieredStopAtLevel=(.*)" %)
                               input-arguments))]
       (warn
-        "JVM argument" (first arg) "is active,"
-        "and may lead to unexpected results as JIT C2 compiler may not be active."
-        "See http://www.slideshare.net/CharlesNutter/javaone-2012-jvm-jit-for-dummies."))))
+       "JVM argument" (first arg) "is active,"
+       "and may lead to unexpected results as JIT C2 compiler may not be active."
+       "See http://www.slideshare.net/CharlesNutter/javaone-2012-jvm-jit-for-dummies."))))
 
 
 ;;; User top level functions
@@ -716,40 +699,41 @@
    longer running expressions."
   [measured
    {:keys [num-samples
-           warmup-jit-period
-           target-execution-time
-           gc-before-sample
-           overhead
-           supress-jvm-option-warnings] :as options}]
+          warmup-jit-period
+          target-execution-time
+          gc-before-sample
+          overhead
+          supress-jvm-option-warnings]
+    :as   options}]
   {:pre [(measured/measured? measured)]}
   (when-not supress-jvm-option-warnings
     (warn-on-suspicious-jvm-options))
   (let [{:keys [num-samples
                 warmup-jit-period
                 target-execution-time
-                gc-before-sample overhead] :as opts}
+                _gc-before-sample overhead]
+         :as   opts}
         (merge *default-benchmark-opts*
                {:overhead (or overhead (estimated-overhead))}
                options)
         data (run-benchmark
-               num-samples
-               warmup-jit-period
-               target-execution-time
-               measured
-               opts
-               overhead)]
-    (println "bbbb")
+              num-samples
+              warmup-jit-period
+              target-execution-time
+              measured
+              opts
+              overhead)]
     (benchmark-stats data opts)))
 
 #_(defn benchmark-round-robin*
   [exprs options]
-  (let [opts  (merge *default-benchmark-opts* options)
-        times (run-benchmarks-round-robin
-                (:num-samples opts)
-                (:warmup-jit-period opts)
-                (:target-execution-time opts)
-                exprs
-                (:gc-before-sample opts))]
+    (let [opts  (merge *default-benchmark-opts* options)
+          times (run-benchmarks-round-robin
+                 (:num-samples opts)
+                 (:warmup-jit-period opts)
+                 (:target-execution-time opts)
+                 exprs
+                 (:gc-before-sample opts))]
     (map #(benchmark-stats % opts) times)))
 
 (defmacro benchmark
@@ -761,14 +745,14 @@
   `(benchmark* (measured/expr ~expr) ~options))
 
 #_(defmacro benchmark-round-robin
-  [exprs options]
-  (let [wrap-exprs (fn [exprs]
-                     (cons 'list
-                           (map (fn [expr]
-                                  {:f           `(fn [] ~expr)
-                                   :expr-string (str expr)})
-                                exprs)))]
-    `(benchmark-round-robin* ~(wrap-exprs exprs) ~options)))
+    [exprs options]
+    (let [wrap-exprs (fn [exprs]
+                       (cons 'list
+                             (map (fn [expr]
+                                    {:f           `(fn [] ~expr)
+                                     :expr-string (str expr)})
+                                  exprs)))]
+      `(benchmark-round-robin* ~(wrap-exprs exprs) ~options)))
 
 (defn quick-benchmark*
   "Benchmark an expression. Less rigorous benchmark (higher uncertainty)."
@@ -909,7 +893,7 @@
   (report-outliers results))
 
 (defn report-gc-sample-stats
-  [results verbose]
+  [results _verbose]
   (when (pos? (:num-with-gc results))
     (println)
     (println "Samples included" (:total-num-gcs results) "GCs.")

@@ -6,7 +6,6 @@
             [criterium
              [format :as format]
              [pipeline :as pipeline]
-             [toolkit :as toolkit]
              [util :as util]]))
 
 
@@ -70,7 +69,7 @@
   (let [mn     (reduce min vs)
         mx     (reduce max vs)
         n      (count vs)
-        {:keys [mn mx n-bins delta]} (bin-definition mn mx n options)
+        {:keys [n-bins delta]} (bin-definition mn mx n options)
         binned (mapv #(long (quot (- % mn) delta)) vs)
         freqs  (frequencies binned)
         is     (range (inc n-bins))
@@ -116,7 +115,7 @@
 
 
 (defn time-histogram
-  [{:keys [samples stats batch-size] :as res} & [options]]
+  [{:keys [samples stats batch-size] :as _res} & [options]]
   {:pre [samples]}
   (let [{[mean] :mean [variance] :variance} (:time stats)
         [scale units] (format/scale :ns mean)
