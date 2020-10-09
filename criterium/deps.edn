@@ -1,6 +1,8 @@
 {:deps    {org.openjdk.jmh/jmh-core {:mvn/version "1.23"}
            org.clojure/clojure {:mvn/version "1.10.1"}}
  :aliases {:kaocha {:extra-deps
-                    {lambdaisland/kaocha           {:mvn/version "1.0.641"}
+                    {expound/expound               {:mvn/version "0.8.6"}
+                     lambdaisland/kaocha           {:mvn/version "1.0.641"}
                      lambdaisland/kaocha-cloverage {:mvn/version "1.0-45"}
+                     orchestra/orchestra           {:mvn/version "2020.07.12-1"}
                      org.clojure/test.check        {:mvn/version "1.1.0"}}}}}

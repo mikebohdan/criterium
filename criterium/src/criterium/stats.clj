@@ -281,12 +281,16 @@ descending order (so the last element of coefficients is the constant term)."
 (defn bca-nonparametric-eval
   "Calculate bootstrap values for given estimate and samples"
   [size z-alpha estimate samples jack-samples]
+  {:pre [(> (count jack-samples) 1)]}
   (let [z0 (normal-quantile
             (/ (count (filter (partial > estimate) samples)) size))
         jack-mean (mean jack-samples)
         jack-deviation (map #(- jack-mean %1) jack-samples)
-        acc (/ (reduce + 0.0 (map cube jack-deviation))
-               (* 6.0 (Math/pow (reduce + 0.0 (map sqr jack-deviation)) 1.5)))
+        ^Double sqr-deviation (reduce + 0.0 (map sqr jack-deviation))
+        acc (if (zero? sqr-deviation)
+              Double/POSITIVE_INFINITY
+              (/ (reduce + 0.0 (map cube jack-deviation))
+                 (* 6.0 (Math/pow sqr-deviation 1.5))))
         tt (map
             #(normal-cdf (+ z0 (/ (+ z0 %1) (- 1.0 (* acc (+ z0 %1))))))
             z-alpha)

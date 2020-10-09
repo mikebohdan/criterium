@@ -1,6 +1,39 @@
 (ns criterium.measured-test
-  (:require [criterium.measured :as measured]
-            [clojure.test :refer [deftest is testing]]))
+  (:require [clojure.spec.alpha :as s]
+            [clojure.spec.test.alpha #_ :as #_ stest]
+            [clojure.test :refer [deftest is testing]]
+            [criterium
+             [measured :as measured]]
+            [expound.alpha :as expound]
+            [orchestra.spec.test :as stest]))
+
+(alias 'stc 'clojure.spec.test.check)
+
+(set! s/*explain-out* expound/printer)
+
+;; (stest/instrument
+;;  [`measured/measured
+;;   `measured/invoke
+;;   `measured/expr])
+
+(clojure.spec.test.alpha/check
+ [`measured/measured
+  `measured/invoke
+  `measured/expr])
+
+;; ((gen/generate (s/gen :criterium.measured/state-fn)))
+;; ((gen/generate (s/gen :criterium.measured/fn)) 'abc)
+;; ((gen/generate (s/gen :criterium.measured/expr-fn)))
+
+;; (gen/generate (s/gen :criterium.measured/measured))
+
+;; (gen/generate (s/gen :criterium.measured/measured))
+
+
+;; (gen/generate (clojure.spec.gen.alpha/tuple
+;;                (s/gen :criterium.measured/state-fn)
+;;                (s/gen :criterium.measured/fn)
+;;                (s/gen :criterium.measured/expr-fn)))
 
 (deftest measured-test
   (let [eval-count (volatile! 0)

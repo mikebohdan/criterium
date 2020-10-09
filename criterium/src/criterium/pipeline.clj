@@ -40,7 +40,7 @@
 
   Uses the ClassLoadingMXBean."
   [next-fn]
-  (fn [sample measured]
+  (fn class-loader-counts [sample measured]
     (assert (measured/measured? measured))
     (let [start (jvm/class-loader-counts)]
       (-> sample
@@ -55,7 +55,7 @@
 
   Uses the CompilationMXBean."
   [next-fn]
-  (fn [sample measured]
+  (fn compilation-time [sample measured]
     (assert (measured/measured? measured))
     (let [start (jvm/compilation-time)]
       (-> sample
@@ -85,7 +85,7 @@
 
   Uses the java Runtime class."
   [next-fn]
-  (fn [sample measured]
+  (fn runtime-memory [sample measured]
     (assert (measured/measured? measured))
     (let [start (jvm/runtime-memory)]
       (-> sample
@@ -112,7 +112,7 @@
 
   Uses the GarbageCollectorMXBean beans."
   [next-fn]
-  (fn [data measured]
+  (fn garbage-collector-stats [data measured]
     (assert (measured/measured? measured))
     (let [start (jvm/garbage-collector-stats)]
       (-> data

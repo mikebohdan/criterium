@@ -85,9 +85,9 @@
 
 (def m (measured/expr 1))
 
-(def mb (measured/batch
-         m
-         100))
+;; (def mb (measured/batch
+;;          m
+;;          100))
 
 #_(comment
     (require 'no.disassemble)

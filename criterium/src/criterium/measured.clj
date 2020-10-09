@@ -1,6 +1,10 @@
 (ns criterium.measured
   "Defines the Measured type."
-  (:require [criterium
+  (:require [clojure.spec.alpha :as s]
+            [clojure.spec.gen.alpha :as sgen]
+            [criterium
+             [domain :as domain]
+             [jvm :as jvm]
              [util :as util]])
   (:import [org.openjdk.jmh.infra Blackhole]))
 
@@ -40,7 +44,7 @@
    & [expr-fn]]
   (->Measured state-fn f expr-fn))
 
-(defn symbolic
+(defn ^:no-doc symbolic
   "Return a symbolic representation of the measured.
   Provides a way to introspect how the measured will be executed."
   [measured]
@@ -59,11 +63,11 @@
 
 ;;; Blackhole
 
-(def ^Blackhole blackhole
+(def ^{:tag 'org.openjdk.jmh.infra.Blackhole :no-doc true} blackhole
   (Blackhole.
    "Today's password is swordfish. I understand instantiating Blackholes directly is dangerous."))
 
-(defn evaporate []
+(defn ^:no-doc evaporate []
   (.evaporate
    blackhole
    "Yes, I am Stephen Hawking, and know a thing or two about black holes."))
@@ -93,7 +97,7 @@
   []
   (gensym "arg"))
 
-(defn form-print
+(defn ^:no-doc form-print
   "Return a symbolic expression for the argument."
   [x]
   (cond
@@ -104,7 +108,7 @@
       `(~(:op x) ~@(mapv form-print (:arg-syms x)))
       (:metamap x))))
 
-(defn factor-form
+(defn ^:no-doc factor-form
   "Factor form, extracting constant expressions."
   [form]
   (let [subj  (first form)
@@ -133,24 +137,24 @@
     {:expr     (form-print res)
      :arg-vals (:arg-vals res)}))
 
-(defn factor-const [expr]
+(defn ^:no-doc factor-const [expr]
   (let [arg-sym (gen-arg-sym)]
     {:expr     arg-sym
      :arg-vals {arg-sym expr}}))
 
-(defn factor-expr [expr]
+(defn ^:no-doc factor-expr [expr]
   (if (s-expression? expr)
     (factor-form expr)
     (factor-const expr)))
 
-(defn cast-fn
+(defn ^:no-doc cast-fn
   "Return a cast function givent a tag."
   [tag]
   (when (and (symbol? tag)
              (#{'long 'int 'double 'float} tag))
     tag))
 
-(defn binding-with-hint-or-cast
+(defn ^:no-doc binding-with-hint-or-cast
   "Return a binding pair to type hint or cast values."
   [arg-sym arg-meta]
   (let [tag (:tag arg-meta)]
@@ -158,13 +162,13 @@
       [arg-sym (list f arg-sym)]
       [(with-meta arg-sym arg-meta) arg-sym])))
 
-(defn ^:internal measured-expr-fn
+(defn ^:internal ^:no-doc measured-expr-fn
   "Construct a function expression to measure the given expr, with the given args."
   [arg-syms expr & [{:keys [arg-metas]}]]
   (let [blackhole-sym  (with-meta (gensym "blachole")
                          {:tag 'org.openjdk.jmh.infra.Blackhole})
         eval-count-sym  (gensym "eval-count")]
-    `(fn [~arg-syms ~(with-meta eval-count-sym {:tag 'long})]
+    `(fn ~'measured [~arg-syms ~(with-meta eval-count-sym {:tag 'long})]
        (let [~blackhole-sym blackhole ; hoist cast lookup out of loop
              ~@(mapcat binding-with-hint-or-cast arg-syms arg-metas)
              ;; primitive loop coounter.  Decrement since we evaluate
@@ -181,7 +185,7 @@
            (evaporate)
            [(unchecked-subtract finish# start#) val#])))))
 
-(defn merge-metas
+(defn ^:no-doc merge-metas
   "Merge two sequences of maps.
   Sequences may be of differing lengths.  The returned length is the
   largest of the two input lengths."
@@ -201,17 +205,17 @@
    'java.lang.Double  'double
    'java.lang.Float   'float})
 
-(defn type-name-conversion [t]
+(defn ^:no-doc type-name-conversion [t]
   (TYPE-NAME-CONVERSIONS t t))
 
-(defn tag-meta [^Class t]
+(defn ^:no-doc tag-meta [^Class t]
   (when t
     (let [type-name (-> (.getCanonicalName ^Class t)
                         symbol
                         type-name-conversion)]
       {:tag type-name})))
 
-(defn capture-arg-types
+(defn ^:no-doc capture-arg-types
   "Use eval to get types of the arg expressions.
   Return a sequence of metadata maps with :tag tupe hints."
   [arg-exprs]
@@ -231,14 +235,15 @@
         arg-metas (capture-arg-types (vals arg-vals))
         options (update options :arg-metas merge-metas arg-metas)]
     `(measured
-      (fn [] ~(vec (vals arg-vals)))
+      (fn ~'measured-state [] ~(vec (vals arg-vals)))
       ~(measured-expr-fn
         (vec (keys arg-vals))
         expr
         options)
-      (fn [] ~(list 'quote
-                    `(do (let [~@arg-vals]
-                           (time ~expr))))))))
+      (fn ~'measured-expr []
+        ~(list 'quote
+               `(do (let [~@arg-vals]
+                      (time ~expr))))))))
 
 (defmacro expr
   "Return a Measured for the given expression.
@@ -253,13 +258,54 @@
   [expr & [options]]
   (measured-expr* expr options))
 
-(defn batch
-  "Wrap `measured` to run `eval-count` times.
+;; (defn batch
+;;   "Wrap `measured` to run `eval-count` times.
 
-  Inside the loop, the return value of each execution is put into a sink,
-  The sink function can be customised by passing the `:sink-fn` options.
+;;   Inside the loop, the return value of each execution is put into a sink,
+;;   The sink function can be customised by passing the `:sink-fn` options.
 
-  Return a Measured."
-  [m ^long eval-count]
-  {:pre [(>= eval-count 1)]}
-  (assoc m :eval-count eval-count))
+;;   Return a Measured."
+;;   [m ^long eval-count]
+;;   {:pre [(>= eval-count 1)]}
+;;   (assoc m :eval-count eval-count))
+
+(s/def ::state-fn (s/fspec
+                   :args (s/cat)
+                   :ret any?))
+
+(s/def ::measured-tuple (s/tuple ::domain/elapsed-time-ns any?))
+
+(s/def ::fn (s/fspec
+             :args (s/cat :state any? :count ::domain/eval-count)
+             :ret ::measured-tuple))
+
+(s/def ::expr-fn (s/fspec
+                  :args (s/cat)
+                  :ret sequential?))
+
+(s/def ::measured
+  (s/with-gen
+    (s/and measured?
+           (comp ifn? :state-fn)
+           (comp ifn? :f)
+           (comp (some-fn nil? ifn?) :expr-fn))
+    #(sgen/fmap
+      (fn [[s t u]] (measured s t u))
+      (sgen/tuple
+       (s/gen ::state-fn)
+       (s/gen ::fn)
+       (s/gen ::expr-fn)))))
+
+(s/fdef measured
+  :args (s/cat :state-fn ::state-fn
+               :fn ::fn
+               :expr-fn (s/? ::expr-fn))
+  :ret ::measured)
+
+(s/fdef invoke
+  :args (s/cat :measured ::measured :eval-count ::domain/eval-count)
+  :ret ::measured-tuple)
+
+(s/fdef expr
+  :args (s/cat :expr any?)
+  :ret ::measured)
