@@ -19,12 +19,12 @@
 
 ;; spec can't instrument functions with primitives, so explicitly
 ;; list the ones that can be instrumented.
-(stest/instrument
- [`budget/add
-  `budget/subtract
-  `budget/budget?
-  `budget/budget
-  `budget/budget*])
+;; (stest/instrument
+;;  [`budget/add
+;;   `budget/subtract
+;;   `budget/budget?
+;;   `budget/budget
+;;   `budget/budget*])
 
 ;; we want function specific options, so explicitly test individual functions
 (stest/check `budget/budget `budget/budget*)

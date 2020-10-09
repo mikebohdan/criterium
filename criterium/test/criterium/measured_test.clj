@@ -1,15 +1,10 @@
 (ns criterium.measured-test
-  (:require [clojure.spec.alpha :as s]
-            [clojure.spec.test.alpha #_ :as #_ stest]
+  (:require [clojure.spec.test.alpha]
             [clojure.test :refer [deftest is testing]]
             [criterium
-             [measured :as measured]]
-            [expound.alpha :as expound]
-            [orchestra.spec.test :as stest]))
+             [measured :as measured]]))
 
-(alias 'stc 'clojure.spec.test.check)
-
-(set! s/*explain-out* expound/printer)
+;; (alias 'stc 'clojure.spec.test.check)
 
 ;; (stest/instrument
 ;;  [`measured/measured

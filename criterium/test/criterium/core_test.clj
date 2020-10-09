@@ -33,5 +33,5 @@
 
 (deftest bench-test
   (let [s (with-out-str
-            (core/bench 1))]
+            (core/bench 1 :target-execution-time 1))]
     (is s)))
