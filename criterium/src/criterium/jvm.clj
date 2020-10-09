@@ -18,11 +18,9 @@
             MemoryPoolMXBean
             MemoryUsage]))
 
-
 (defmacro timestamp
   "Obtain a timestamp using System/nanoTime."
   [] `(System/nanoTime))
-
 
 (defn run-finalization
   "Run object finalizers"
@@ -56,7 +54,6 @@
     {:loaded-count  (. bean getLoadedClassCount)
      :unloaded-count (. bean getUnloadedClassCount)}))
 
-
 (let [bean (.. ManagementFactory getCompilationMXBean)]
   (defn compilation-time
     "Returns the total compilation time for the JVM instance.
@@ -67,13 +64,11 @@
                          (. bean getTotalCompilationTime)
                          -1)}))
 
-
 (let [bean (.. ManagementFactory getMemoryMXBean)]
   (defn finalization-count
     "Return the pending finalization count for the JVM instance."
     []
     {:pending (. bean getObjectPendingFinalizationCount)}))
-
 
 (defn- memory-usage
   [^MemoryUsage usage]
@@ -81,7 +76,6 @@
    :init      (.getInit usage)
    :max       (.getMax usage)
    :used      (.getUsed usage)})
-
 
 (let [mem-bean (.. ManagementFactory getMemoryMXBean)]
   (defn memory
@@ -92,8 +86,7 @@
           sum      (util/sum heap non-heap)]
       {:heap     heap
        :non-heap non-heap
-       :total    sum    })))
-
+       :total    sum})))
 
 (let [pools (.. ManagementFactory getMemoryPoolMXBeans)]
   (defn memory-pools
@@ -106,16 +99,15 @@
        (into {} pool-usaage)
        :total sum))))
 
-
 (let [beans (.. ManagementFactory getGarbageCollectorMXBeans)
       kws   (reduce
-              (fn [res ^GarbageCollectorMXBean bean]
-                (let [n (. bean getName)]
-                  (assoc res n (keyword (-> n
-                                            string/lower-case
-                                            (string/replace \space \-))))))
-              {}
-              beans)]
+             (fn [res ^GarbageCollectorMXBean bean]
+               (let [n (. bean getName)]
+                 (assoc res n (keyword (-> n
+                                           string/lower-case
+                                           (string/replace \space \-))))))
+             {}
+             beans)]
   (defn garbage-collector-stats
     "Return the garbage collection counts and times for the JVM instance.
 
@@ -124,26 +116,27 @@
     with the keyword :total."
     []
     (let [stats (reduce
-                  (fn [res ^GarbageCollectorMXBean bean]
-                    (assoc res (kws (. bean getName))
-                           {:count (. bean getCollectionCount)
-                            :time  (. bean getCollectionTime)}))
-                  {}
-                  beans)
+                 (fn [res ^GarbageCollectorMXBean bean]
+                   (assoc res (kws (. bean getName))
+                          {:count (. bean getCollectionCount)
+                           :time  (. bean getCollectionTime)}))
+                 {}
+                 beans)
           total (reduce
-                  #(merge-with + %1 %2)
-                  {}
-                  (vals stats))]
+                 #(merge-with + %1 %2)
+                 {}
+                 (vals stats))]
       (assoc stats :total total))))
 
 
 ;;; Memory reporting
+
+
 (defn heap-used
   "Report a (inconsistent) snapshot of the heap memory used."
   []
   (let [runtime (Runtime/getRuntime)]
     (- (.totalMemory runtime) (.freeMemory runtime))))
-
 
 (defn runtime-memory
   "Report a (inconsistent) snapshot of the memory situation."
@@ -159,13 +152,11 @@
   (let [bean (.. ManagementFactory getClassLoadingMXBean)]
     (. bean setVerbose (boolean flag))))
 
-
 (defn jit-name
   "Returns the name of the JIT compiler."
   []
   (let [bean (.. ManagementFactory getCompilationMXBean)]
     (. bean getName)))
-
 
 (defn os-details
   "Return the operating system details as a hash."
@@ -175,7 +166,6 @@
      :available-processors (. bean getAvailableProcessors)
      :name (. bean getName)
      :version (. bean getVersion)}))
-
 
 (defn runtime-details
   "Return the runtime details as a hash."
@@ -196,13 +186,11 @@
      :clojure-version-string (clojure-version)
      :clojure-version *clojure-version*}))
 
-
 (defn system-properties
   "Return the operating system details."
   []
   (let [bean (.. ManagementFactory getRuntimeMXBean)]
     (. bean getSystemProperties)))
-
 
 (defn wait
   "Utility function to wait the given time in ns, without releasing the thread.

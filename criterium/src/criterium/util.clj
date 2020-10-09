@@ -1,6 +1,5 @@
 (ns criterium.util)
 
-
 (defn- safe-keys
   [m]
   (assert (or (map? m) (nil? m)) (pr-str m))
@@ -11,22 +10,21 @@
   (fn merge-fn-inner [a b]
     (if (or (map? a) (map? b))
       (merge-with
-        merge-fn-inner
-        (safe-keys a)
-        (safe-keys b))
+       merge-fn-inner
+       (safe-keys a)
+       (safe-keys b))
       (op a b))))
 
 (defn diff [finish start]
   (merge-with (merge-fn -) finish start))
 
-
 (defn sum
   ([] {})
   ([a b]
    (merge-with
-     (merge-fn +)
-     (safe-keys a)
-     (safe-keys b))))
+    (merge-fn +)
+    (safe-keys a)
+    (safe-keys b))))
 
 (defn divide-by
   [divisor]
@@ -57,6 +55,8 @@
 
 
 ;; Modified version of clojure.walk to preserve metadata
+
+
 (defn walk
   "Traverses form, an arbitrary data structure.  inner and outer are
   functions.  Applies inner to each element of form, building up a
@@ -73,8 +73,8 @@
 
     (instance? clojure.lang.IMapEntry form)
     (outer
-      (clojure.lang.MapEntry/create
-        (inner (key form)) (inner (val form))))
+     (clojure.lang.MapEntry/create
+      (inner (key form)) (inner (val form))))
 
     (seq? form)
     (outer (with-meta
@@ -108,6 +108,7 @@
 ;;        :as    nil
 ;;        :refer (mapv (partial f namespace) refs))]))
 
+
 (defn missing-spec
   [[namespace-sym & [_sep _as-sym _sep _refs :as args]]]
   (reduce
@@ -127,19 +128,19 @@
   (ns-unalias *ns* alias-sym)
   (remove-ns ns-sym)
   (dosync
-    (commute
-      (var-get #'clojure.core/*loaded-libs*)
-      disj
-      ns-sym)))
+   (commute
+    (var-get #'clojure.core/*loaded-libs*)
+    disj
+    ns-sym)))
 
 (defn load-ns
   "Add loaded namespace."
   [ns-sym]
   (dosync
-    (commute
-     (var-get #'clojure.core/*loaded-libs*)
-     conj
-     ns-sym)))
+   (commute
+    (var-get #'clojure.core/*loaded-libs*)
+    conj
+    ns-sym)))
 
 (def optional-nses (volatile! #{}))
 

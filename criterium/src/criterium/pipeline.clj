@@ -32,7 +32,6 @@
            :expr-value expr-value
            :eval-count eval-count)))
 
-
 (defn with-class-loader-counts
   "Execute measured, adding class loading counts to the data map.
 
@@ -45,9 +44,8 @@
     (assert (measured/measured? measured))
     (let [start (jvm/class-loader-counts)]
       (-> sample
-         (next-fn measured)
-         (assoc :class-loader (util/diff (jvm/class-loader-counts) start))))))
-
+          (next-fn measured)
+          (assoc :class-loader (util/diff (jvm/class-loader-counts) start))))))
 
 (defn with-compilation-time
   "Execute measured, add compilation time to the data map.
@@ -61,9 +59,8 @@
     (assert (measured/measured? measured))
     (let [start (jvm/compilation-time)]
       (-> sample
-         (next-fn measured)
-         (assoc :compilation (util/diff (jvm/compilation-time) start))))))
-
+          (next-fn measured)
+          (assoc :compilation (util/diff (jvm/compilation-time) start))))))
 
 (defn with-memory
   "Execute measured, add compilation time to the data map.
@@ -78,9 +75,8 @@
     (assert (measured/measured? measured))
     (let [start (jvm/memory)]
       (-> sample
-         (next-fn measured)
-         (assoc :memory (util/diff (jvm/memory) start))))))
-
+          (next-fn measured)
+          (assoc :memory (util/diff (jvm/memory) start))))))
 
 (defn with-runtime-memory
   "Execute measured, add runtime memory to the data map.
@@ -93,9 +89,8 @@
     (assert (measured/measured? measured))
     (let [start (jvm/runtime-memory)]
       (-> sample
-         (next-fn measured)
-         (assoc :runtime-memory (util/diff (jvm/runtime-memory) start))))))
-
+          (next-fn measured)
+          (assoc :runtime-memory (util/diff (jvm/runtime-memory) start))))))
 
 (defn with-finalization-count
   "Execute measured, add pending finalization count to the data map.
@@ -109,9 +104,8 @@
     (assert (measured/measured? measured))
     (let [start (jvm/finalization-count)]
       (-> sample
-         (next-fn measured)
-         (assoc :finalization (util/diff (jvm/finalization-count) start))))))
-
+          (next-fn measured)
+          (assoc :finalization (util/diff (jvm/finalization-count) start))))))
 
 (defn with-garbage-collector-stats
   "Execute measured, add garbage collection counts and times to the data map.
@@ -122,10 +116,9 @@
     (assert (measured/measured? measured))
     (let [start (jvm/garbage-collector-stats)]
       (-> data
-         (next-fn measured)
-         (assoc :garbage-collector
-                (util/diff (jvm/garbage-collector-stats) start))))))
-
+          (next-fn measured)
+          (assoc :garbage-collector
+                 (util/diff (jvm/garbage-collector-stats) start))))))
 
 (def terminal-fns
   {:elapsed-time-ns time-metric})
@@ -138,7 +131,6 @@
    :finalization-count with-finalization-count
    :garbage-collector  with-garbage-collector-stats})
 
-
 (defn pipeline
   "Build a pipeline by specifying pipeline function keywords.
 
@@ -149,14 +141,13 @@
     (when-not terminal-fn
       (throw (ex-info "Unknown terminal function" {:terminal-fn-kw terminal-fn-kw})))
     (reduce
-      (fn [pipeline pipeline-kw]
-        (let [f (pipeline-fns pipeline-kw)]
-          (when-not f
-            (throw (ex-info "Unknown pipeline function" {:pipeline-kw pipeline-kw})))
-          (f pipeline)))
-      terminal-fn
-      pipeline-fn-kws)))
-
+     (fn [pipeline pipeline-kw]
+       (let [f (pipeline-fns pipeline-kw)]
+         (when-not f
+           (throw (ex-info "Unknown pipeline function" {:pipeline-kw pipeline-kw})))
+         (f pipeline)))
+     terminal-fn
+     pipeline-fn-kws)))
 
 (defn execute
   "Executes a measured pipeline.
@@ -217,14 +208,15 @@
   [sample divisor]
   {:pre [(some? divisor) (number? divisor) (not= 0 divisor)]}
   (walk/postwalk
-    #(cond
-       (integer? %) (quot % divisor)
-       (number? %) (/ % divisor)
-       :else %)
-    sample))
+   #(cond
+      (integer? %) (quot % divisor)
+      (number? %) (/ % divisor)
+      :else %)
+   sample))
 
 
 ;;; Sample metric accessors
+
 
 (defn elapsed-time
   ^long [sample]

@@ -5,21 +5,20 @@
              [pipeline :as pipeline]]
             [clojure.test :refer [deftest is testing]]))
 
-
 (def m (measured/measured
-         (fn [] ::state)
-         (fn [state _n]
-           [::time [state state]])
-         nil))
+        (fn [] ::state)
+        (fn [state _n]
+          [::time [state state]])
+        nil))
 
 (def base-keys #{:state :expr-value :eval-count :elapsed-time-ns})
 
 (deftest execute-test
   (testing "Execute a measured with time-metric"
     (let [res (pipeline/execute
-                pipeline/time-metric
-                m
-                1)]
+               pipeline/time-metric
+               m
+               1)]
       (testing "Has the measured state on the :state key"
         (is (= ::state (:state res))))
       (testing "Has the measured time on the :elapsed-time-ns key"
@@ -33,8 +32,8 @@
   (doseq [[kw f] pipeline/pipeline-fns]
     (testing (str "Pipeline function " (name kw))
       (let [res (pipeline/execute
-                  (f pipeline/time-metric)
-                  m
-                  1)
+                 (f pipeline/time-metric)
+                 m
+                 1)
             ks (set (keys res))]
         (is (= base-keys (set/intersection base-keys ks)))))))

@@ -28,7 +28,6 @@
   (gamma-fn 5)  ; 24
   )
 
-
 (defn mellin-transform
   "Mellin transform.
 
@@ -43,8 +42,7 @@
         a1 (/ (* zeta zeta) (* gamma gamma cos-theta cos-theta))
         a2 (/ (* zeta zeta) (* gamma gamma cos-theta cos-theta))
         e1 (+ a1 (* zeta (- z 1)))
-        e2 (+ a2 (* zeta (- 1 z)))
-        ]
+        e2 (+ a2 (* zeta (- 1 z)))]
     (* (Math/pow nu (- z 1))
        (Math/pow (/ 1 (* tan-theta tan-theta)) (* zeta (- z 1)))
        (/ (* (gamma-fn e1) (gamma-fn e2))

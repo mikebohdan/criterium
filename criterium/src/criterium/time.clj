@@ -570,28 +570,25 @@
 
 #_(comment
 
-  (time 1)
+    (time 1)
 
-  (time (Thread/sleep 10))
+    (time (Thread/sleep 10))
 
-  (time 1 :limit-time 1)
+    (time 1 :limit-time 1)
 
+    (time (do
+            (range 100000)
+            (range 10))
+          :metrics
+          [:memory
+           :runtime-memory
+           :finalization-count])
 
-  (time (do
-          (range 100000)
-          (range 10))
-        :metrics
-        [:memory
-         :runtime-memory
-         :finalization-count])
-
-  (time (repeatedly 100 #(Object.))
-        :metrics
-        [:memory
-         :class-loader
-         :compilation-time
-         :runtime-memory
-         :finalization-count
-         :garbage-collector])
-
-  )
+    (time (repeatedly 100 #(Object.))
+          :metrics
+          [:memory
+           :class-loader
+           :compilation-time
+           :runtime-memory
+           :finalization-count
+           :garbage-collector]))

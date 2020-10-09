@@ -7,14 +7,12 @@
              [output :as output]
              [report :as report]]))
 
-
 (def last-time* (volatile! nil))
 
 (defn last-time
   "Return the data from the last time invocation."
   []
   @last-time*)
-
 
 (defn time*
   "Evaluates expr and prints the time it took.

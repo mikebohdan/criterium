@@ -7,7 +7,6 @@
              [pipeline :as pipeline]])
   (:import [criterium.budget Budget]))
 
-
 (set! *unchecked-math* :warn-on-boxed)
 
 (def ^Long NANOSEC-NS 1)
@@ -54,6 +53,8 @@
 
 
 ;;; Timing
+
+
 (defn throw-away-sample
   "The initial evaluation is always un-representative.
   This function throws it away."
@@ -71,7 +72,6 @@
         _ignore  (pipeline/execute pipeline measured 1)
         s0       (pipeline/execute pipeline measured 1)]
     (pipeline/elapsed-time s0)))
-
 
 (defn estimate-eval-count
   "Given an estimated execution time and a budget, estimate eval count."
@@ -103,9 +103,9 @@
    budget
    batch-time-ns]
   (let [est-eval-count (estimate-eval-count
-                         t0
-                         budget
-                         batch-time-ns)]
+                        t0
+                        budget
+                        batch-time-ns)]
     est-eval-count))
 
 
@@ -153,7 +153,6 @@
          :samples         (conj samples sample)
          :batch-size      batch-size}))))
 
-
 (defn execution-time-from-batch
   ^long [^long elapsed-time-ns ^long eval-count]
   (max 1 (long (quot elapsed-time-ns eval-count))))
@@ -171,16 +170,15 @@
   (let [pipeline          pipeline/time-metric
         {:keys [elapsed-time-ns eval-count _samples]}
         (sample
-          pipeline
-          measured
-          budget
-          batch-size)
+         pipeline
+         measured
+         budget
+         batch-size)
         ;; ^long n           (:eval-count (first samples))
         ]
     ;; (long (quot ^long (reduce min (map pipeline/elapsed-time samples))
     ;;             n))
     (execution-time-from-batch elapsed-time-ns eval-count)))
-
 
 (defn warmup
   "Run measured for the given amount of time to enable JIT compilation.
@@ -202,8 +200,7 @@
             elapsed-time-ns (unchecked-add elapsed-time-ns t)
             eval-count      (unchecked-add eval-count (long (:eval-count sample)))
             ^long cl-counts (-> sample :class-loader :loaded-count)
-            ^long comp-time (-> sample :compilation :compilation-time)
-            ]
+            ^long comp-time (-> sample :compilation :compilation-time)]
         (if (and (> delta-free-iters 2)
                  (not (budget/budget-remaining? budget elapsed-time-ns eval-count)))
           {:eval-count      eval-count

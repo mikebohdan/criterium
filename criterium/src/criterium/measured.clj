@@ -7,15 +7,14 @@
 ;;; Measured type
 
 (defrecord Measured
-    [^clojure.lang.IFn state-fn
-     ^clojure.lang.IFn f
-     expr-fn])
+           [^clojure.lang.IFn state-fn
+            ^clojure.lang.IFn f
+            expr-fn])
 
 (defn measured?
   "Predicate for x being a Measured"
   [x]
   (instance? Measured x))
-
 
 (defn measured
   "Return a Measured for a function that can be benchmarked.
@@ -66,8 +65,8 @@
 
 (defn evaporate []
   (.evaporate
-    blackhole
-    "Yes, I am Stephen Hawking, and know a thing or two about black holes."))
+   blackhole
+   "Yes, I am Stephen Hawking, and know a thing or two about black holes."))
 
 ;;; Build a Measured from an expression
 
@@ -78,11 +77,11 @@
 
 (defrecord FnCallExpr
     ;; a representation of an s-expression
-    [op                                 ; the operand
-     arg-syms                           ; arguments as symbols
-     arg-vals                           ; the symbolic value of of the arg-syms
-     metamap                            ; metadata on the FnCallExpr
-     ])
+           [op                                 ; the operand
+            arg-syms                           ; arguments as symbols
+            arg-vals                           ; the symbolic value of of the arg-syms
+            metamap                            ; metadata on the FnCallExpr
+            ])
 
 (defn- fn-call-expr?
   "Predicate for x being an instance of a FnCallExpr"
@@ -112,27 +111,25 @@
         tform (fn [x]
                 (if (and (s-expression? x) (= subj (first x)))
                   (reduce
-                    (fn [res arg]
-                      (if (fn-call-expr? arg)
-                        (-> res
+                   (fn [res arg]
+                     (if (fn-call-expr? arg)
+                       (-> res
                            (update :arg-syms conj arg)
-                           (update :arg-vals merge (:arg-vals arg))
-                           )
-                        (let [arg-sym (gen-arg-sym)]
-                          (-> res
+                           (update :arg-vals merge (:arg-vals arg)))
+                       (let [arg-sym (gen-arg-sym)]
+                         (-> res
                              (update :arg-syms conj arg-sym)
                              (update :arg-vals assoc arg-sym arg)))))
-                    (->FnCallExpr
-                      (first x)
-                      []
-                      {}
-                      (meta x))
-                    (rest x))
+                   (->FnCallExpr
+                    (first x)
+                    []
+                    {}
+                    (meta x))
+                   (rest x))
                   x))
         res   (util/postwalk
-                tform
-                form
-                )]
+               tform
+               form)]
     {:expr     (form-print res)
      :arg-vals (:arg-vals res)}))
 
@@ -145,7 +142,6 @@
   (if (s-expression? expr)
     (factor-form expr)
     (factor-const expr)))
-
 
 (defn cast-fn
   "Return a cast function givent a tag."
@@ -211,8 +207,8 @@
 (defn tag-meta [^Class t]
   (when t
     (let [type-name (-> (.getCanonicalName ^Class t)
-                       symbol
-                       type-name-conversion)]
+                        symbol
+                        type-name-conversion)]
       {:tag type-name})))
 
 (defn capture-arg-types
@@ -235,12 +231,12 @@
         arg-metas (capture-arg-types (vals arg-vals))
         options (update options :arg-metas merge-metas arg-metas)]
     `(measured
-       (fn [] ~(vec (vals arg-vals)))
-       ~(measured-expr-fn
-          (vec (keys arg-vals))
-          expr
-          options)
-       (fn [] ~(list 'quote
+      (fn [] ~(vec (vals arg-vals)))
+      ~(measured-expr-fn
+        (vec (keys arg-vals))
+        expr
+        options)
+      (fn [] ~(list 'quote
                     `(do (let [~@arg-vals]
                            (time ~expr))))))))
 

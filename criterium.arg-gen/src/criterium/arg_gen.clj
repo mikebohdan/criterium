@@ -10,6 +10,8 @@
 
 
 ;; from c.t.check (private)
+
+
 (defn- make-rng
   [seed]
   (if seed
@@ -48,8 +50,8 @@
         ;; gen args ;; (apply gen/tuple args)
         ]
     (measured/measured
-      (state-fn gen state-fn-state)
-      f)))
+     (state-fn gen state-fn-state)
+     f)))
 
 ;; (defn- binding-vars
 ;;   [bindings]
@@ -88,10 +90,10 @@
   (let [pairs (partition 2 bindings)
         binding-vars (mapv first pairs)
         binding-gens (reduce
-                        (fn [curr [sym code]]
-                          `(gen/bind ~code (fn [~sym] ~curr)))
-                        `(gen/return ~binding-vars)
-                        (reverse pairs))
+                      (fn [curr [sym code]]
+                        `(gen/bind ~code (fn [~sym] ~curr)))
+                      `(gen/return ~binding-vars)
+                      (reverse pairs))
         ;; _ (prn "eaxmple-state form"
         ;;            `((state-fn ~binding-gens (state-fn-state 2 nil))))
         example-state (eval `((state-fn ~binding-gens (state-fn-state 2 nil))))
@@ -99,19 +101,17 @@
         arg-metas (mapv measured/tag-meta types)
         options {:arg-metas arg-metas}]
     `(measured-impl
-       ~binding-gens
+      ~binding-gens
        ;; ~(list 'quote `(do ~@body))
-       ~(measured/measured-expr-fn
-          binding-vars
-          `(do ~@body)
-          options)
-       ~{:size size
-         :seed seed}
+      ~(measured/measured-expr-fn
+        binding-vars
+        `(do ~@body)
+        options)
+      ~{:size size
+        :seed seed}
        ;; (fn ~(gensym "for-all-body") [~binding-vars]
        ;;   ~@body)
-       )))
-
-
+      )))
 
 (defmacro measured
   "Return a measured using test.check generators for state."
@@ -124,39 +124,37 @@
       (assert (map? bindings) "options must be passed as a literal map")
       `(measured* ~bindings ~@body))))
 
-
 #_(comment
-  (def m (for-all [i (gen/choose 0 1000000000000000000)]
-           (inc i)))
+    (def m (for-all [i (gen/choose 0 1000000000000000000)]
+                    (inc i)))
 
-  (def m (for-all [i (gen/choose 0 1000000000000000000)]
-           i))
+    (def m (for-all [i (gen/choose 0 1000000000000000000)]
+                    i))
 
-  (def nth-bench
-    (for-all [v (gen/vector gen/int 1 100000)
-              i (gen/choose 0 (dec (count v)))]
-      (nth v i)))
+    (def nth-bench
+      (for-all [v (gen/vector gen/int 1 100000)
+                i (gen/choose 0 (dec (count v)))]
+               (nth v i)))
 
-  (def vec-nth-bench
-    (for-all [v (gen/vector gen/int 1 100000)
-              i (gen/choose 0 (dec (count v)))]
+    (def vec-nth-bench
+      (for-all [v (gen/vector gen/int 1 100000)
+                i (gen/choose 0 (dec (count v)))]
       ;;(.nth ^clojure.lang.APersistentVector v ^int i)
-      (.nth  v  i)))
+               (.nth  v  i)))
 
-  ((:state-fn m))
+    ((:state-fn m))
 
-  (criterium.measure/measure m {:limit-time 1})
-  (dissoc (criterium.measure/measure m {:limit-evals 100}) :samples)
-  (dissoc (criterium.measure/measure nth-bench {:limit-time 1}) :samples)
-  (dissoc (criterium.measure/measure vec-nth-bench {:limit-time 1}) :samples)
-  (criterium.measure/measure m {})
+    (criterium.measure/measure m {:limit-time 1})
+    (dissoc (criterium.measure/measure m {:limit-evals 100}) :samples)
+    (dissoc (criterium.measure/measure nth-bench {:limit-time 1}) :samples)
+    (dissoc (criterium.measure/measure vec-nth-bench {:limit-time 1}) :samples)
+    (criterium.measure/measure m {})
 
-  (def g (gen/bind
-             (gen/vector gen/int 1 100000)
-           (fn [v]
-             (gen/bind
-                 (gen/choose 0 (dec (count v)))
-               (fn [i] (gen/return [v i])))))
-    ))
+    (def g (gen/bind
+            (gen/vector gen/int 1 100000)
+            (fn [v]
+              (gen/bind
+               (gen/choose 0 (dec (count v)))
+               (fn [i] (gen/return [v i])))))))
 
 ;; (gen/generate g)

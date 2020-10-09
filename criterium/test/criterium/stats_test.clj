@@ -53,30 +53,29 @@
     (is (test-max-error 0.0833 s 0.2))))
 
 #_(comment
-  (let [f (fn [n] (take n (repeatedly rand)))]
-    (dissoc (criterium.time/measure (f 1000000)) :expr-value))
+    (let [f (fn [n] (take n (repeatedly rand)))]
+      (dissoc (criterium.time/measure (f 1000000)) :expr-value))
 
-  (let [f (fn [n] (take n (criterium.well/well-rng-1024a)))]
-    (dissoc (criterium.time/measure (f 1000000)) :expr-value))
+    (let [f (fn [n] (take n (criterium.well/well-rng-1024a)))]
+      (dissoc (criterium.time/measure (f 1000000)) :expr-value))
 
-  (criterium.time/time (bootstrap-estimate (take 1000000 (repeatedly rand))))
+    (criterium.time/time (bootstrap-estimate (take 1000000 (repeatedly rand))))
 
-  (let [f (fn [n] (bootstrap-estimate (take n (repeatedly rand))))]
-    (double (/ (criterium.toolkit/elapsed-time
-                 (-> (criterium.time/measure
-                      (f 1000000))
-                    (dissoc :expr-value)
-                    ))
-               (double criterium.toolkit/MILLISEC-NS))))
+    (let [f (fn [n] (bootstrap-estimate (take n (repeatedly rand))))]
+      (double (/ (criterium.toolkit/elapsed-time
+                  (-> (criterium.time/measure
+                       (f 1000000))
+                      (dissoc :expr-value)))
+                 (double criterium.toolkit/MILLISEC-NS))))
 
-  (def m (criterium.arg-gen/for-all
-             [v (clojure.test.check.generators/vector
-                  (clojure.test.check.generators/double* {:inifinte? false :NaN? false
-                                                          :min       0     :max  1})
-                  1000000)]
-           (bootstrap-estimate v)))
+    (def m (criterium.arg-gen/for-all
+            [v (clojure.test.check.generators/vector
+                (clojure.test.check.generators/double* {:inifinte? false :NaN? false
+                                                        :min       0     :max  1})
+                1000000)]
+            (bootstrap-estimate v)))
 
-  (dissoc (criterium.measure/measure m {}) :state))
+    (dissoc (criterium.measure/measure m {}) :state))
 
 (deftest bootstrap-estimate-scale-test
   (is (= [1e-9 [1e-8 1e-8]]
@@ -96,6 +95,8 @@
 
 
 ;; Values from R, erf <- function(x) 2 * pnorm(x * sqrt(2)) - 1
+
+
 (deftest erf-test
   (let [max-error 1.5e-7]
     (test-max-error 0.999999984582742 (stats/erf 4) max-error)
@@ -124,14 +125,13 @@
   (is (= 5.0 (stats/quantile 0.05 (range 0 101))))
   (is (= 95.0 (stats/quantile 0.95 (range 0 101)))))
 
-
 (deftest bootstrap-test
   (is (= [1 0.0 [1.0 1.0]]
          (stats/bootstrap (take 20 (repeatedly (constantly 1)))
                           stats/mean
                           100
                           well/well-rng-1024a)))
-  (is (=  [ [1 0.0 [1.0 1.0]] [0.0 0.0 [0.0 0.0]]]
+  (is (=  [[1 0.0 [1.0 1.0]] [0.0 0.0 [0.0 0.0]]]
           (stats/bootstrap (take 20 (repeatedly (constantly 1)))
                            (juxt stats/mean stats/variance)
                            100
@@ -145,7 +145,7 @@
                                 100
                                 [0.5 ci (- 1.0 ci)]
                                 well/well-rng-1024a)))
-    (is (=  [ [1 [1 1]] [0.0 [0.0 0.0]]]
+    (is (=  [[1 [1 1]] [0.0 [0.0 0.0]]]
             (stats/bootstrap-bca (take 20 (repeatedly (constantly 1)))
                                  (juxt stats/mean stats/variance)
                                  100

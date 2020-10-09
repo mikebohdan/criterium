@@ -10,7 +10,6 @@
              [toolkit :as toolkit]])
   (:import [criterium.budget Budget]))
 
-
 (def ^Long DEFAULT-TIME-BUDGET-NS
   "Default time budget when no limit specified.
   100ms should be imperceptible."
@@ -29,17 +28,15 @@
 (defn budget-for-limits
   ^Budget [limit-time-s limit-eval-count factor]
   (budget/budget
-    (or (and limit-time-s (* limit-time-s toolkit/SEC-NS))
-        (if limit-eval-count
-          Long/MAX_VALUE
-          (* factor DEFAULT-TIME-BUDGET-NS)))
-    (or limit-eval-count
-        Long/MAX_VALUE
-        #_(if limit-time-s
-          Long/MAX_VALUE
-          (* factor DEFAULT-EVAL-COUNT-BUDGET)))))
-
-
+   (or (and limit-time-s (* limit-time-s toolkit/SEC-NS))
+       (if limit-eval-count
+         Long/MAX_VALUE
+         (* factor DEFAULT-TIME-BUDGET-NS)))
+   (or limit-eval-count
+       Long/MAX_VALUE
+       #_(if limit-time-s
+           Long/MAX_VALUE
+           (* factor DEFAULT-EVAL-COUNT-BUDGET)))))
 
 (defn- pipeline-spec
   "Return a pipeline spec for the given user specified options.
@@ -64,9 +61,8 @@
   [{:keys [pipeline-fn-kws terminal-fn-kw] :as _spec}
    extra-pipeline-fn-kws]
   (pipeline/pipeline
-    (into pipeline-fn-kws extra-pipeline-fn-kws)
-    {:terminal-fn-kw terminal-fn-kw}))
-
+   (into pipeline-fn-kws extra-pipeline-fn-kws)
+   {:terminal-fn-kw terminal-fn-kw}))
 
 (defmulti sample-data
   #_{:clj-kondo/ignore [:unused-binding]}
@@ -113,9 +109,9 @@
         warmup-frac     (or warmup-fraction
                             DEFAULT-WARMUP-FRACTION)
         _sample-frac    (or sample-fraction
-                             (- 1.0
-                                estimation-frac
-                                warmup-frac))
+                            (- 1.0
+                               estimation-frac
+                               warmup-frac))
 
         estimation-budget (budget/phase-budget
                            total-budget
@@ -147,7 +143,6 @@
      sample-budget
      config)))
 
-
 (defmulti process-samples
   #_{:clj-kondo/ignore [:unused-binding]}
   (fn [process-mode sampled metrics options]
@@ -163,14 +158,14 @@
   [_process-mode sampled metrics options]
   (output/progress "Num samples" (count (:samples sampled)))
   (let [res (sampled-stats/sample-stats
-              metrics
-              (:batch-size sampled)
-              (:samples sampled)
-              options)
+             metrics
+             (:batch-size sampled)
+             (:samples sampled)
+             options)
         res  (assoc
-               res
-               :jvm-event-stats
-               (sampled-stats/jvm-event-stats (:samples sampled)))]
+              res
+              :jvm-event-stats
+              (sampled-stats/jvm-event-stats (:samples sampled)))]
     (if (or (:histogram options) (:include-samples options))
       (assoc res :samples (:samples sampled))
       res)))
@@ -200,17 +195,17 @@
         factor          1 ;; (if (= sample-mode :quick) 1 100)
         total-budget    (budget-for-limits limit-time-s limit-eval-count factor)
         _ (output/progress
-            "Limits:  time"
-            (format/format-value :time-ns (.elapsed-time-ns total-budget))
-            " evaluations"
-            (format/format-value :count (.eval-count total-budget)))
+           "Limits:  time"
+           (format/format-value :time-ns (.elapsed-time-ns total-budget))
+           " evaluations"
+           (format/format-value :count (.eval-count total-budget)))
         pipeline-spec   (pipeline-spec options)
         metrics         (pipeline-metrics pipeline-spec)
         sampled         (sample-data
-                          sample-mode
-                          pipeline-spec
-                          measured
-                          total-budget
-                          config
-                          options)]
+                         sample-mode
+                         pipeline-spec
+                         measured
+                         total-budget
+                         config
+                         options)]
     (process-samples process-mode sampled metrics options)))

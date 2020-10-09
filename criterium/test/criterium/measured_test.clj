@@ -2,15 +2,14 @@
   (:require [criterium.measured :as measured]
             [clojure.test :refer [deftest is testing]]))
 
-
 (deftest measured-test
   (let [eval-count (volatile! 0)
         m (measured/measured
-            (fn [] :arg)
-            (fn [arg ^long n]
-              (vswap! eval-count #(+ n ^long %))
-              [::time [arg arg]])
-            (fn [] ::symbolic))]
+           (fn [] :arg)
+           (fn [arg ^long n]
+             (vswap! eval-count #(+ n ^long %))
+             [::time [arg arg]])
+           (fn [] ::symbolic))]
     (is (measured/measured? m))
     (is (= ::symbolic (measured/symbolic m)))
     (testing "invoke calls the function with one eval"

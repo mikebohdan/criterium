@@ -20,11 +20,11 @@
 ;; spec can't instrument functions with primitives, so explicitly
 ;; list the ones that can be instrumented.
 (stest/instrument
-  [`budget/add
-   `budget/subtract
-   `budget/budget?
-   `budget/budget
-   `budget/budget*])
+ [`budget/add
+  `budget/subtract
+  `budget/budget?
+  `budget/budget
+  `budget/budget*])
 
 ;; we want function specific options, so explicitly test individual functions
 (stest/check `budget/budget `budget/budget*)
@@ -38,18 +38,18 @@
 
 (defspec budget-is-readable
   (prop/for-all [b (s/gen ::budget/budget)]
-    (budget= b (read-string (pr-str b)))))
+                (budget= b (read-string (pr-str b)))))
 
 (defspec budget-add-is-inverse-of-subtract
   (prop/for-all [b1 (s/gen ::budget/budget)
                  b2 (s/gen ::budget/budget)]
-    (budget= b1 (budget/subtract (budget/add b1 b2) b2))))
+                (budget= b1 (budget/subtract (budget/add b1 b2) b2))))
 
 (defspec phase-budget-with-no-period-ns-scales-budget
   (prop/for-all [b (s/gen ::budget/budget)
                  f (gen/double* {:min 0.0 :max 1.0})]
-    (budget=
-      (budget/budget
-        (long (* (double (.elapsed-time-ns b)) f))
-        (long (* (double (.eval-count b)) f)))
-      (budget/phase-budget b nil nil f))))
+                (budget=
+                 (budget/budget
+                  (long (* (double (.elapsed-time-ns b)) f))
+                  (long (* (double (.eval-count b)) f)))
+                 (budget/phase-budget b nil nil f))))

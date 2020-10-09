@@ -1,7 +1,6 @@
 (ns criterium.format
   "Metric formatters")
 
-
 (defmulti scale
   "Scale value with given dimensions keyword.
   Return a [scale units] tuple.
@@ -31,7 +30,6 @@
     (< value 60e9) [1e-9 "s"]
     :else          [60e-9 "min"]))
 
-
 (def ONE-KB 1024)
 (def ONE-MB (* 1024 1024))
 (def ONE-GB (* 1024 1024 1024))
@@ -44,7 +42,6 @@
     (< value ONE-GB) [(/ ONE-MB) "Mb"]
     :else            [(/ ONE-GB) "Gb"]))
 
-
 (defmulti format-value
   "Format value to 3 significant figures in an appropriate unit for the scale."
   #_{:clj-kondo/ignore [:unused-binding]}
@@ -54,7 +51,7 @@
   [_ value]
   (format "%d" value))
 
- (defmethod format-value :time
+(defmethod format-value :time
   [dimension value]
   (let [[scale unit] (scale dimension value)]
     (format "%3.3g %s" (double (* scale value)) unit)))
@@ -68,8 +65,6 @@
   [dimension value]
   (let [[scale unit] (scale dimension value)]
     (format "%3.3f %s" (double (* scale value)) unit)))
-
-
 
 (defmulti format-metric
   #_{:clj-kondo/ignore [:unused-binding]}
@@ -86,7 +81,7 @@
 (defmethod format-metric :garbage-collector
   [_ val]
   (format "%32s:\n%s" "Garbage collection"
-       (apply str (map format-count-time val))))
+          (apply str (map format-count-time val))))
 
 (defmethod format-metric :finalization
   [_ val]
@@ -94,10 +89,10 @@
 
 (defn- format-memory-metrics [[k vs]]
   (apply
-    str
-    (format "%36s:\n" (name k))
-    (for [[mk v] vs]
-      (format "%40s: %s\n" (name mk) (format-value :memory v)))))
+   str
+   (format "%36s:\n" (name k))
+   (for [[mk v] vs]
+     (format "%40s: %s\n" (name mk) (format-value :memory v)))))
 
 (defmethod format-metric :memory
   [_ val]
@@ -123,9 +118,9 @@
 (defmethod format-metric :class-loader
   [_ val]
   (apply
-    str
-    (format "%32s:\n" "Classloader")
-    (map format-count val)))
+   str
+   (format "%32s:\n" "Classloader")
+   (map format-count val)))
 
 (defmethod format-metric :state
   [_ _]

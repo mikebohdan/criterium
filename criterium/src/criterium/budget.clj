@@ -10,8 +10,8 @@
 
 (deftype Budget
     ;; use deftype so we cna have long values
-    [^long elapsed-time-ns
-     ^long eval-count])
+         [^long elapsed-time-ns
+          ^long eval-count])
 
 (defn budget?
   "Predicate for x being a Budget"
@@ -34,8 +34,8 @@
   {:pre [(s/valid? ::domain/elapsed-time-ns elapsed-time-ns)
          (s/valid? ::domain/eval-count elapsed-time-ns)]}
   (->Budget
-    (or elapsed-time-ns Long/MAX_VALUE)
-    (or eval-count Long/MAX_VALUE)))
+   (or elapsed-time-ns Long/MAX_VALUE)
+   (or eval-count Long/MAX_VALUE)))
 
 (defn ^:no-doc budget*
   ^Budget [[elapsed-time-ns eval-count]]
@@ -44,22 +44,22 @@
 (defn add
   ^Budget [& budgets]
   (reduce
-    (fn [^Budget b ^Budget b1]
-      (budget
-        (+ (.elapsed-time-ns b) (.elapsed-time-ns b1))
-        (+ (.eval-count b) (.eval-count b1))))
-    (first budgets)
-    (rest budgets)))
+   (fn [^Budget b ^Budget b1]
+     (budget
+      (+ (.elapsed-time-ns b) (.elapsed-time-ns b1))
+      (+ (.eval-count b) (.eval-count b1))))
+   (first budgets)
+   (rest budgets)))
 
 (defn subtract
   ^Budget [from-budget & other-budgets]
   (reduce
-    (fn [^Budget b ^Budget b1]
-      (budget
-        (- (.elapsed-time-ns b) (.elapsed-time-ns b1))
-        (- (.eval-count b) (.eval-count b1))))
-    from-budget
-    other-budgets))
+   (fn [^Budget b ^Budget b1]
+     (budget
+      (- (.elapsed-time-ns b) (.elapsed-time-ns b1))
+      (- (.eval-count b) (.eval-count b1))))
+   from-budget
+   other-budgets))
 
 (defn phase-budget
   "Return a budget for a measurement phase, given a total budget.
@@ -71,19 +71,19 @@
            ^double default-fraction]
   {:pre [default-fraction]}
   (budget
-    (cond
-      (and period-ns fraction)
-      (min ^long period-ns
-           (long (* (.elapsed-time-ns total-budget) ^double fraction)))
+   (cond
+     (and period-ns fraction)
+     (min ^long period-ns
+          (long (* (.elapsed-time-ns total-budget) ^double fraction)))
 
-      period-ns period-ns
-      fraction (long (* (.elapsed-time-ns total-budget) ^double fraction))
+     period-ns period-ns
+     fraction (long (* (.elapsed-time-ns total-budget) ^double fraction))
 
-      :else (long (* (.elapsed-time-ns total-budget) default-fraction)))
-    (cond
-      fraction (long (* (.eval-count total-budget) ^double fraction))
-      (nil? period-ns) (long (* (.eval-count total-budget) default-fraction))
-      :else Long/MAX_VALUE)))
+     :else (long (* (.elapsed-time-ns total-budget) default-fraction)))
+   (cond
+     fraction (long (* (.eval-count total-budget) ^double fraction))
+     (nil? period-ns) (long (* (.eval-count total-budget) default-fraction))
+     :else Long/MAX_VALUE)))
 
 (defn budget-remaining?
   [^Budget budget ^long elapsed-time-ns ^long eval-count]
@@ -108,7 +108,6 @@
   [^Budget budget]
   (pprint/pprint {:elapsed-time-ns (.elapsed-time-ns budget)
                   :eval-count      (.eval-count budget)}))
-
 
 (s/fdef budget?
   :args (s/cat :x any?)
@@ -159,23 +158,22 @@
                             (fn [b] (eval-count b))
                             (-> % :args :budgets))))))
 
-
 (s/fdef subtract
   :args (s/and (s/cat :budgets (s/+ ::budget))
                #(>= (reduce - (map
                                (fn [b] (double (elapsed-time-ns b)))
                                (:budgets %)))
-                   0)
+                    0)
                #(>= (reduce - (map
                                (fn [b] (double (eval-count b)))
                                (:budgets %)))
-                   0))
+                    0))
   :ret ::budget
   :fn (s/and #(= (.elapsed-time-ns (:ret %))
                  (reduce - (map
                             (fn [b] (elapsed-time-ns b))
-                            (-> % :args :budgets) )))
+                            (-> % :args :budgets))))
              #(= (.eval-count (:ret %))
                  (reduce - (map
                             (fn [b] (eval-count b))
-                            (-> % :args :budgets) )))))
+                            (-> % :args :budgets))))))

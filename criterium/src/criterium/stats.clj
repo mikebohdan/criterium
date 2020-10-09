@@ -31,6 +31,8 @@
 
 
 ;;; Statistics
+
+
 (defn mean
   "Arithmetic mean of data."
   ([data]
@@ -115,7 +117,6 @@
      (+ q3 mild)
      (+ q3 severe)]))
 
-
 (defn uniform-distribution
   "Return uniformly distributed deviates on 0..max-val use the specified rng."
   [max-val rng]
@@ -158,8 +159,7 @@
         ;; stats ((juxt mean variance) sampled-stat)
         stats [m v]]
     (conj stats
-          (apply confidence-interval stats)
-          )))
+          (apply confidence-interval stats))))
 
 (defn scale-bootstrap-estimate [estimate scale]
   [(* (first estimate) scale)
@@ -231,16 +231,14 @@ descending order (so the last element of coefficients is the constant term)."
            1.67638483018380384940
            2.05319162663775882187
            1.0]
-        e [
-           2.01033439929228813265e-7
+        e [2.01033439929228813265e-7
            0.0000271155556874348757815
            0.00124266094738807843860
            0.0265321895265761230930
            0.296560571828504891230
            1.78482653991729133580
            5.46378491116411436990
-           6.65790464350110377720
-           ]
+           6.65790464350110377720]
         f [2.04426310338993978564e-15
            1.42151175831644588870e-7
            1.84631831751005468180e-5
@@ -263,11 +261,10 @@ descending order (so the last element of coefficients is the constant term)."
             (* (Math/signum (double (- x 0.5)))
                (/ (polynomial-value r e) (polynomial-value r f)))))))))
 
-
 (defn drop-at [n coll]
   (lazy-seq
-    (when-let [s (seq coll)]
-      (concat (take n s) (next (drop n s))))))
+   (when-let [s (seq coll)]
+     (concat (take n s) (next (drop n s))))))
 
 (defn trunc
   "Round towards zero to an integeral value."
@@ -354,6 +351,7 @@ descending order (so the last element of coefficients is the constant term)."
 ;;; Maximum likelihood kernel density estimation: On the potential of convolution sieves.
 ;;; Jones and Henderson. Computational Statistics and Data Analysis (2009)
 
+
 (defn modal-estimation-constant
   "Kernel function for estimation of multi-modality.
   h-k is the critical bandwidth, sample-variance is the observed sample variance.
@@ -366,10 +364,10 @@ descending order (so the last element of coefficients is the constant term)."
   "Smoothed estimation function."
   [c-k h-k data deviates]
   (lazy-seq
-    (cons
-     (* c-k (+ (first data) (* h-k (first deviates))))
-     (when-let [n (next data)]
-       (smoothed-sample c-k h-k n (next deviates))))))
+   (cons
+    (* c-k (+ (first data) (* h-k (first deviates))))
+    (when-let [n (next data)]
+      (smoothed-sample c-k h-k n (next deviates))))))
 
 (defn gaussian-weight
   "Weight function for gaussian kernel."
@@ -381,7 +379,6 @@ descending order (so the last element of coefficients is the constant term)."
   "Kernel density estimator for x, given n samples X, weights K and width h."
   [h K n X x]
   (/ (reduce #(+ %1 (K (/ (- x %2) h))) 0 X) (* n h)))
-
 
 (defn sum-square-delta [vs mv]
   (reduce + (map (comp sqr #(- % mv)) vs)))
@@ -402,8 +399,7 @@ descending order (so the last element of coefficients is the constant term)."
         ss-residuals  (reduce + sqr-residuals)
         variance      (/ ss-residuals (- n 2))
         ss-total      (sum-square-delta ys my)
-        r-sqr         (- 1 (/ ss-residuals ss-total))
-        ]
+        r-sqr         (- 1 (/ ss-residuals ss-total))]
     {:coeffs   [a0 a1]
      :variance variance
      :r-sqr    r-sqr}))

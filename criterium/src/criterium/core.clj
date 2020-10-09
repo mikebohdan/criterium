@@ -2,7 +2,7 @@
       :see-also
       [["http://github.com/hugoduncan/criterium" "Source code"]
        ["http://hugoduncan.github.com/criterium" "API Documentation"]]}
-    criterium.core
+ criterium.core
   "Criterium measures the computation time of an expression.  It is
   designed to address some of the pitfalls of benchmarking, and benchmarking on
   the JVM in particular.
@@ -43,6 +43,7 @@
 
 
 ;; Default values controlling behaviour
+
 
 (def ^:dynamic *final-gc-problem-threshold*
   "Fraction of excution time allowed for final cleanup before a
@@ -88,6 +89,7 @@
 
 ;;; Progress reporting
 
+
 (def ^:dynamic *report-progress*
   "Flag to control output of progress messages"
   nil)
@@ -127,16 +129,17 @@
 
 ;;; Execution timing
 
+
 (defn time-expr
   "Returns a map containing execution time and result of specified function."
   [measured n]
   (let [pline (pipeline/with-garbage-collector-stats
                 pipeline/time-metric)]
     (toolkit/sample
-      pline
-      measured
-      (budget/budget Long/MAX_VALUE n)
-      n)))
+     pline
+     measured
+     (budget/budget Long/MAX_VALUE n)
+     n)))
 
 (defn time-expr-for-warmup
   "Returns a map containing execution time, change in loaded and unloaded
@@ -146,10 +149,10 @@
                 (pipeline/with-compilation-time
                   pipeline/time-metric))]
     (toolkit/sample
-      pline
-      measured
-      (budget/budget 1 1)
-      eval-count)))
+     pline
+     measured
+     (budget/budget 1 1)
+     eval-count)))
 
 ;; (defn elapsed-time
 ;;   "Helper to return the elapsed time from instrumentation data map."
@@ -204,6 +207,7 @@
 
 ;;; Compilation
 
+
 (defn warmup-for-jit
   "Run expression for the given amount of time to enable JIT compilation.
 
@@ -219,12 +223,11 @@
         _             (debug "  initial t" t)
         [deltas-n n]  (if (< t 100000)           ; 100us
                         (let [n (inc (quot 100000 t))]
-                         [(execute-expr-for-warmup n measured) n])
-                       [deltas-1 1])
+                          [(execute-expr-for-warmup n measured) n])
+                        [deltas-1 1])
         t             (pipeline/elapsed-time deltas-n)
         p             (/ warmup-period t)
-        c             (long (max 1 (* n (/ p 5))))
-        ]
+        c             (long (max 1 (* n (/ p 5))))]
     (debug "  using t" t "for n" n)
     (debug "  using execution-count" c)
     (loop [count      n
@@ -262,6 +265,7 @@
 
 ;;; Execution parameter estimation
 
+
 (defn estimate-execution-count
   "Estimate the number of executions required in order to have at least the
    specified execution period, check for the jvm to have constant class loader
@@ -294,6 +298,7 @@
 
 
 ;; Benchmarksx
+
 
 (defn run-benchmark
   "Benchmark an expression. This tries its best to eliminate sources of error.
@@ -348,9 +353,8 @@
      :final-gc-time     final-gc-time
      :overhead          overhead}))
 
-
 #_(defn run-benchmarks-round-robin
-  "Benchmark multiple expressions in a 'round robin' fashion.  Very
+    "Benchmark multiple expressions in a 'round robin' fashion.  Very
   similar to run-benchmark, except it takes multiple expressions in a
   sequence instead of only one (each element of the sequence should be a
   map with keys :f and :expr-string).  It runs the following steps in
@@ -373,82 +377,83 @@
    Do the same for the rest of the expressions.
 
   5. Repeat step 4 a total of sample-count times."
-  [sample-count warmup-jit-period target-execution-time exprs gc-before-sample]
-  (toolkit/force-gc *max-gc-attempts*)
-  (let [_           (progress
-                      (format "Warm up %d expressions for %.2e sec each:"
-                              (count exprs) (/ warmup-jit-period 1.0e9)))
-        warmup      (vec (for [{:keys [f expr-string]} exprs]
-                           (do (progress (format "    %s..." expr-string))
-                               (warmup-for-jit warmup-jit-period f))))
-        _           (progress
-                      (format
+    [sample-count warmup-jit-period target-execution-time exprs gc-before-sample]
+    (toolkit/force-gc *max-gc-attempts*)
+    (let [_           (progress
+                       (format "Warm up %d expressions for %.2e sec each:"
+                               (count exprs) (/ warmup-jit-period 1.0e9)))
+          warmup      (vec (for [{:keys [f expr-string]} exprs]
+                             (do (progress (format "    %s..." expr-string))
+                                 (warmup-for-jit warmup-jit-period f))))
+          _           (progress
+                       (format
                         (str "Estimate execution counts for %d expressions.  "
                              "Target execution time = %.2e sec:")
                         (count exprs) (/ target-execution-time 1.0e9)))
-        exec-counts (map
-                      (fn [{:keys [f expr-string] :as expr}
-                           [warmup-n deltas estimated-fn-time]]
-                        (progress (format "    %s..." expr-string))
-                        (estimate-execution-count
+          exec-counts (map
+                       (fn [{:keys [f expr-string] :as expr}
+                            [warmup-n deltas estimated-fn-time]]
+                         (progress (format "    %s..." expr-string))
+                         (estimate-execution-count
                           target-execution-time f
                           gc-before-sample
                           estimated-fn-time))
-                      exprs warmup)
-        exprs       (map
-                      (fn [idx expr exec-count]
-                        (assoc expr :index idx :n-exec exec-count))
-                      (range) exprs exec-counts)
-        all-samples (doall
-                      (for [i (range sample-count)]
-                        (do
-                          (progress
+                       exprs warmup)
+          exprs       (map
+                       (fn [idx expr exec-count]
+                         (assoc expr :index idx :n-exec exec-count))
+                       (range) exprs exec-counts)
+          all-samples (doall
+                       (for [i (range sample-count)]
+                         (do
+                           (progress
                             (format
-                              "    Running sample %d/%d for %d expressions:"
-                              (inc i) sample-count (count exprs)))
-                          (doall
+                             "    Running sample %d/%d for %d expressions:"
+                             (inc i) sample-count (count exprs)))
+                           (doall
                             (for [{:keys [f n-exec expr-string] :as expr} exprs]
                               (do
                                 (progress (format "        %s..." expr-string))
                                 (assoc expr
                                        :sample (first
-                                                 (collect-samples
-                                                   1 n-exec f gc-before-sample)))))))))
+                                                (collect-samples
+                                                 1 n-exec f gc-before-sample)))))))))
 
         ;; 'transpose' all-samples so that all samples for a
         ;; particular expression are in a sequence together, and
         ;; all-samples is a sequence of one map per expression.
-        all-samples (group-by :index (apply concat all-samples))
-        all-samples
-        (map (fn [[idx data-seq]]
-               (let [expr            (dissoc (first data-seq) :sample)
-                     n-exec          (:n-exec expr)
-                     samples         (map :sample data-seq)
-                     _               (progress "Final GC...")
-                     gc-deltas       (toolkit/force-gc *max-gc-attempts*)
-                     final-gc-time   (pipeline/elapsed-time gc-deltas)
-                     sample-times    (map pipeline/elapsed-time samples)
-                     total           (reduce + 0 sample-times)
+          all-samples (group-by :index (apply concat all-samples))
+          all-samples
+          (map (fn [[idx data-seq]]
+                 (let [expr            (dissoc (first data-seq) :sample)
+                       n-exec          (:n-exec expr)
+                       samples         (map :sample data-seq)
+                       _               (progress "Final GC...")
+                       gc-deltas       (toolkit/force-gc *max-gc-attempts*)
+                       final-gc-time   (pipeline/elapsed-time gc-deltas)
+                       sample-times    (map pipeline/elapsed-time samples)
+                       total           (reduce + 0 sample-times)
                      ;; TBD: Doesn't make much sense to attach final
                      ;; GC warning to the expression that happened
                      ;; to be first in the sequence, but that is
                      ;; what this probably does right now.  Think
                      ;; what might be better to do.
-                     _               (progress "Checking GC..." total final-gc-time)
-                     final-gc-result (final-gc-warn total final-gc-time)]
-                 {:execution-count n-exec
-                  :sample-count    sample-count
-                  :sample-times    sample-times
-                  :results         (map second samples)
-                  :total-time      (/ total 1e9)}))
-             all-samples)]
-    all-samples))
+                       _               (progress "Checking GC..." total final-gc-time)
+                       final-gc-result (final-gc-warn total final-gc-time)]
+                   {:execution-count n-exec
+                    :sample-count    sample-count
+                    :sample-times    sample-times
+                    :results         (map second samples)
+                    :total-time      (/ total 1e9)}))
+               all-samples)]
+      all-samples))
 
 
 ;; Statistics
 
 
 ;;; Outliers
+
 
 (defn outlier-effect
   "Return a keyword describing the effect of outliers on the estimate of mean
@@ -492,8 +497,7 @@
                          (let [nmc (- n c)]
                            (* (/ nmc n) (- variance-block (* nmc variance-g)))))
         min-f          (fn [f q r]
-                         (min (f q) (f r)))
-        ]
+                         (min (f q) (f r)))]
     (if (zero? variance-block)
       0
       (/ (min-f var-out 1 (min-f c-max 0 mean-g-min)) variance-block))))
@@ -506,18 +510,18 @@
 
 (defn add-outlier [low-severe low-mild high-mild high-severe counts x]
   (outlier-count
-    (if (<= x low-severe)
-      (inc (:low-severe counts))
-      (:low-severe counts))
-    (if (< low-severe x low-mild)
-      (inc (:low-mild counts))
-      (:low-mild counts))
-    (if (> high-severe x high-mild)
-      (inc (:high-mild counts))
-      (:high-mild counts))
-    (if (>= x high-severe)
-      (inc (:high-severe counts))
-      (:high-severe counts))))
+   (if (<= x low-severe)
+     (inc (:low-severe counts))
+     (:low-severe counts))
+   (if (< low-severe x low-mild)
+     (inc (:low-mild counts))
+     (:low-mild counts))
+   (if (> high-severe x high-mild)
+     (inc (:high-mild counts))
+     (:high-mild counts))
+   (if (>= x high-severe)
+     (inc (:high-severe counts))
+     (:high-severe counts))))
 
 (defn outliers
   "Find the outliers in the data using a boxplot technique."
@@ -532,18 +536,19 @@
 
 ;;; Overhead estimation
 
+
 (declare benchmark*)
 
 (defn estimate-overhead
   "Calculate a conservative estimate of the timing loop overhead."
   []
   (let [bm (benchmark*
-             (measured/expr 1)
-             {:warmup-jit-period           (* 10 s-to-ns)
-              :num-samples                 10
-              :target-execution-time       (* 0.5 s-to-ns)
-              :overhead                    0
-              :supress-jvm-option-warnings true})]
+            (measured/expr 1)
+            {:warmup-jit-period           (* 10 s-to-ns)
+             :num-samples                 10
+             :target-execution-time       (* 0.5 s-to-ns)
+             :overhead                    0
+             :supress-jvm-option-warnings true})]
     (-> bm :execution-time :lower-q first)))
 
 (def estimated-overhead-cache nil)
@@ -553,7 +558,7 @@
   []
   (progress "Estimating sampling overhead")
   (alter-var-root
-    #'estimated-overhead-cache (constantly (estimate-overhead))))
+   #'estimated-overhead-cache (constantly (estimate-overhead))))
 
 (defn estimated-overhead
   []
@@ -562,6 +567,7 @@
 
 
 ;;; Options
+
 
 (defn extract-report-options
   "Extract reporting options from the given options vector.  Returns a two
@@ -584,43 +590,44 @@
 
 ;;; Sample statistic
 
+
 (defn sample-stats
   "Compute sample statistics for the given values."
   [values sample-count execution-count opts]
   (let [outliers      (outliers values)
         tail-quantile (:tail-quantile opts)
         stats         (stats/bootstrap-bca
-                        (map double values)
-                        (juxt
-                         stats/mean
-                          stats/variance
-                          (partial stats/quantile tail-quantile)
-                          (partial stats/quantile (- 1.0 tail-quantile)))
-                        (:bootstrap-size opts)
-                        [0.5 tail-quantile (- 1.0 tail-quantile)]
-                        well/well-rng-1024a)
+                       (map double values)
+                       (juxt
+                        stats/mean
+                        stats/variance
+                        (partial stats/quantile tail-quantile)
+                        (partial stats/quantile (- 1.0 tail-quantile)))
+                       (:bootstrap-size opts)
+                       [0.5 tail-quantile (- 1.0 tail-quantile)]
+                       well/well-rng-1024a)
         analysis      (outlier-significance
-                        (first stats)
-                        (second stats)
-                        sample-count)
+                       (first stats)
+                       (second stats)
+                       sample-count)
         sqr           (fn [x] (* x x))
         m             (stats/mean (map double values))
         s             (Math/sqrt (stats/variance (map double values)))]
     {:outliers         outliers
      :mean             (stats/scale-bootstrap-estimate
-                         (first stats) (/ 1e-9 execution-count))
+                        (first stats) (/ 1e-9 execution-count))
      :sample-mean      (stats/scale-bootstrap-estimate
-                         [m [(- m (* 3 s)) (+ m (* 3 s))]]
-                         (/ 1e-9 execution-count))
+                        [m [(- m (* 3 s)) (+ m (* 3 s))]]
+                        (/ 1e-9 execution-count))
      :variance         (stats/scale-bootstrap-estimate
-                         (second stats) (sqr (/ 1e-9 execution-count)))
+                        (second stats) (sqr (/ 1e-9 execution-count)))
      :sample-variance  (stats/scale-bootstrap-estimate
-                         [ (sqr s) [0 0]]
-                         (sqr (/ 1e-9 execution-count)))
+                        [(sqr s) [0 0]]
+                        (sqr (/ 1e-9 execution-count)))
      :lower-q          (stats/scale-bootstrap-estimate
-                         (nth stats 2) (/ 1e-9 execution-count))
+                        (nth stats 2) (/ 1e-9 execution-count))
      :upper-q          (stats/scale-bootstrap-estimate
-                         (nth stats 3) (/ 1e-9 execution-count))
+                        (nth stats 3) (/ 1e-9 execution-count))
      :outlier-variance analysis
      :tail-quantile    (:tail-quantile opts)
      :sample-count     sample-count
@@ -642,37 +649,36 @@
      :sample-count         sample-count
      :execution-count      execution-count}))
 
-
 (defn benchmark-stats
   [data opts]
   (let [execution-count  (:execution-count data)
         sample-count     (:sample-count data)
         time-samples     (:sample-times data)
         time-stats       (sample-stats
-                           time-samples
-                           sample-count
-                           execution-count
-                           opts)
+                          time-samples
+                          sample-count
+                          execution-count
+                          opts)
         gc-count-samples (map
-                           #(-> % :garbage-collector :total :count)
-                           (:samples data))
+                          #(-> % :garbage-collector :total :count)
+                          (:samples data))
         gc-time-samples  (map
-                           #(-> % :garbage-collector :total :time)
-                           (:samples data))
+                          #(-> % :garbage-collector :total :time)
+                          (:samples data))
         gc-stats         (gc-sample-stats
-                           gc-count-samples
-                           gc-time-samples
-                           sample-count
-                           execution-count
-                           opts)]
+                          gc-count-samples
+                          gc-time-samples
+                          sample-count
+                          execution-count
+                          opts)]
     (merge data
            {:execution-time  time-stats
             :gc-stats        gc-stats
             :os-details      (jvm/os-details)
             :options         opts
             :runtime-details (->
-                               (jvm/runtime-details)
-                               (update-in [:input-arguments] vec))
+                              (jvm/runtime-details)
+                              (update-in [:input-arguments] vec))
             :sample-count    sample-count
             :execution-count execution-count})))
 
@@ -692,6 +698,7 @@
 
 ;;; User top level functions
 
+
 (defn benchmark*
   "Benchmark a function. This tries its best to eliminate sources of error.
    This also means that it runs for a while.  It will typically take 70s for a
@@ -699,11 +706,11 @@
    longer running expressions."
   [measured
    {:keys [num-samples
-          warmup-jit-period
-          target-execution-time
-          gc-before-sample
-          overhead
-          supress-jvm-option-warnings]
+           warmup-jit-period
+           target-execution-time
+           gc-before-sample
+           overhead
+           supress-jvm-option-warnings]
     :as   options}]
   {:pre [(measured/measured? measured)]}
   (when-not supress-jvm-option-warnings
@@ -726,7 +733,7 @@
     (benchmark-stats data opts)))
 
 #_(defn benchmark-round-robin*
-  [exprs options]
+    [exprs options]
     (let [opts  (merge *default-benchmark-opts* options)
           times (run-benchmarks-round-robin
                  (:num-samples opts)
@@ -734,7 +741,7 @@
                  (:target-execution-time opts)
                  exprs
                  (:gc-before-sample opts))]
-    (map #(benchmark-stats % opts) times)))
+      (map #(benchmark-stats % opts) times)))
 
 (defmacro benchmark
   "Benchmark an expression. This tries its best to eliminate sources of error.
@@ -767,11 +774,11 @@
 
 ;;; Reporting
 
+
 (defn report
   "Print format output"
   [format-string & values]
   (print (apply format format-string values)))
-
 
 (defn scale-time
   "Determine a scale factor and unit for displaying a time."
@@ -783,11 +790,9 @@
     (< measurement 1)    [1e3 "ms"]
     :else                [1 "sec"]))
 
-
 (def one-kb 1024)
 (def one-mb (* 1024 1024))
 (def one-gb (* 1024 1024 1024))
-
 
 (defn scale-memory
   "Determine a scale factor and unit for displaying a memory."
@@ -806,11 +811,11 @@
   (let [mean          (first estimate)
         [factor unit] (scale-fn mean)]
     (apply
-      report "%32s : %s  %2.1f%% CI: (%s, %s)\n"
-      msg
-      (format-value mean factor unit)
-      (* significance 100)
-      (map #(format-value % factor unit) (last estimate)))))
+     report "%32s : %s  %2.1f%% CI: (%s, %s)\n"
+     msg
+     (format-value mean factor unit)
+     (* significance 100)
+     (map #(format-value % factor unit) (last estimate)))))
 
 (defn report-point-estimate
   ([msg estimate scale-fn]
@@ -821,19 +826,19 @@
    (let [mean          (first estimate)
          [factor unit] (scale-fn mean)]
      (report
-       "%32s : %s (%4.1f%%)\n"
-       msg (format-value mean factor unit) (* quantile 100)))))
+      "%32s : %s (%4.1f%%)\n"
+      msg (format-value mean factor unit) (* quantile 100)))))
 
 (defn report-estimate-sqrt
   [msg estimate significance scale-fn]
   (let [mean          (Math/sqrt (first estimate))
         [factor unit] (scale-fn mean)]
     (apply
-      report "%32s : %s  %2.1f%% CI: (%s, %s)\n"
-      msg
-      (format-value mean factor unit)
-      (* significance 100)
-      (map #(format-value (Math/sqrt %) factor unit) (last estimate)))))
+     report "%32s : %s  %2.1f%% CI: (%s, %s)\n"
+     msg
+     (format-value mean factor unit)
+     (* significance 100)
+     (map #(format-value (Math/sqrt %) factor unit) (last estimate)))))
 
 (defn report-point-estimate-sqrt
   [msg estimate scale-fn]
@@ -853,8 +858,8 @@
     (when (some pos? values)
       (let [sum (reduce + values)]
         (report
-          "\nFound %d outliers in %d samples (%2.4f %%)\n"
-          sum sample-count (* 100.0 (/ sum sample-count))))
+         "\nFound %d outliers in %d samples (%2.4f %%)\n"
+         sum sample-count (* 100.0 (/ sum sample-count))))
       (doseq [[v c] (partition 2 (interleave (filter pos? values) types))]
         (report "\t%s\t %d (%2.4f %%)\n" c v (* 100.0 (/ v sample-count))))
       (report " Variance from outliers : %2.4f %%"
@@ -862,31 +867,30 @@
       (report " Variance is %s by outliers\n"
               (-> (:outlier-variance results) outlier-effect labels)))))
 
-
 (defn report-sample-stats [results dimension scale-fn verbose]
   (when verbose
     (report-point-estimate
-      (str dimension " sample mean")
-      (:sample-mean results)
-      scale-fn))
+     (str dimension " sample mean")
+     (:sample-mean results)
+     scale-fn))
   (report-point-estimate (str dimension " mean") (:mean results) scale-fn)
   (when verbose
     (report-point-estimate-sqrt
-      (str dimension " sample std-deviation")
-      (:sample-variance results)
-      scale-fn))
+     (str dimension " sample std-deviation")
+     (:sample-variance results)
+     scale-fn))
   (report-point-estimate-sqrt
-    (str dimension" std-deviation")
-    (:variance results)
-    scale-fn)
+   (str dimension " std-deviation")
+   (:variance results)
+   scale-fn)
   (report-point-estimate
-    (str dimension " lower quantile")
-    (:lower-q results) (:tail-quantile results)
-    scale-fn)
+   (str dimension " lower quantile")
+   (:lower-q results) (:tail-quantile results)
+   scale-fn)
   (report-point-estimate
-    (str dimension " upper quantile")
-    (:upper-q results) (- 1.0 (:tail-quantile results))
-    scale-fn)
+   (str dimension " upper quantile")
+   (:upper-q results) (- 1.0 (:tail-quantile results))
+   scale-fn)
   (when-let [overhead (:overhead results)]
     (when (pos? overhead)
       (report-point-estimate "Overhead used" [overhead] scale-fn)))
@@ -908,8 +912,8 @@
     (when show-os
       (apply println
              (->  (map
-                    #(%1 (:os-details results))
-                    [:arch :name :version :available-processors])
+                   #(%1 (:os-details results))
+                   [:arch :name :version :available-processors])
                   vec (conj "cpu(s)"))))
     (when show-runtime
       (let [runtime-details (:runtime-details results)]
@@ -927,6 +931,7 @@
 
 ;;; All in one invocations
 
+
 (defmacro bench
   "Convenience macro for benchmarking an expression, expr.  Results are reported
   to *out* in human readable format. Options for report format are: :os,
@@ -934,10 +939,10 @@
   [expr & opts]
   (let [[report-options options] (extract-report-options opts)]
     `(report-result
-       (benchmark
-         ~expr
-         ~(when (seq options) (apply hash-map options)))
-       ~@report-options)))
+      (benchmark
+       ~expr
+       ~(when (seq options) (apply hash-map options)))
+      ~@report-options)))
 
 (defmacro quick-bench
   "Convenience macro for benchmarking an expression, expr.  Results are reported
@@ -946,7 +951,7 @@
   [expr & opts]
   (let [[report-options options] (extract-report-options opts)]
     `(report-result
-       (quick-benchmark
-         ~expr
-         ~(when (seq options) (apply hash-map options)))
-       ~@report-options)))
+      (quick-benchmark
+       ~expr
+       ~(when (seq options) (apply hash-map options)))
+      ~@report-options)))

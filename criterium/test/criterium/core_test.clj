@@ -3,7 +3,6 @@
             [criterium
              [core :as core]]))
 
-
 (deftest outliers-test
   (is (= (core/outlier-count 0 0 0 0)
          (core/outliers [1 2 5 7 8])))

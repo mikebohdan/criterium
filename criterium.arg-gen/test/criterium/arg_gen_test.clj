@@ -1,7 +1,7 @@
 (ns criterium.arg-gen-test
   (:require [clojure.test :refer [deftest is testing]]
             [clojure.test.check
-              [generators :as gen]]
+             [generators :as gen]]
             [criterium
              [arg-gen :as arg-gen]
              [measured :as measured]]))
@@ -9,12 +9,13 @@
 
 ;; TODO test that generate vars are type hinted correctly
 
+
 (deftest measured-test
   (testing "arg-gen/measured"
     (let [m (arg-gen/measured
              [v (gen/vector gen/small-integer 1 10)
-               i (gen/choose 0 (dec (count v)))]
-              {:v v :i i})]
+              i (gen/choose 0 (dec (count v)))]
+             {:v v :i i})]
       (testing "creates a measured"
         (is (measured/measured? m))
         (testing "with a state fn that generates a tuple of generated values"

@@ -8,15 +8,13 @@
              [pipeline :as pipeline]
              [util :as util]]))
 
-
 (defn xy-chart [xs ys]
   (c/xy-chart
-    {"Expected rate" [xs ys]
-     }
-    {:x-axis {:title "Number of evals"
-              :logarithmic? false}
-     :y-axis {:title "Elapsed"
-              :logarithmic? false}}))
+   {"Expected rate" [xs ys]}
+   {:x-axis {:title "Number of evals"
+             :logarithmic? false}
+    :y-axis {:title "Elapsed"
+             :logarithmic? false}}))
 
 (defn bin-definition [mn mx n {:keys [delta num-bins]}]
   (let [delta (when delta (double delta))
@@ -64,7 +62,6 @@
          :mn     mn
          :mx     mx}))))
 
-
 (defn histogram [vs options]
   (let [mn     (reduce min vs)
         mx     (reduce max vs)
@@ -76,8 +73,8 @@
         xs     (mapv #(+ mn (* % delta)) is)
         ys     (mapv #(get freqs % 0) is)
         tick-spacing (util/sig-figs
-                       (* delta (quot n-bins 5))
-                       1)]
+                      (* delta (quot n-bins 5))
+                      1)]
     ;; (clojure.pprint/pprint
     ;;   {:mn mn
     ;;    :mx mx
@@ -91,17 +88,15 @@
     ;;    :ys ys
     ;;    :tick-spacing tick-spacing})
     (c/category-chart
-      {(:title options "Histogram")
-       {:x xs
-        :y ys}}
-      {:legend {:position :inside-ne}
-       :x-axis {:title (:value-label options "Value")
-                :label {:rotation 90}
-                :tick-mark-spacing-hint tick-spacing
-                :decimal-pattern "###.##"}
-       :y-axis {:title "Frequency"}})
-    ))
-
+     {(:title options "Histogram")
+      {:x xs
+       :y ys}}
+     {:legend {:position :inside-ne}
+      :x-axis {:title (:value-label options "Value")
+               :label {:rotation 90}
+               :tick-mark-spacing-hint tick-spacing
+               :decimal-pattern "###.##"}
+      :y-axis {:title "Frequency"}})))
 
 (defn view [& charts]
   (apply c/view charts)
@@ -121,11 +116,11 @@
         [scale units] (format/scale :ns mean)
         upper-limit (+ mean (* 2 (Math/sqrt variance)))
         vs (->>
-             samples
-             (mapv pipeline/elapsed-time)
-             (mapv #(/ % (double batch-size)))
-             (filterv #(< % upper-limit))
-             (mapv #(* % scale)))
+            samples
+            (mapv pipeline/elapsed-time)
+            (mapv #(/ % (double batch-size)))
+            (filterv #(< % upper-limit))
+            (mapv #(* % scale)))
         num-outliers (- (count samples) (count vs))
         _ (println {:mean mean
                     :variance variance
@@ -133,10 +128,9 @@
                     :num-outliers num-outliers
                     :n            (count vs)})
         chart (histogram
-                vs
-                (merge
-                  {:value-label (str "Time [" units"]")}
-                  options))
-        ]
+               vs
+               (merge
+                {:value-label (str "Time [" units "]")}
+                options))]
     (println "Ignoring n outliers: " num-outliers)
     chart))
