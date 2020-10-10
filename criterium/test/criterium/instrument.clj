@@ -16,9 +16,22 @@
     `budget/budget*
     `measured/measured
     `measured/invoke
-    `measured/expr]))
+    `measured/expr
+    `pipeline/time-metric
+    `pipeline/with-class-loader-counts
+    `pipeline/with-compilation-time
+    `pipeline/with-memory
+    `pipeline/with-runtime-memory
+    `pipeline/with-finalization-count
+    `pipeline/with-garbage-collector-stats
+    `pipeline/elapsed-time
+    `pipeline/total-memory
+    `pipeline/divide
+    `pipeline/pipeline
+    `pipeline/execute]))
 
 (defn explain-with-expound []
   (set! s/*explain-out* expound/printer))
 
 (explain-with-expound)
+;; (instrument-all)

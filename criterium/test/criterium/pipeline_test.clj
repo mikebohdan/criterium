@@ -1,14 +1,30 @@
 (ns criterium.pipeline-test
   (:require [clojure.set :as set]
+            [clojure.spec.test.alpha]
             [criterium
              [measured :as measured]
              [pipeline :as pipeline]]
             [clojure.test :refer [deftest is testing]]))
 
+(clojure.spec.test.alpha/check
+ [`pipeline/time-metric
+  `pipeline/with-class-loader-counts
+  `pipeline/with-compilation-time
+  `pipeline/with-memory
+  `pipeline/with-runtime-memory
+  `pipeline/with-finalization-count
+  `pipeline/with-garbage-collector-stats
+  `pipeline/elapsed-time
+  `pipeline/total-memory
+  `pipeline/divide
+  `pipeline/pipeline
+  `pipeline/execute])
+
+(def m-value 12345)
 (def m (measured/measured
         (fn [] ::state)
         (fn [state _n]
-          [::time [state state]])
+          [m-value [state state]])
         nil))
 
 (def base-keys #{:state :expr-value :eval-count :elapsed-time-ns})
@@ -22,11 +38,11 @@
       (testing "Has the measured state on the :state key"
         (is (= ::state (:state res))))
       (testing "Has the measured time on the :elapsed-time-ns key"
-        (is (= ::time (:elapsed-time-ns res))))
+        (is (= m-value (:elapsed-time-ns res))))
       (testing "Has the evaluation count on the :eval-count key"
-        (is (= ::time (:elapsed-time-ns res))))
+        (is (= m-value (:elapsed-time-ns res))))
       (testing "Has the measured expression value on the :expr-value key"
-        (is (= ::time (:elapsed-time-ns res)))))))
+        (is (= m-value (:elapsed-time-ns res)))))))
 
 (deftest pipeline-fns-test
   (doseq [[kw f] pipeline/pipeline-fns]
@@ -37,3 +53,14 @@
                  1)
             ks (set (keys res))]
         (is (= base-keys (set/intersection base-keys ks)))))))
+
+(deftest pipeline-test
+  (testing "pipeline"
+    (testing "builds a pipeline"
+      (is (fn? (pipeline/pipeline (keys pipeline/pipeline-fns)))))
+    (testing "throws if passed a non keyword"
+      (is (thrown? clojure.lang.ExceptionInfo
+                   (pipeline/pipeline ['a]))))
+    (testing "throws if passed an unknown terminal function"
+      (is (thrown? clojure.lang.ExceptionInfo
+                   (pipeline/pipeline [] {:terminal-fn-kw :xxx}))))))

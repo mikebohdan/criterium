@@ -7,8 +7,11 @@
 
   A pipeline can be composed via pipeline functions and a pipeline
   terminal function."
-  (:require [clojure.walk :as walk]
+  (:require [clojure.spec.alpha :as s]
+            [clojure.spec.gen.alpha :as sgen]
+            [clojure.walk :as walk]
             [criterium
+             [domain :as domain]
              [jvm :as jvm]
              [measured :as measured]
              [util :as util]]))
@@ -225,3 +228,84 @@
 (defn total-memory
   ^long [sample]
   (-> sample :memory :total :used))
+
+;;; Spec definitions
+
+(s/def ::state any?)
+(s/def ::expr-value any?)
+(s/def ::state any?)
+
+(s/def ::sample (s/keys :req-un [::state ::domain/eval-count]))
+
+(s/def ::pipeline-fn
+  (s/fspec
+   :args (s/cat :sample (s/keys :req-un [::state ::domain/eval-count])
+                :measured ::measured/measured)
+   :ret  (s/keys
+          :req-un [::state ::domain/eval-count
+                   ::domain/elapsed-time-ns
+                   ::expr-value ::domain/eval-count])))
+
+(s/fdef time-metric
+  :args (s/cat :sample (s/keys :req-un [::state ::domain/eval-count])
+               :measured ::measured/measured)
+  :ret  (s/keys
+         :req-un [::state ::domain/eval-count
+                  ::domain/elapsed-time-ns
+                  ::expr-value ::domain/eval-count]))
+
+(s/fdef with-class-loader-counts
+  :args (s/cat :fn ::pipeline-fn)
+  :ret  ::pipeline-fn)
+
+(s/fdef with-compilation-time
+  :args (s/cat :fn ::pipeline-fn)
+  :ret  ::pipeline-fn)
+
+(s/fdef with-memory
+  :args (s/cat :fn ::pipeline-fn)
+  :ret  ::pipeline-fn)
+
+(s/fdef with-runtime-memory
+  :args (s/cat :fn ::pipeline-fn)
+  :ret  ::pipeline-fn)
+
+(s/fdef with-finalization-count
+  :args (s/cat :fn ::pipeline-fn)
+  :ret  ::pipeline-fn)
+
+(s/fdef with-garbage-collector-stats
+  :args (s/cat :fn ::pipeline-fn)
+  :ret  ::pipeline-fn)
+
+(s/def ::terminal-fn-kw keyword?)
+
+(s/fdef elapsed-time
+  :args (s/cat :sample ::sample)
+  :ret ::domain/elapsed-time-ns
+  :fn #(= (:ret %) (-> % :args :sample :elapsed-time-ns)))
+
+(s/def ::total-memory (s/and number? pos?))
+
+(s/fdef total-memory
+  :args (s/cat :sample ::sample)
+  :ret ::total-memory
+  :fn #(= (:ret %) (-> % :args :sample :memory :total :used)))
+
+(s/fdef divide
+  :args (s/cat :sample ::sample :divisor number?)
+  :ret ::sample
+  :fn #(= (-> % :ret :elapsed-time-ns)
+          (/ (-> % :args :sample :elapsed-time-ns)
+             (-> % :args :divisor))))
+
+(s/fdef pipeline
+  :args (s/cat :keywords (s/coll-of keyword?)
+               :options (s/or :empty nil? :map (s/keys :req-un [::terminal-fn-kw])))
+  :ret ::pipeline-fn)
+
+(s/fdef execute
+  :args (s/cat :pipeline ::pipeline-fn
+               :measured ::measured/measured
+               :eval-count ::domain/eval-count)
+  :ret ::sample)

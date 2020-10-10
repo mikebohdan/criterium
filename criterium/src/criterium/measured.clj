@@ -279,9 +279,10 @@
              :args (s/cat :state any? :count ::domain/eval-count)
              :ret ::measured-tuple))
 
-(s/def ::expr-fn (s/fspec
-                  :args (s/cat)
-                  :ret sequential?))
+(s/def ::expr-fn (s/or :empty nil?
+                       :fn (s/fspec
+                            :args (s/cat)
+                            :ret sequential?)))
 
 (s/def ::measured
   (s/with-gen
