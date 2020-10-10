@@ -218,7 +218,6 @@
   ;; (debug "warmup-for-jit measured" measured)
   (let [_ignore-first (time-expr-for-warmup measured 1)
         deltas-1      (time-expr-for-warmup measured 1)
-        _             (println "deltas-1" deltas-1)
         t             (max 1 (pipeline/elapsed-time deltas-1))
         _             (debug "  initial t" t)
         [deltas-n n]  (if (< t 100000)           ; 100us

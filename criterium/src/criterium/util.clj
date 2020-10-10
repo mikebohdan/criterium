@@ -159,13 +159,14 @@
         (unrefer orig-ns refer-syms)
         (unload-ns namespace-sym as-sym))
       (try
-        (if as-sym
-          (require [namespace-sym :as as-sym])
-          (require namespace-sym))
+        (require (cond-> [namespace-sym]
+                   as-sym (into [:as as-sym])
+                   refer-syms (into [:refer refer-syms])))
         (vswap! optional-nses conj namespace-sym)
         (catch Exception _
           (in-ns namespace-sym)
           (intern namespace-sym 'stub true)
+          (prn :refer refer-syms)
           (doseq [ref refer-syms]
             (intern namespace-sym ref))
           (in-ns orig-ns)

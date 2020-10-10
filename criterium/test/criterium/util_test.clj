@@ -17,8 +17,9 @@
       (testing "creates an alias"
         (is (= (the-ns 'non-existing2) (get (ns-aliases *ns*) 'ns2)))))
     (testing "with refers"
-      (util/optional-require '[non-existing3 :refer [abc]])
+      (util/optional-require '[non-existing3 :refer [abc def]])
       (is (ns-resolve 'non-existing3 'stub))
       (testing "creates vars for each referred symbol"
         (is (ns-resolve 'non-existing3 'abc))
-        (is (ns-resolve this-ns 'abc))))))
+        (is (ns-resolve this-ns 'abc))
+        (is (ns-resolve this-ns 'def))))))
