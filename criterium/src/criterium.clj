@@ -15,7 +15,7 @@
   []
   @last-time*)
 
-(defn- options-map
+(defn options-map
   "Convert option arguments into a criterium option map.
   The options map specifies how criterium will execute."
   [option-args]

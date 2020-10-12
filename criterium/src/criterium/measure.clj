@@ -50,7 +50,7 @@
    :max-gc-attempts  3
    :batch-time-ns    DEFAULT-BATCH-TIME-NS
    :pipeline         {:stages []
-                      :terminator :elapsed-timr-ns}
+                      :terminator :elapsed-time-ns}
    :processing       [:stats]})
 
 (s/def ::verbose boolean?)
@@ -73,7 +73,7 @@
 
 (defn- default-processing [{:keys [sample-mode] :as options-map}]
   (if (= :one-shot (:sample-mode options-map))
-    [:sample]
+    [:samples]
     [:stats]))
 
 (defn expand-options
