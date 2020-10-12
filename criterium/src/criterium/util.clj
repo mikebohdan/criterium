@@ -212,3 +212,13 @@
 ;;   (optional-require
 ;;     (constantly nil)
 ;;     [criterium.stats :as stats :refer [well]]))
+
+
+(defn deep-merge
+  "Merge maps recursively."
+  [& ms]
+  (letfn [(merge* [& xs]
+            (if (some #(and (map? %) (not (record? %))) xs)
+              (apply merge-with merge* xs)
+              (last xs)))]
+    (reduce merge* ms)))

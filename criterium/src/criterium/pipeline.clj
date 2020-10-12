@@ -126,6 +126,10 @@
 (def terminal-fns
   {:elapsed-time-ns time-metric})
 
+(defn terminal-fn?
+  [fn-kw]
+  ((set (keys terminal-fns)) fn-kw))
+
 (def pipeline-fns
   {:class-loader       with-class-loader-counts
    :compilation-time   with-compilation-time
@@ -133,6 +137,8 @@
    :runtime-memory     with-runtime-memory
    :finalization-count with-finalization-count
    :garbage-collector  with-garbage-collector-stats})
+
+(s/def ::pipeline-fn-kw (set (keys pipeline-fns)))
 
 (defn pipeline
   "Build a pipeline by specifying pipeline function keywords.
@@ -299,8 +305,10 @@
           (/ (-> % :args :sample :elapsed-time-ns)
              (-> % :args :divisor))))
 
+(s/def ::pipeline-fn-kws (s/coll-of ::pipeline-fn-kw))
+
 (s/fdef pipeline
-  :args (s/cat :keywords (s/coll-of keyword?)
+  :args (s/cat :keywords ::pipeline-fn-kws
                :options (s/or :empty nil? :map (s/keys :req-un [::terminal-fn-kw])))
   :ret ::pipeline-fn)
 

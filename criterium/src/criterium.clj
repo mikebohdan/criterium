@@ -5,18 +5,37 @@
              [measure :as measure]
              [measured :as measured]
              [output :as output]
+             [pipeline :as pipeline]
              [report :as report]]))
 
-(def last-time* (volatile! nil))
+(def ^:no-doc last-time* (volatile! nil))
 
 (defn last-time
   "Return the data from the last time invocation."
   []
   @last-time*)
 
-(defn time*
-  "Evaluates expr and prints the time it took.
-  Return the value of expr.
+(defn- options-map
+  "Convert option arguments into a criterium option map.
+  The options map specifies how criterium will execute."
+  [option-args]
+  (let [options-map  (apply hash-map option-args)
+        pipeline     (:pipeline options-map)
+        terminator   (filterv pipeline/terminal-fn? pipeline)
+        pipeline-fns (remove pipeline/terminal-fn? pipeline)]
+    (when (> (count pipeline) 1)
+      (throw (ex-info
+              "More than one terminal function specified in pipeline"
+              {:terminators terminator})))
+    (measure/expand-options
+     (cond-> options-map
+       true               (dissoc :pipeline :terminator)
+       (seq pipeline-fns) (assoc-in [:pipeline :stages] (vec pipeline-fns))
+       (seq terminator)   (assoc-in [:pipeline :terminator] (first terminator))))))
+
+(defn time-measured
+  "Evaluates measured and prints the time it took.
+  Return the value of calling the measured's wrapped function.
 
   The timing info is available as a data structure by calling last-time.
 
@@ -28,16 +47,17 @@
   keyword selectors. Valid metrics
   are :time, :garbage-collector, :finalization, :memory, :runtime-memory,
   :compilation, and :class-loader."
-  [measured options]
-  (output/with-progress-reporting (:verbose options)
-    (let [result (measure/measure measured options)]
-      (vreset! last-time* result)
-      (if (:stats result)
-        (do (report/print-stats result options)
-            (report/print-jvm-event-stats result options)
-            (report/print-final-gc-warnings result options))
-        (report/print-metrics result))
-      (:expr-value result))))
+  [measured & options]
+  (let [options (options-map options)]
+    (output/with-progress-reporting (:verbose options)
+      (let [result (measure/measure measured options)]
+        (vreset! last-time* result)
+        (if (:stats result)
+          (do (report/print-stats (:stats result) options)
+              (report/print-jvm-event-stats (:stats result) options)
+              (report/print-final-gc-warnings (:stats result) options))
+          (report/print-metrics result))
+        (:expr-value result)))))
 
 (defmacro time
   "Evaluates expr and prints the time it took.
@@ -54,10 +74,4 @@
   are :time, :garbage-collector, :finalization, :memory, :runtime-memory,
   :compilation, and :class-loader."
   [expr & options]
-  (let [options (apply hash-map options)]
-    `(time* (measured/expr ~expr) ~options)))
-
-
-;; (time 1)
-;; (time 1 :sample-mode :full)
-;; (time 1 :sample-mode :one-shot)
+  `(time-measured (measured/expr ~expr) ~@options))

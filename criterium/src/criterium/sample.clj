@@ -1,6 +1,8 @@
 (ns criterium.sample
   "Sampling functions."
-  (:require [criterium
+  (:require [clojure.spec.alpha :as s]
+            [criterium
+             [domain :as domain]
              [measured :as measured]
              [output :as output]
              [pipeline :as pipeline]
@@ -43,6 +45,10 @@
      sample-budget
      batch-size)))
 
+(s/def ::max-gc-attempts nat-int?)
+(s/def ::batch-time-ns ::domain/elapsed-time-ns)
+(s/def ::config (s/keys :req-un [::max-gc-attempts ::batch-time-ns]))
+
 (defn full
   "Sample measured with estimation, warmup and forced GC.
   Return a sampled data map."
@@ -52,8 +58,8 @@
    warmup-budget
    sample-budget
    {:keys [max-gc-attempts batch-time-ns]
-    :as   _config}]
-  {:pre [pipeline (measured/measured? measured)]}
+    :as   config}]
+  {:pre [pipeline (measured/measured? measured) (s/valid? ::config config)]}
   ;; Start by running GC until it has nothing to do.
   (toolkit/throw-away-sample measured)
   (toolkit/force-gc max-gc-attempts)

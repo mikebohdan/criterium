@@ -1,13 +1,16 @@
 (ns criterium.measure
   "Opinionated measure function."
-  (:require [criterium
+  (:require [clojure.spec.alpha :as s]
+            [criterium
              [budget :as budget]
+             [domain :as domain]
              [format :as format]
              [output :as output]
              [pipeline :as pipeline]
              [sample :as sample]
              [sampled-stats :as sampled-stats]
-             [toolkit :as toolkit]])
+             [toolkit :as toolkit]
+             [util :as util]])
   (:import [criterium.budget Budget]))
 
 (def ^Long DEFAULT-TIME-BUDGET-NS
@@ -20,7 +23,7 @@
 ;;   1000000)
 
 (def ^Long DEFAULT-BATCH-TIME-NS
-  (* 10 toolkit/MICROSEC-NS))
+  (* 100 toolkit/MICROSEC-NS))
 
 (def ^Double DEFAULT-ESTIMATION-FRACTION 0.1)
 (def ^Double DEFAULT-WARMUP-FRACTION 0.8)
@@ -37,6 +40,53 @@
        #_(if limit-time-s
            Long/MAX_VALUE
            (* factor DEFAULT-EVAL-COUNT-BUDGET)))))
+
+(def default-options
+  "Default options for criterium.measure."
+  {:verbose          false
+   :sample-mode      :full
+   :limit-time-s     nil
+   :limit-eval-count nil
+   :max-gc-attempts  3
+   :batch-time-ns    DEFAULT-BATCH-TIME-NS
+   :pipeline         {:stages []
+                      :terminator :elapsed-timr-ns}
+   :processing       [:stats]})
+
+(s/def ::verbose boolean?)
+(s/def ::sample-mode #{:full :one-shot})
+(s/def ::limit-time-s (s/or :empty? nil? :limit (s/and number? pos?)))
+(s/def ::limit-eval-count (s/or :empty? nil? :limit ::domain/eval-count))
+(s/def ::stages ::pipeline/pipeline-fn-kws)
+(s/def ::terminator ::pipeline/terminal-fn-kw)
+(s/def ::pipeline (s/keys ::req-un [::stages ::terminator]))
+(s/def ::processing (s/coll-of keyword?))
+(s/def ::options (s/keys :req-un [::verbose
+                                  ::sample-mode
+                                  ::limit-time-s
+                                  ::limit-eval-count
+                                  ::sample/max-gc-attempts
+                                  ::sample/batch-time-ns
+                                  ::pipeline
+                                  ::processing
+                                  ]))
+
+(defn- default-processing [{:keys [sample-mode] :as options-map}]
+  (if (= :one-shot (:sample-mode options-map))
+    [:sample]
+    [:stats]))
+
+(defn expand-options
+  "Convert option arguments into a criterium option map.
+  The options map specifies how criterium will execute."
+  [options-map]
+  (util/deep-merge
+   (merge
+    default-options
+    (cond-> {}
+      (not (:processing options-map))
+      (assoc :processing (default-processing options-map))))
+   options-map))
 
 (defn- pipeline-spec
   "Return a pipeline spec for the given user specified options.
@@ -66,13 +116,13 @@
 
 (defmulti sample-data
   #_{:clj-kondo/ignore [:unused-binding]}
-  (fn [sample-mode pipeline-spec measured total-budget config options]
+  (fn [sample-mode pipeline-spec measured total-budget options]
     sample-mode))
 
 (defmethod sample-data :one-shot
-  [_ pipeline-spec measured _total-budget config _options]
+  [_ pipeline-spec measured _total-budget options]
   (let [pipeline (pipeline-from-spec pipeline-spec [])]
-    (sample/one-shot pipeline measured config)))
+    (sample/one-shot pipeline measured options)))
 
 ;; (defmethod sample-data :quick
 ;;   [_ pipeline measured total-budget config
@@ -95,11 +145,11 @@
 ;;     (sample/quick pipeline measured estimation-budget sample-budget config)))
 
 (defmethod sample-data :full
-  [_ pipeline-spec measured total-budget config
+  [_ pipeline-spec measured total-budget
    {:keys [estimation-fraction estimation-period-ns
            warmup-fraction warmup-period-ns
            sample-fraction _sample-period-ns]
-    :as   _options}]
+    :as   options}]
   (let [pipeline        (pipeline-from-spec
                          pipeline-spec
                          [:compilation-time
@@ -141,7 +191,7 @@
      estimation-budget
      warmup-budget
      sample-budget
-     config)))
+     options)))
 
 (defmulti process-samples
   #_{:clj-kondo/ignore [:unused-binding]}
@@ -151,7 +201,7 @@
 (defmethod process-samples :samples
   ;; mode to just return the samples
   [_process-mode sampled _metrics _options]
-  sampled)
+  (assoc sampled :samples (:samples sampled)))
 
 (defmethod process-samples :stats
   ;; mode to just return the samples
@@ -166,9 +216,12 @@
               res
               :jvm-event-stats
               (sampled-stats/jvm-event-stats (:samples sampled)))]
-    (if (or (:histogram options) (:include-samples options))
-      (assoc res :samples (:samples sampled))
-      res)))
+    (assoc sampled :stats res)
+    ;; (if (or (:histogram options) (:include-samples options))
+
+    ;;   (assoc res :samples (:samples sampled))
+    ;;   res)
+    ))
 
 (defn measure
   [measured
@@ -177,21 +230,13 @@
            max-gc-attempts
            batch-time-ns
            process-mode]
-    :as   options}]
-  (let [sample-mode     (or sample-mode
-                            :full
-                            ;; (if (or limit-time-s limit-eval-count)
-                            ;;   :full
-                            ;;   :quick)
-                            )
-        process-mode    (or process-mode
-                            (if (= :one-shot sample-mode)
-                              :samples
-                              :stats))
-        _ (output/progress "Modes:  " sample-mode " process" process-mode)
-        config          {:max-gc-attempts (or max-gc-attempts 3)
-                         :batch-time-ns   (or batch-time-ns
-                                              (* 10 DEFAULT-BATCH-TIME-NS))}
+    :as  options}]
+  ;; {:pre [(s/valid? ::options options)]}
+  (output/progress "options:   " options)
+  (assert (s/valid? ::options options))
+  (output/progress "sample-mode:   " sample-mode)
+  (output/progress "process-mode:  " process-mode)
+  (let [config          (select-keys options [:max-gc-attempts :batch-time-ns])
         factor          1 ;; (if (= sample-mode :quick) 1 100)
         total-budget    (budget-for-limits limit-time-s limit-eval-count factor)
         _ (output/progress
@@ -206,6 +251,8 @@
                          pipeline-spec
                          measured
                          total-budget
-                         config
                          options)]
-    (process-samples process-mode sampled metrics options)))
+    (reduce
+     #(process-samples %2 %1 metrics options)
+     sampled
+     (:processing options))))

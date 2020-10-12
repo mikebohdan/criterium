@@ -275,9 +275,9 @@
 
 (s/def ::measured-tuple (s/tuple ::domain/elapsed-time-ns any?))
 
-(s/def ::fn (s/fspec
-             :args (s/cat :state any? :count ::domain/eval-count)
-             :ret ::measured-tuple))
+(s/def ::measure-fn (s/fspec
+                     :args (s/cat :state any? :count ::domain/eval-count)
+                     :ret ::measured-tuple))
 
 (s/def ::expr-fn (s/or :empty nil?
                        :fn (s/fspec
@@ -294,12 +294,12 @@
       (fn [[s t u]] (measured s t u))
       (sgen/tuple
        (s/gen ::state-fn)
-       (s/gen ::fn)
+       (s/gen ::measured-fn)
        (s/gen ::expr-fn)))))
 
 (s/fdef measured
   :args (s/cat :state-fn ::state-fn
-               :fn ::fn
+               :measured-fn ::measured-fn
                :expr-fn (s/? ::expr-fn))
   :ret ::measured)
 
