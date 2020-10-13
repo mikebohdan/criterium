@@ -29,49 +29,85 @@
 (def ^Double DEFAULT-WARMUP-FRACTION 0.8)
 
 (defn budget-for-limits
-  ^Budget [limit-time-s limit-eval-count factor]
+  ^Budget [limit-time-s limit-eval-count]
   (budget/budget
    (or (and limit-time-s (* limit-time-s toolkit/SEC-NS))
        (if limit-eval-count
          Long/MAX_VALUE
-         (* factor DEFAULT-TIME-BUDGET-NS)))
+         DEFAULT-TIME-BUDGET-NS))
    (or limit-eval-count
-       Long/MAX_VALUE
-       #_(if limit-time-s
-           Long/MAX_VALUE
-           (* factor DEFAULT-EVAL-COUNT-BUDGET)))))
+       Long/MAX_VALUE)))
+
+
+(defn full-sample-options
+  [{:keys [limit-time-s limit-eval-count
+           estimation-fraction estimation-period-ns
+           warmup-fraction warmup-period-ns
+           sample-fraction _sample-period-ns
+           max-gc-attempts batch-time-ns]
+    :as   _options}]
+  (let [total-budget      (budget-for-limits limit-time-s limit-eval-count)
+        estimation-frac   (or estimation-fraction
+                              DEFAULT-ESTIMATION-FRACTION)
+        warmup-frac       (or warmup-fraction
+                              DEFAULT-WARMUP-FRACTION)
+        estimation-budget (budget/phase-budget
+                           total-budget
+                           estimation-period-ns
+                           estimation-fraction
+                           estimation-frac)
+        warmup-budget     (budget/phase-budget
+                           total-budget
+                           warmup-period-ns
+                           warmup-fraction
+                           warmup-frac)
+        max-gc-attempts   (or max-gc-attempts 3)
+        batch-time-ns     (or batch-time-ns DEFAULT-BATCH-TIME-NS)]
+
+    {:sample-mode       :full
+     :estimation-budget estimation-budget
+     :warmup-budget     warmup-budget
+     :sample-budget     (budget/subtract
+                         total-budget
+                         estimation-budget
+                         warmup-budget)
+     :max-gc-attempts   max-gc-attempts
+     :batch-time-ns     batch-time-ns}))
 
 (def default-options
   "Default options for criterium.measure."
-  {:verbose          false
-   :sample-mode      :full
-   :limit-time-s     nil
-   :limit-eval-count nil
-   :max-gc-attempts  3
-   :batch-time-ns    DEFAULT-BATCH-TIME-NS
-   :pipeline         {:stages []
-                      :terminator :elapsed-time-ns}
-   :processing       [:stats]})
+  {:verbose       false
+   :pipeline      {:stages     []
+                   :terminator :elapsed-time-ns}
+   :sample-scheme (full-sample-options {})
+   :analysis      [:stats]})
+
+
+(s/def ::sample-mode #{::one-shot ::full})
+(s/def ::one-shot (s/keys))
+(s/def ::full-options
+  (s/keys                   ; TODO tighten this spec
+   :req-un
+   [::sample-mode ::estimation-budget ::warmup-budget ::sample-budget]))
+(s/def ::one-shot-options (s/keys :req-un [::sample-mode])) ; TODO tighten this spec
+(s/def ::sample-scheme (s/or :full-options :one-shot-options))
 
 (s/def ::verbose boolean?)
-(s/def ::sample-mode #{:full :one-shot})
-(s/def ::limit-time-s (s/or :empty? nil? :limit (s/and number? pos?)))
-(s/def ::limit-eval-count (s/or :empty? nil? :limit ::domain/eval-count))
+(s/def ::total-budget ::budget/budget)
 (s/def ::stages ::pipeline/pipeline-fn-kws)
 (s/def ::terminator ::pipeline/terminal-fn-kw)
 (s/def ::pipeline (s/keys ::req-un [::stages ::terminator]))
-(s/def ::processing (s/coll-of keyword?))
+(s/def ::analysis (s/coll-of keyword?))
 (s/def ::options (s/keys :req-un [::verbose
                                   ::sample-mode
-                                  ::limit-time-s
-                                  ::limit-eval-count
+                                  ::total-budget
                                   ::sample/max-gc-attempts
                                   ::sample/batch-time-ns
                                   ::pipeline
-                                  ::processing
+                                  ::analysis
                                   ]))
 
-(defn- default-processing [{:keys [sample-mode] :as options-map}]
+(defn- default-analysis [{:keys [sample-mode] :as options-map}]
   (if (= :one-shot (:sample-mode options-map))
     [:samples]
     [:stats]))
@@ -84,8 +120,8 @@
    (merge
     default-options
     (cond-> {}
-      (not (:processing options-map))
-      (assoc :processing (default-processing options-map))))
+      (not (:analysis options-map))
+      (assoc :analysis (default-analysis options-map))))
    options-map))
 
 (defn- pipeline-spec
@@ -104,24 +140,24 @@
 (defn pipeline-metrics
   "Return a sequence of all metrics produced by a pipeline with the
   given spec."
-  [{:keys [pipeline-fn-kws terminal-fn-kw] :as _spec}]
-  (conj pipeline-fn-kws terminal-fn-kw))
+  [{:keys [pipeline] :as _options}]
+  (conj (:stages pipeline) (:terminator pipeline)))
 
-(defn- pipeline-from-spec
-  [{:keys [pipeline-fn-kws terminal-fn-kw] :as _spec}
-   extra-pipeline-fn-kws]
+(defn- pipeline-from-options
+  [{:keys [pipeline] :as _spec} extra-pipeline-fn-kws]
   (pipeline/pipeline
-   (into pipeline-fn-kws extra-pipeline-fn-kws)
-   {:terminal-fn-kw terminal-fn-kw}))
+   (into (:stages pipeline) extra-pipeline-fn-kws)
+   (:terminator pipeline)))
 
 (defmulti sample-data
   #_{:clj-kondo/ignore [:unused-binding]}
-  (fn [sample-mode pipeline-spec measured total-budget options]
-    sample-mode))
+  (fn [sample-scheme measured options]
+    (:sample-mode sample-mode)))
 
 (defmethod sample-data :one-shot
-  [_ pipeline-spec measured _total-budget options]
-  (let [pipeline (pipeline-from-spec pipeline-spec [])]
+  [_ measured options]
+  (let [pipeline (pipeline-from-options options [])]
+    ;; TODo consider warming up criterium code
     (sample/one-shot pipeline measured options)))
 
 ;; (defmethod sample-data :quick
@@ -145,40 +181,14 @@
 ;;     (sample/quick pipeline measured estimation-budget sample-budget config)))
 
 (defmethod sample-data :full
-  [_ pipeline-spec measured total-budget
-   {:keys [estimation-fraction estimation-period-ns
-           warmup-fraction warmup-period-ns
-           sample-fraction _sample-period-ns]
-    :as   options}]
-  (let [pipeline        (pipeline-from-spec
-                         pipeline-spec
+  [{:keys [estimation-budget warmup-budget sample-budget]}
+   measured
+   options]
+  (let [pipeline (pipeline-from-options
+                         options
                          [:compilation-time
                           :garbage-collector])
-        estimation-frac (or estimation-fraction
-                            DEFAULT-ESTIMATION-FRACTION)
-        warmup-frac     (or warmup-fraction
-                            DEFAULT-WARMUP-FRACTION)
-        _sample-frac    (or sample-fraction
-                            (- 1.0
-                               estimation-frac
-                               warmup-frac))
-
-        estimation-budget (budget/phase-budget
-                           total-budget
-                           estimation-period-ns
-                           estimation-fraction
-                           estimation-frac)
-        warmup-budget     (budget/phase-budget
-                           total-budget
-                           warmup-period-ns
-                           warmup-fraction
-                           warmup-frac)
-        sample-budget     (budget/subtract
-                           total-budget
-                           estimation-budget
-                           warmup-budget)]
-    (output/progress
-     "total-budget" total-budget)
+        ]
     (output/progress
      "estimation-budget" estimation-budget)
     (output/progress
@@ -223,36 +233,32 @@
     ;;   res)
     ))
 
-(defn measure
-  [measured
-   {:keys [sample-mode
-           limit-time-s limit-eval-count
-           max-gc-attempts
-           batch-time-ns
-           process-mode]
-    :as  options}]
-  ;; {:pre [(s/valid? ::options options)]}
-  (output/progress "options:   " options)
-  (assert (s/valid? ::options options))
-  (output/progress "sample-mode:   " sample-mode)
-  (output/progress "process-mode:  " process-mode)
-  (let [config          (select-keys options [:max-gc-attempts :batch-time-ns])
-        factor          1 ;; (if (= sample-mode :quick) 1 100)
-        total-budget    (budget-for-limits limit-time-s limit-eval-count factor)
-        _ (output/progress
-           "Limits:  time"
-           (format/format-value :time-ns (.elapsed-time-ns total-budget))
-           " evaluations"
-           (format/format-value :count (.eval-count total-budget)))
-        pipeline-spec   (pipeline-spec options)
-        metrics         (pipeline-metrics pipeline-spec)
-        sampled         (sample-data
-                         sample-mode
-                         pipeline-spec
-                         measured
-                         total-budget
-                         options)]
+
+(defn analyze
+  [sampled {:keys [analysis] :as options}]
+  ;; TODO - this needs to see the extra stages injected into the pipeline
+  (let [metrics (pipeline-metrics options)]
     (reduce
      #(process-samples %2 %1 metrics options)
      sampled
-     (:processing options))))
+     (:analysis options))))
+
+
+(defn measure
+  [measured
+   {:keys [sample-scheme process-mode] :as  options}]
+  ;; {:pre [(s/valid? ::options options)]}
+  (output/progress "options:   " options)
+  (assert (s/valid? ::options options))
+  (output/progress "sample-scheme:   " sample-scheme)
+  (output/progress "process-mode:  " process-mode)
+  (output/progress
+           "Limits:  time"
+           (format/format-value :time-ns (.elapsed-time-ns (:total-budget options)))
+           " evaluations"
+           (format/format-value :count (.eval-count (:total-budget options))))
+  (let [sampled         (sample-data
+                         sample-scheme
+                         measured
+                         options)]
+    (analyze sampled options)))

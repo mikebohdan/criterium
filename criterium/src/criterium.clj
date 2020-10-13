@@ -1,7 +1,9 @@
 (ns criterium
   "Criterium top level"
   (:refer-clojure :exclude [time])
-  (:require [criterium
+  (:require [clojure.spec.alpha :as s]
+            [criterium
+             [domain :as domain]
              [measure :as measure]
              [measured :as measured]
              [output :as output]
@@ -15,23 +17,38 @@
   []
   @last-time*)
 
+
+(s/def ::limit-eval-count (s/or :empty? nil? :limit ::domain/eval-count))
+(s/def ::limit-time-s (s/or :empty? nil? :limit (s/and number? pos?)))
+(s/def ::pipeline (s/coll-of
+                   (s/or ::pipeline/pipeline-fn-kw
+                         ::pipeline/terminal-fn-kw)))
+(s/def ::options (s/keys :opt-un [::limit-eval-count ::limit-time-s ::pipeline]))
+
 (defn options-map
   "Convert option arguments into a criterium option map.
   The options map specifies how criterium will execute."
   [option-args]
-  (let [options-map  (apply hash-map option-args)
-        pipeline     (:pipeline options-map)
-        terminator   (filterv pipeline/terminal-fn? pipeline)
-        pipeline-fns (remove pipeline/terminal-fn? pipeline)]
-    (when (> (count pipeline) 1)
-      (throw (ex-info
-              "More than one terminal function specified in pipeline"
-              {:terminators terminator})))
-    (measure/expand-options
-     (cond-> options-map
-       true               (dissoc :pipeline :terminator)
-       (seq pipeline-fns) (assoc-in [:pipeline :stages] (vec pipeline-fns))
-       (seq terminator)   (assoc-in [:pipeline :terminator] (first terminator))))))
+  (if (and (= 1 (count option-args)) (map? (first option-args)))
+    option-args
+    (let [options-map  (apply hash-map option-args)
+          _            (assert (s/valid? ::options options-map))
+          pipeline     (:pipeline options-map)
+          terminator   (filterv pipeline/terminal-fn? pipeline)
+          pipeline-fns (remove pipeline/terminal-fn? pipeline)
+          total-budget (measure/budget-for-limits
+                        (:limit-time-s options-map)
+                        (:limit-eval-count options-map))]
+      (when (> (count pipeline) 1)
+        (throw (ex-info
+                "More than one terminal function specified in pipeline"
+                {:terminators terminator})))
+      (measure/expand-options
+       (cond-> options-map
+         true               (dissoc :pipeline :terminator :limit-eval-count :limit-time-s)
+         true               (assoc :total-budget total-budget)
+         (seq pipeline-fns) (assoc-in [:pipeline :stages] (vec pipeline-fns))
+         (seq terminator)   (assoc-in [:pipeline :terminator] (first terminator)))))))
 
 (defn time-measured
   "Evaluates measured and prints the time it took.
@@ -51,6 +68,7 @@
   (let [options (options-map options)]
     (output/with-progress-reporting (:verbose options)
       (let [result (measure/measure measured options)]
+        (prn :result result :expr-value (:expr-value result))
         (vreset! last-time* result)
         (if (:stats result)
           (do (report/print-stats (:stats result) options)
