@@ -57,8 +57,8 @@
    estimation-budget
    warmup-budget
    sample-budget
-   {:keys [max-gc-attempts batch-time-ns]
-    :as   config}]
+   {{:keys [max-gc-attempts batch-time-ns]
+     :as   config} :sample-scheme}]
   {:pre [pipeline (measured/measured? measured) (s/valid? ::config config)]}
   ;; Start by running GC until it has nothing to do.
   (toolkit/throw-away-sample measured)

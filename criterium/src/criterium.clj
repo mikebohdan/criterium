@@ -36,17 +36,17 @@
           pipeline     (:pipeline options-map)
           terminator   (filterv pipeline/terminal-fn? pipeline)
           pipeline-fns (remove pipeline/terminal-fn? pipeline)
-          total-budget (measure/budget-for-limits
-                        (:limit-time-s options-map)
-                        (:limit-eval-count options-map))]
+          sample-mode   (:sample-mode options-map :full)]
       (when (> (count pipeline) 1)
         (throw (ex-info
                 "More than one terminal function specified in pipeline"
                 {:terminators terminator})))
       (measure/expand-options
-       (cond-> options-map
-         true               (dissoc :pipeline :terminator :limit-eval-count :limit-time-s)
-         true               (assoc :total-budget total-budget)
+       (cond-> (select-keys options-map [:verbose])
+         (= sample-mode :full) (assoc :sample-scheme
+                                      (measure/full-sample-options options-map))
+         (= sample-mode :one-shot) (assoc :sample-scheme
+                                      {:sample-mode sample-mode})
          (seq pipeline-fns) (assoc-in [:pipeline :stages] (vec pipeline-fns))
          (seq terminator)   (assoc-in [:pipeline :terminator] (first terminator)))))))
 
@@ -68,7 +68,6 @@
   (let [options (options-map options)]
     (output/with-progress-reporting (:verbose options)
       (let [result (measure/measure measured options)]
-        (prn :result result :expr-value (:expr-value result))
         (vreset! last-time* result)
         (if (:stats result)
           (do (report/print-stats (:stats result) options)

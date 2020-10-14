@@ -83,14 +83,20 @@
    :analysis      [:stats]})
 
 
-(s/def ::sample-mode #{::one-shot ::full})
+(s/def ::sample-mode #{:one-shot :full})
 (s/def ::one-shot (s/keys))
 (s/def ::full-options
   (s/keys                   ; TODO tighten this spec
    :req-un
-   [::sample-mode ::estimation-budget ::warmup-budget ::sample-budget]))
+   [::sample-mode
+    ::estimation-budget
+    ::warmup-budget
+    ::sample-budget
+    ::sample/max-gc-attempts
+    ::sample/batch-time-ns
+    ]))
 (s/def ::one-shot-options (s/keys :req-un [::sample-mode])) ; TODO tighten this spec
-(s/def ::sample-scheme (s/or :full-options :one-shot-options))
+(s/def ::sample-scheme (s/or :full-options ::one-shot-options))
 
 (s/def ::verbose boolean?)
 (s/def ::total-budget ::budget/budget)
@@ -99,16 +105,13 @@
 (s/def ::pipeline (s/keys ::req-un [::stages ::terminator]))
 (s/def ::analysis (s/coll-of keyword?))
 (s/def ::options (s/keys :req-un [::verbose
-                                  ::sample-mode
-                                  ::total-budget
-                                  ::sample/max-gc-attempts
-                                  ::sample/batch-time-ns
                                   ::pipeline
                                   ::analysis
+                                  ::sample-scheme
                                   ]))
 
-(defn- default-analysis [{:keys [sample-mode] :as options-map}]
-  (if (= :one-shot (:sample-mode options-map))
+(defn- default-analysis [{:keys [sample-scheme] :as options-map}]
+  (if (= :one-shot (:sample-mode sample-scheme))
     [:samples]
     [:stats]))
 
@@ -152,7 +155,7 @@
 (defmulti sample-data
   #_{:clj-kondo/ignore [:unused-binding]}
   (fn [sample-scheme measured options]
-    (:sample-mode sample-mode)))
+    (:sample-mode sample-scheme)))
 
 (defmethod sample-data :one-shot
   [_ measured options]
@@ -246,17 +249,12 @@
 
 (defn measure
   [measured
-   {:keys [sample-scheme process-mode] :as  options}]
+   {:keys [sample-scheme analysis] :as  options}]
   ;; {:pre [(s/valid? ::options options)]}
   (output/progress "options:   " options)
   (assert (s/valid? ::options options))
   (output/progress "sample-scheme:   " sample-scheme)
-  (output/progress "process-mode:  " process-mode)
-  (output/progress
-           "Limits:  time"
-           (format/format-value :time-ns (.elapsed-time-ns (:total-budget options)))
-           " evaluations"
-           (format/format-value :count (.eval-count (:total-budget options))))
+  (output/progress "analysis:  " analysis)
   (let [sampled         (sample-data
                          sample-scheme
                          measured
