@@ -6,7 +6,7 @@
                         [:memory :heap :used]]
    :class-loader       [[:class-loader :loaded-count]
                         [:class-loader :unloaded-count]]
-   :compilation-time   [[:compilation-time :compilation-time]]
+   :compilation-time   [[:compilation :compilation-time]]
    :runtime-memory     [[:runtime-memory :max]
                         [:runtime-memory :free]
                         [:runtime-memory :total]]
@@ -22,7 +22,8 @@
                                           :label     "Total Heap Memory"}
    [:class-loader :loaded-count]         {:dimension :count :label "Classes Loaded"}
    [:class-loader :unloaded-count]       {:dimension :count :label "Classes Unloaded"}
-   [:compilation-time :compilation-time] {:dimension :time-ns :label "Compilation Time"}
+   [:compilation :compilation-time]      {:dimension :time-ns
+                                          :label "JIT Compilation Time"}
    [:runtime-memory :max]                {:dimension :memory
                                           :label     "Max Memory (runtime)"}
    [:runtime-memory :free]               {:dimension :memory

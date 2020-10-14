@@ -32,6 +32,7 @@
   library that applies many of the same statistical techniques."
   (:require [clojure.set :as set]
             [criterium
+             [analyze :as analyze]
              [budget :as budget]
              [jvm :as jvm]
              [measured :as measured]

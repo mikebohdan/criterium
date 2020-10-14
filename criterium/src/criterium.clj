@@ -3,6 +3,7 @@
   (:refer-clojure :exclude [time])
   (:require [clojure.spec.alpha :as s]
             [criterium
+             [analyze :as analyze]
              [domain :as domain]
              [measure :as measure]
              [measured :as measured]
@@ -37,6 +38,12 @@
           terminator   (filterv pipeline/terminal-fn? pipeline)
           pipeline-fns (remove pipeline/terminal-fn? pipeline)
           sample-mode   (:sample-mode options-map :full)]
+
+
+      ;; (if (or (:histogram options) (:include-samples options))
+      ;;   (assoc res :samples (:samples sampled))
+      ;;   res)
+
       (when (> (count pipeline) 1)
         (throw (ex-info
                 "More than one terminal function specified in pipeline"
@@ -46,7 +53,7 @@
          (= sample-mode :full) (assoc :sample-scheme
                                       (measure/full-sample-options options-map))
          (= sample-mode :one-shot) (assoc :sample-scheme
-                                      {:sample-mode sample-mode})
+                                          (measure/one-shot-sample-options options-map))
          (seq pipeline-fns) (assoc-in [:pipeline :stages] (vec pipeline-fns))
          (seq terminator)   (assoc-in [:pipeline :terminator] (first terminator)))))))
 
@@ -67,7 +74,8 @@
   [measured & options]
   (let [options (options-map options)]
     (output/with-progress-reporting (:verbose options)
-      (let [result (measure/measure measured options)]
+      (let [sampled (measure/measure measured options)
+            result (analyze/analyze sampled options)]
         (vreset! last-time* result)
         (if (:stats result)
           (do (report/print-stats (:stats result) options)

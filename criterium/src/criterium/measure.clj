@@ -8,7 +8,6 @@
              [output :as output]
              [pipeline :as pipeline]
              [sample :as sample]
-             [sampled-stats :as sampled-stats]
              [toolkit :as toolkit]
              [util :as util]])
   (:import [criterium.budget Budget]))
@@ -74,6 +73,12 @@
      :max-gc-attempts   max-gc-attempts
      :batch-time-ns     batch-time-ns}))
 
+(defn one-shot-sample-options
+  [{:keys [max-gc-attempts]
+    :as   _options}]
+  {:sample-mode     :one-shot
+   :max-gc-attempts (or max-gc-attempts 3)})
+
 (def default-options
   "Default options for criterium.measure."
   {:verbose       false
@@ -84,9 +89,8 @@
 
 
 (s/def ::sample-mode #{:one-shot :full})
-(s/def ::one-shot (s/keys))
 (s/def ::full-options
-  (s/keys                   ; TODO tighten this spec
+  (s/keys
    :req-un
    [::sample-mode
     ::estimation-budget
@@ -95,7 +99,8 @@
     ::sample/max-gc-attempts
     ::sample/batch-time-ns
     ]))
-(s/def ::one-shot-options (s/keys :req-un [::sample-mode])) ; TODO tighten this spec
+(s/def ::one-shot-options  (s/keys :req-un [::sample-mode ::sample/max-gc-attempts]))
+
 (s/def ::sample-scheme (s/or :full-options ::one-shot-options))
 
 (s/def ::verbose boolean?)
@@ -115,41 +120,62 @@
     [:samples]
     [:stats]))
 
+
+(defmulti sample-mode-stages
+  (fn [sample-mode] sample-mode))
+
+(defmethod sample-mode-stages :one-shot
+  [_sample-mode]
+  [])
+
+(defmethod sample-mode-stages :full
+  [_sample-mode]
+  [:compilation-time
+   :garbage-collector])
+
+(defn ensure-pipeline-stages
+  "Add any injected stages that aren't already present."
+  [{:keys [pipeline sample-scheme] :as options}]
+  (let [stages (set (:stages pipeline))
+        injected (sample-mode-stages (:sample-mode sample-scheme))]
+    (update-in
+     options
+     [:pipeline :stages]
+     (fnil into [])
+     (remove stages injected))))
+
+
 (defn expand-options
   "Convert option arguments into a criterium option map.
   The options map specifies how criterium will execute."
   [options-map]
-  (util/deep-merge
-   (merge
-    default-options
-    (cond-> {}
-      (not (:analysis options-map))
-      (assoc :analysis (default-analysis options-map))))
-   options-map))
+  (-> (util/deep-merge
+      (merge
+       default-options
+       (cond-> {}
+         (not (:analysis options-map))
+         (assoc :analysis (default-analysis options-map))))
+      options-map)
+      ensure-pipeline-stages))
 
-(defn- pipeline-spec
-  "Return a pipeline spec for the given user specified options.
-  Recognizes :pipeline-fn-kws and terminal-fn-kw options.
-  Specifying :all for :pipeline-fn-kws uses all known pipeline functions."
-  [options]
-  (let [pipeline-fn-kws (let [pipeline-opt (:pipeline-fn-kws options [])]
-                          (if (= :all pipeline-opt)
-                            (keys pipeline/pipeline-fns)
-                            pipeline-opt))
-        terminal-fn-kw  (get options :terminal-fn-kw :elapsed-time-ns)]
-    {:pipeline-fn-kws pipeline-fn-kws
-     :terminal-fn-kw  terminal-fn-kw}))
+;; (defn- pipeline-spec
+;;   "Return a pipeline spec for the given user specified options.
+;;   Recognizes :pipeline-fn-kws and terminal-fn-kw options.
+;;   Specifying :all for :pipeline-fn-kws uses all known pipeline functions."
+;;   [options]
+;;   (let [pipeline-fn-kws (let [pipeline-opt (:pipeline-fn-kws options [])]
+;;                           (if (= :all pipeline-opt)
+;;                             (keys pipeline/pipeline-fns)
+;;                             pipeline-opt))
+;;         terminal-fn-kw  (get options :terminal-fn-kw :elapsed-time-ns)]
+;;     {:pipeline-fn-kws pipeline-fn-kws
+;;      :terminal-fn-kw  terminal-fn-kw}))
 
-(defn pipeline-metrics
-  "Return a sequence of all metrics produced by a pipeline with the
-  given spec."
-  [{:keys [pipeline] :as _options}]
-  (conj (:stages pipeline) (:terminator pipeline)))
 
 (defn- pipeline-from-options
-  [{:keys [pipeline] :as _spec} extra-pipeline-fn-kws]
+  [{:keys [pipeline] :as _spec}]
   (pipeline/pipeline
-   (into (:stages pipeline) extra-pipeline-fn-kws)
+   (:stages pipeline)
    (:terminator pipeline)))
 
 (defmulti sample-data
@@ -159,7 +185,7 @@
 
 (defmethod sample-data :one-shot
   [_ measured options]
-  (let [pipeline (pipeline-from-options options [])]
+  (let [pipeline (pipeline-from-options options)]
     ;; TODo consider warming up criterium code
     (sample/one-shot pipeline measured options)))
 
@@ -187,11 +213,7 @@
   [{:keys [estimation-budget warmup-budget sample-budget]}
    measured
    options]
-  (let [pipeline (pipeline-from-options
-                         options
-                         [:compilation-time
-                          :garbage-collector])
-        ]
+  (let [pipeline (pipeline-from-options options)]
     (output/progress
      "estimation-budget" estimation-budget)
     (output/progress
@@ -206,57 +228,17 @@
      sample-budget
      options)))
 
-(defmulti process-samples
-  #_{:clj-kondo/ignore [:unused-binding]}
-  (fn [process-mode sampled metrics options]
-    process-mode))
-
-(defmethod process-samples :samples
-  ;; mode to just return the samples
-  [_process-mode sampled _metrics _options]
-  (assoc sampled :samples (:samples sampled)))
-
-(defmethod process-samples :stats
-  ;; mode to just return the samples
-  [_process-mode sampled metrics options]
-  (output/progress "Num samples" (count (:samples sampled)))
-  (let [res (sampled-stats/sample-stats
-             metrics
-             (:batch-size sampled)
-             (:samples sampled)
-             options)
-        res  (assoc
-              res
-              :jvm-event-stats
-              (sampled-stats/jvm-event-stats (:samples sampled)))]
-    (assoc sampled :stats res)
-    ;; (if (or (:histogram options) (:include-samples options))
-
-    ;;   (assoc res :samples (:samples sampled))
-    ;;   res)
-    ))
-
-
-(defn analyze
-  [sampled {:keys [analysis] :as options}]
-  ;; TODO - this needs to see the extra stages injected into the pipeline
-  (let [metrics (pipeline-metrics options)]
-    (reduce
-     #(process-samples %2 %1 metrics options)
-     sampled
-     (:analysis options))))
-
 
 (defn measure
   [measured
    {:keys [sample-scheme analysis] :as  options}]
   ;; {:pre [(s/valid? ::options options)]}
   (output/progress "options:   " options)
-  (assert (s/valid? ::options options))
+  (assert (s/valid? ::options options) (s/explain ::options options))
   (output/progress "sample-scheme:   " sample-scheme)
   (output/progress "analysis:  " analysis)
   (let [sampled         (sample-data
                          sample-scheme
                          measured
                          options)]
-    (analyze sampled options)))
+    sampled))
