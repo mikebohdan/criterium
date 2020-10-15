@@ -4,3 +4,4 @@
 (s/def ::elapsed-time-ns nat-int?)
 (s/def ::eval-count nat-int?)
 (s/def ::count nat-int?)
+(s/def ::batch-size nat-int?)

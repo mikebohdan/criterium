@@ -1,20 +1,44 @@
-(ns criterium.sample
-  "Sampling functions."
+(ns criterium.sample-scheme
+  "Sample schemes to control the collection of samples from a measured."
   (:require [clojure.spec.alpha :as s]
             [criterium
+             [budget :as budget]
              [domain :as domain]
              [measured :as measured]
              [output :as output]
              [pipeline :as pipeline]
              [toolkit :as toolkit]]))
 
-(defn one-shot
-  "Single sample measured with no warmup.
-  Forces GC.
-  Return a sampled data map."
-  [pipeline measured {{:keys [max-gc-attempts] :as _config} :sample-scheme}]
+(defmulti required-stages
+  "Pipeline stages required for the given schema-type"
+  (fn [{:keys [scheme-type] :as _sample-scheme}]
+    scheme-type))
+
+(defmethod required-stages :one-shot
+  [_sample-scheme]
+  [])
+
+(defmethod required-stages :full
+  [_sample-scheme]
+  [:compilation-time
+   :garbage-collector])
+
+(defmulti sample
+  #_{:clj-kondo/ignore [:unused-binding]}
+  (fn [pipeline measured config]
+    (:scheme-type config)))
+
+(defmethod sample :one-shot
+  ;; Collects a Single sample measured with no warmup of the measured function.
+  ;; Forces GC.
+  ;; Return a sampled data map.
+  [pipeline measured {:keys [max-gc-attempts] :as _config}]
   (toolkit/force-gc max-gc-attempts)
-  (pipeline/execute pipeline measured 1))
+  (let [sample (pipeline/execute pipeline measured 1)]
+    {:batch-size      1
+     :elapsed-time-ns (pipeline/elapsed-time sample)
+     :eval-count      1
+     :samples         [sample]}))
 
 ;; (defn quick
 ;;   "Sample measured with minimal warmup.
@@ -45,20 +69,19 @@
 ;;      sample-budget
 ;;      batch-size)))
 
-(s/def ::max-gc-attempts nat-int?)
-(s/def ::batch-time-ns ::domain/elapsed-time-ns)
-(s/def ::config (s/keys :req-un [::max-gc-attempts ::batch-time-ns]))
-
-(defn full
-  "Sample measured with estimation, warmup and forced GC.
-  Return a sampled data map."
+(defmethod sample :full
+  ;; Sample measured with estimation, warmup and forced GC.
+  ;; Return a sampled data map.
   [pipeline
    measured
-   estimation-budget
-   warmup-budget
-   sample-budget
-   {{:keys [max-gc-attempts batch-time-ns] :as config} :sample-scheme}]
-  {:pre [pipeline (measured/measured? measured) (s/valid? ::config config)]}
+   {:keys [max-gc-attempts
+           batch-time-ns
+           estimation-budget
+           warmup-budget
+           sample-budget] :as config}]
+  {:pre [pipeline
+         (measured/measured? measured)
+         (s/valid? ::full-config config)]}
   ;; Start by running GC until it has nothing to do.
   (toolkit/throw-away-sample measured)
   (toolkit/force-gc max-gc-attempts)
@@ -95,3 +118,42 @@
     (assoc sample-data
            :warmup warmup-data
            :final-gc final-gc-data)))
+
+
+(s/def ::scheme-type #{:one-shot :full})
+
+(s/def ::max-gc-attempts nat-int?)
+
+(s/def ::batch-time-ns ::domain/elapsed-time-ns)
+
+(s/def ::estimation-budget ::budget/budget)
+(s/def ::warmup-budget ::budget/budget)
+(s/def ::sample-budget ::budget/budget)
+
+(s/def ::full-config
+  (s/keys
+   :req-un
+   [::scheme-type
+    ::estimation-budget
+    ::warmup-budget
+    ::sample-budget
+    ::max-gc-attempts
+    ::batch-time-ns]))
+
+(s/def ::one-shot-config (s/keys :req-un [::scheme-type ::max-gc-attempts]))
+
+(s/def ::sample-scheme (s/or :full-config ::one-shot-config))
+
+(s/def ::samples (s/coll-of ::pipeline/sample))
+
+(s/def ::sample-result (s/keys :req-un
+                               [::domain/batch-size
+                                ::domain/elapsed-time-ns
+                                ::domain/eval-count
+                                ::samplea]))
+
+(s/fdef sample
+  :args (s/cat :pipeline ::pipeline/pipeline-fn
+               :measured ::measured/measured
+               :scheme ::sample-scheme)
+  :ret ::sample-result)

@@ -166,7 +166,6 @@
         (catch Exception _
           (in-ns namespace-sym)
           (intern namespace-sym 'stub true)
-          (prn :refer refer-syms)
           (doseq [ref refer-syms]
             (intern namespace-sym ref))
           (in-ns orig-ns)

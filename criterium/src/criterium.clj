@@ -37,7 +37,7 @@
           pipeline     (:pipeline options-map)
           terminator   (filterv pipeline/terminal-fn? pipeline)
           pipeline-fns (remove pipeline/terminal-fn? pipeline)
-          sample-mode   (:sample-mode options-map :full)]
+          scheme-type  (:sample-scheme options-map :full)]
 
 
       ;; (if (or (:histogram options) (:include-samples options))
@@ -50,12 +50,14 @@
                 {:terminators terminator})))
       (measure/expand-options
        (cond-> (select-keys options-map [:verbose])
-         (= sample-mode :full) (assoc :sample-scheme
-                                      (measure/full-sample-options options-map))
-         (= sample-mode :one-shot) (assoc :sample-scheme
-                                          (measure/one-shot-sample-options options-map))
-         (seq pipeline-fns) (assoc-in [:pipeline :stages] (vec pipeline-fns))
-         (seq terminator)   (assoc-in [:pipeline :terminator] (first terminator)))))))
+         (= scheme-type :full)     (assoc :sample-scheme
+                                          (measure/full-sample-scheme options-map))
+         (= scheme-type :one-shot) (assoc :sample-scheme
+                                          (measure/one-shot-sample-scheme options-map))
+         (seq pipeline-fns)        (assoc-in [:pipeline :stages]
+                                             (vec pipeline-fns))
+         (seq terminator)          (assoc-in [:pipeline :terminator]
+                                             (first terminator)))))))
 
 (defn time-measured
   "Evaluates measured and prints the time it took.
