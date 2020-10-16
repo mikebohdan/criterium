@@ -41,7 +41,7 @@
                        ks))]
     stats))
 
-(defn sample-stats [metrics batch-size samples {:keys [return-samples] :as opts}]
+(defn sample-stats [metrics batch-size samples config]
   ;;(clojure.pprint/pprint samples)
   (let [sum        (pipeline/total samples)
         ;; _ (clojure.pprint/pprint sum)
@@ -50,7 +50,7 @@
         paths      (mapcat metric/metric-paths metrics)
         stats      (reduce
                     (fn [res path]
-                      (assoc-in res path (stats-for path batch-size samples opts)))
+                      (assoc-in res path (stats-for path batch-size samples config)))
                     {}
                     paths)
 
@@ -84,19 +84,17 @@
         ;;            :0.975 scale-1}
         ]
 
-    (cond->
-     {:eval-count  eval-count
-      :avg         avg
-      :stats       stats
-         ;; (zipmap ks
-         ;;                      (mapv
-         ;;                        (fn [k]
-         ;;                          ((scale-fns k) (k stats)))
-         ;;                        ks))
-      :num-samples (count samples)
-      :batch-size batch-size
-      :metrics metrics}
-      return-samples (assoc :samples samples))))
+    {:eval-count  eval-count
+     :avg         avg
+     :stats       stats
+     ;; (zipmap ks
+     ;;                      (mapv
+     ;;                        (fn [k]
+     ;;                          ((scale-fns k) (k stats)))
+     ;;                        ks))
+     :num-samples (count samples)
+     :batch-size  batch-size
+     :metrics     metrics}))
 
 (defn jvm-event-stats
   "Return the stats for JIT compilation and garbage-collection."

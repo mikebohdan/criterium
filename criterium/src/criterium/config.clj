@@ -2,6 +2,7 @@
   "Configuration builders"
   (:require [clojure.spec.alpha :as s]
             [criterium
+             [analyze :as analyze]
              [budget :as budget]
              [pipeline :as pipeline]
              [sample-scheme :as sample-scheme]
@@ -82,21 +83,25 @@
    :pipeline      {:stages     []
                    :terminator :elapsed-time-ns}
    :sample-scheme (full-sample-scheme {})
-   :analysis      [:stats]})
+   :analysis      [{:analysis-type :stats
+                    :tail-quantile 0.025
+                    :bootstrap-size 100}]})
 
 (s/def ::verbose boolean?)
 (s/def ::pipeline ::pipeline/pipeline-config)
-(s/def ::analysis (s/coll-of keyword?))
+(s/def ::analysis ::analyze/analysis-config)
 (s/def ::options (s/keys :req-un [::verbose
                                   ::pipeline
                                   ::analysis
                                   ::sample-scheme/sample-scheme
                                   ]))
 
-(defn- default-analysis [{:keys [sample-scheme] :as options-map}]
+(defn- default-analysis [{:keys [sample-scheme]}]
   (if (= :one-shot (:scheme-type sample-scheme))
-    [:samples]
-    [:stats]))
+    [{:analysis-type :samples}]
+    [{:analysis-type  :stats
+      :tail-quantile  0.025
+      :bootstrap-size 100}]))
 
 
 (defn ensure-pipeline-stages

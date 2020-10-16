@@ -144,8 +144,7 @@
   "Build a pipeline by specifying pipeline function keywords.
 
   Returns a pipeline."
-  [{:keys [stages terminator]
-    :or   {terminatpr :elapsed-time-ns}}]
+  [{:keys [stages terminator]}]
   (let [terminal-fn (terminal-fns terminator)]
     (when-not terminal-fn
       (throw (ex-info "Unknown terminator function" {:terminator terminator})))
@@ -157,6 +156,12 @@
          (f pipeline)))
      terminal-fn
      stages)))
+
+(defn metrics
+  "Return a sequence of all metrics produced by a pipeline with the
+  given spec."
+  [{:keys [stages terminator]}]
+  (conj stages terminator))
 
 (defn execute
   "Executes a measured pipeline.

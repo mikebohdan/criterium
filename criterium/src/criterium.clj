@@ -82,7 +82,10 @@
                       pipeline
                       measured
                       (:sample-scheme config))
-            result (analyze/analyze sampled config)]
+            result (analyze/analyze
+                    sampled
+                    (pipeline/metrics (:pipeline config))
+                    (:analysis config))]
         (vreset! last-time* result)
         (if (:stats result)
           (do (report/print-stats (:stats result) config)
