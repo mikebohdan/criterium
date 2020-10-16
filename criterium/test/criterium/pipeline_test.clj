@@ -57,10 +57,16 @@
 (deftest pipeline-test
   (testing "pipeline"
     (testing "builds a pipeline"
-      (is (fn? (pipeline/pipeline (keys pipeline/pipeline-fns)))))
+      (is (fn? (pipeline/pipeline
+                {:stages (keys pipeline/pipeline-fns)
+                 :terminator (first (keys pipeline/terminal-fns))}))))
     (testing "throws if passed a non keyword"
       (is (thrown? clojure.lang.ExceptionInfo
-                   (pipeline/pipeline ['a]))))
+                   (pipeline/pipeline
+                    {:stages [::unknown]
+                     :terminator (first (keys pipeline/terminal-fns))}))))
     (testing "throws if passed an unknown terminal function"
       (is (thrown? clojure.lang.ExceptionInfo
-                   (pipeline/pipeline [] {:terminal-fn-kw :xxx}))))))
+                   (pipeline/pipeline
+                    {:stages (keys pipeline/pipeline-fns)
+                     :terminator ::unknown}))))))

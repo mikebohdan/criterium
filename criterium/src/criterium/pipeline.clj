@@ -144,19 +144,19 @@
   "Build a pipeline by specifying pipeline function keywords.
 
   Returns a pipeline."
-  [pipeline-fn-kws & [{:keys [terminal-fn-kw]
-                       :or   {terminal-fn-kw :elapsed-time-ns}}]]
-  (let [terminal-fn (terminal-fns terminal-fn-kw)]
+  [{:keys [stages terminator]
+    :or   {terminatpr :elapsed-time-ns}}]
+  (let [terminal-fn (terminal-fns terminator)]
     (when-not terminal-fn
-      (throw (ex-info "Unknown terminal function" {:terminal-fn-kw terminal-fn-kw})))
+      (throw (ex-info "Unknown terminator function" {:terminator terminator})))
     (reduce
-     (fn [pipeline pipeline-kw]
-       (let [f (pipeline-fns pipeline-kw)]
+     (fn [pipeline stage]
+       (let [f (pipeline-fns stage)]
          (when-not f
-           (throw (ex-info "Unknown pipeline function" {:pipeline-kw pipeline-kw})))
+           (throw (ex-info "Unknown pipeline function" {:stage stage})))
          (f pipeline)))
      terminal-fn
-     pipeline-fn-kws)))
+     stages)))
 
 (defn execute
   "Executes a measured pipeline.
@@ -306,10 +306,12 @@
              (-> % :args :divisor))))
 
 (s/def ::pipeline-fn-kws (s/coll-of ::pipeline-fn-kw))
+(s/def ::stages ::pipeline-fn-kws)
+(s/def ::termonator ::terminal-fn-kw)
+(s/def ::pipeline-config (s/keys :req-un [::stages ::terminator]))
 
 (s/fdef pipeline
-  :args (s/cat :keywords ::pipeline-fn-kws
-               :options (s/or :empty nil? :map (s/keys :req-un [::terminal-fn-kw])))
+  :args ::pipeline-config
   :ret ::pipeline-fn)
 
 (s/fdef execute

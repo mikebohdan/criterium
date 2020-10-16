@@ -1,9 +1,8 @@
-(ns criterium.measure
-  "Opinionated measure function."
+(ns criterium.config
+  "Configuration builders"
   (:require [clojure.spec.alpha :as s]
             [criterium
              [budget :as budget]
-             [output :as output]
              [pipeline :as pipeline]
              [sample-scheme :as sample-scheme]
              [toolkit :as toolkit]
@@ -77,7 +76,7 @@
   {:scheme-type     :one-shot
    :max-gc-attempts (or max-gc-attempts 3)})
 
-(def default-options
+(def default-config
   "Default options for criterium.measure."
   {:verbose       false
    :pipeline      {:stages     []
@@ -86,9 +85,7 @@
    :analysis      [:stats]})
 
 (s/def ::verbose boolean?)
-(s/def ::stages ::pipeline/pipeline-fn-kws)
-(s/def ::terminator ::pipeline/terminal-fn-kw)
-(s/def ::pipeline (s/keys ::req-un [::stages ::terminator]))
+(s/def ::pipeline ::pipeline/pipeline-config)
 (s/def ::analysis (s/coll-of keyword?))
 (s/def ::options (s/keys :req-un [::verbose
                                   ::pipeline
@@ -115,12 +112,12 @@
 
 
 (defn expand-options
-  "Convert option arguments into a criterium option map.
-  The options map specifies how criterium will execute."
+  "Convert option arguments into a criterium config map.
+  The config map specifies how criterium will execute."
   [options-map]
   (-> (util/deep-merge
       (merge
-       default-options
+       default-config
        (cond-> {}
          (not (:analysis options-map))
          (assoc :analysis (default-analysis options-map))))
@@ -141,11 +138,11 @@
 ;;      :terminal-fn-kw  terminal-fn-kw}))
 
 
-(defn- pipeline-from-options
-  [{:keys [pipeline] :as _spec}]
-  (pipeline/pipeline
-   (:stages pipeline)
-   (:terminator pipeline)))
+;; (defn pipeline-from-options
+;;   [{:keys [pipeline] :as _spec}]
+;;   (pipeline/pipeline
+;;    (:stages pipeline)
+;;    (:terminator pipeline)))
 
 ;; (defmulti sample-data
 ;;   #_{:clj-kondo/ignore [:unused-binding]}
@@ -198,18 +195,18 @@
 ;;      options)))
 
 
-(defn measure
-  [measured
-   {:keys [pipeline sample-scheme analysis] :as  options}]
+;; (defn measure
+;;   [measured
+;;    {:keys [pipeline sample-scheme analysis] :as  options}]
 
-  ;; {:pre [(s/valid? ::options options)]}
-  (output/progress "options:   " options)
-  (assert (s/valid? ::options options) (s/explain ::options options))
-  (output/progress "sample-scheme:   " sample-scheme)
-  (output/progress "analysis:  " analysis)
-  (let [pipeline (pipeline-from-options options)
-        sampled         (sample-scheme/sample
-                         pipeline
-                         measured
-                         sample-scheme)]
-    sampled))
+;;   ;; {:pre [(s/valid? ::options options)]}
+;;   (output/progress "options:   " options)
+;;   (assert (s/valid? ::options options) (s/explain ::options options))
+;;   (output/progress "sample-scheme:   " sample-scheme)
+;;   (output/progress "analysis:  " analysis)
+;;   (let [pipeline (pipeline-from-options options)
+;;         sampled         (sample-scheme/sample
+;;                          pipeline
+;;                          measured
+;;                          sample-scheme)]
+;;     sampled))

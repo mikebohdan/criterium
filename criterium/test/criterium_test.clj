@@ -3,16 +3,16 @@
             [clojure.test :refer [deftest is testing]]
             [criterium :as criterium]
             [criterium
-             [measure :as measure]
+             [config :as config]
              [pipeline :as pipeline]]))
 
-(deftest options-map-test
-  (is (= measure/default-options (criterium/options-map [])))
-  (is (= (assoc measure/default-options
+(deftest config-map-test
+  (is (= config/default-config (criterium/config-map [])))
+  (is (= (assoc config/default-config
                 :pipeline {:stages [:class-loader] :terminator :elapsed-time-ns})
-         (criterium/options-map [:pipeline [:class-loader]])))
-  (is (= (merge measure/default-options {:processing [:samples] :sample-mode :one-shot})
-         (criterium/options-map [:sample-mode :one-shot]))))
+         (criterium/config-map [:pipeline [:class-loader]])))
+  (is (= (merge config/default-config {:processing [:samples] :sample-mode :one-shot})
+         (criterium/config-map [:sample-mode :one-shot]))))
 
 (deftest time-test
   (testing "time"

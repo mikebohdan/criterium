@@ -127,9 +127,7 @@
   `(binding [*report-progress* true]
      ~expr))
 
-
 ;;; Execution timing
-
 
 (defn time-expr
   "Returns a map containing execution time and result of specified function."
@@ -159,7 +157,6 @@
 ;;   "Helper to return the elapsed time from instrumentation data map."
 ;;   [data]
 ;;   (-> data :time :elapsed))
-
 
 ;;; Memory management
 

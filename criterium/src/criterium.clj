@@ -4,12 +4,13 @@
   (:require [clojure.spec.alpha :as s]
             [criterium
              [analyze :as analyze]
+             [config :as config]
              [domain :as domain]
-             [measure :as measure]
              [measured :as measured]
              [output :as output]
              [pipeline :as pipeline]
-             [report :as report]]))
+             [report :as report]
+             [sample-scheme :as sample-scheme]]))
 
 (def ^:no-doc last-time* (volatile! nil))
 
@@ -26,7 +27,7 @@
                          ::pipeline/terminal-fn-kw)))
 (s/def ::options (s/keys :opt-un [::limit-eval-count ::limit-time-s ::pipeline]))
 
-(defn options-map
+(defn config-map
   "Convert option arguments into a criterium option map.
   The options map specifies how criterium will execute."
   [option-args]
@@ -48,12 +49,12 @@
         (throw (ex-info
                 "More than one terminal function specified in pipeline"
                 {:terminators terminator})))
-      (measure/expand-options
+      (config/expand-options
        (cond-> (select-keys options-map [:verbose])
          (= scheme-type :full)     (assoc :sample-scheme
-                                          (measure/full-sample-scheme options-map))
+                                          (config/full-sample-scheme options-map))
          (= scheme-type :one-shot) (assoc :sample-scheme
-                                          (measure/one-shot-sample-scheme options-map))
+                                          (config/one-shot-sample-scheme options-map))
          (seq pipeline-fns)        (assoc-in [:pipeline :stages]
                                              (vec pipeline-fns))
          (seq terminator)          (assoc-in [:pipeline :terminator]
@@ -74,15 +75,19 @@
   are :time, :garbage-collector, :finalization, :memory, :runtime-memory,
   :compilation, and :class-loader."
   [measured & options]
-  (let [options (options-map options)]
-    (output/with-progress-reporting (:verbose options)
-      (let [sampled (measure/measure measured options)
-            result (analyze/analyze sampled options)]
+  (let [config (config-map options)]
+    (output/with-progress-reporting (:verbose config)
+      (let [pipeline (pipeline/pipeline (:pipeline config))
+            sampled  (sample-scheme/sample
+                      pipeline
+                      measured
+                      (:sample-scheme config))
+            result (analyze/analyze sampled config)]
         (vreset! last-time* result)
         (if (:stats result)
-          (do (report/print-stats (:stats result) options)
-              (report/print-jvm-event-stats (:stats result) options)
-              (report/print-final-gc-warnings (:stats result) options))
+          (do (report/print-stats (:stats result) config)
+              (report/print-jvm-event-stats (:stats result) config)
+              (report/print-final-gc-warnings (:stats result) config))
           (report/print-metrics result))
         (:expr-value result)))))
 
