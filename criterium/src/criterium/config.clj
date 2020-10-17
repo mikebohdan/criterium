@@ -1,13 +1,12 @@
 (ns criterium.config
   "Configuration builders"
   (:require [clojure.spec.alpha :as s]
-            [criterium
-             [analyze :as analyze]
-             [budget :as budget]
-             [pipeline :as pipeline]
-             [sample-scheme :as sample-scheme]
-             [toolkit :as toolkit]
-             [util :as util]])
+            [criterium.analyze :as analyze]
+            [criterium.budget :as budget]
+            [criterium.pipeline :as pipeline]
+            [criterium.sample-scheme :as sample-scheme]
+            [criterium.toolkit :as toolkit]
+            [criterium.util :as util])
   (:import [criterium.budget Budget]))
 
 (def ^Long DEFAULT-TIME-BUDGET-NS
@@ -34,7 +33,6 @@
          DEFAULT-TIME-BUDGET-NS))
    (or limit-eval-count
        Long/MAX_VALUE)))
-
 
 (defn full-sample-scheme
   [{:keys [limit-time-s limit-eval-count
@@ -93,8 +91,7 @@
 (s/def ::options (s/keys :req-un [::verbose
                                   ::pipeline
                                   ::analysis
-                                  ::sample-scheme/sample-scheme
-                                  ]))
+                                  ::sample-scheme/sample-scheme]))
 
 (defn- default-analysis [{:keys [sample-scheme]}]
   (if (= :one-shot (:scheme-type sample-scheme))
@@ -102,7 +99,6 @@
     [{:analysis-type  :stats
       :tail-quantile  0.025
       :bootstrap-size 100}]))
-
 
 (defn ensure-pipeline-stages
   "Add any injected stages that aren't already present."
@@ -115,103 +111,15 @@
      (fnil into [])
      (remove stages injected))))
 
-
 (defn expand-options
   "Convert option arguments into a criterium config map.
   The config map specifies how criterium will execute."
   [options-map]
   (-> (util/deep-merge
-      (merge
-       default-config
-       (cond-> {}
-         (not (:analysis options-map))
-         (assoc :analysis (default-analysis options-map))))
-      options-map)
+       (merge
+        default-config
+        (cond-> {}
+          (not (:analysis options-map))
+          (assoc :analysis (default-analysis options-map))))
+       options-map)
       ensure-pipeline-stages))
-
-;; (defn- pipeline-spec
-;;   "Return a pipeline spec for the given user specified options.
-;;   Recognizes :pipeline-fn-kws and terminal-fn-kw options.
-;;   Specifying :all for :pipeline-fn-kws uses all known pipeline functions."
-;;   [options]
-;;   (let [pipeline-fn-kws (let [pipeline-opt (:pipeline-fn-kws options [])]
-;;                           (if (= :all pipeline-opt)
-;;                             (keys pipeline/pipeline-fns)
-;;                             pipeline-opt))
-;;         terminal-fn-kw  (get options :terminal-fn-kw :elapsed-time-ns)]
-;;     {:pipeline-fn-kws pipeline-fn-kws
-;;      :terminal-fn-kw  terminal-fn-kw}))
-
-
-;; (defn pipeline-from-options
-;;   [{:keys [pipeline] :as _spec}]
-;;   (pipeline/pipeline
-;;    (:stages pipeline)
-;;    (:terminator pipeline)))
-
-;; (defmulti sample-data
-;;   #_{:clj-kondo/ignore [:unused-binding]}
-;;   (fn [sample-scheme measured options]
-;;     (:sample-mode sample-scheme)))
-
-;; (defmethod sample-data :one-shot
-;;   [_ measured options]
-;;   (let [pipeline (pipeline-from-options options)]
-;;     ;; TODo consider warming up criterium code
-;;     (sample/one-shot pipeline measured options)))
-
-;; (defmethod sample-data :quick
-;;   [_ pipeline measured total-budget config
-;;    {:keys [estimation-fraction estimation-period-ns
-;;            sample-fraction sample-period-ns]
-;;     :as   options}]
-;;   (let [^double estimation-frac (or estimation-fraction
-;;                                     DEFAULT-ESTIMATION-FRACTION)
-;;         ^double sample-frac     (if sample-fraction
-;;                                   sample-fraction
-;;                                   (- 1.0 estimation-frac))
-;;         estimation-budget       (toolkit/phase-budget
-;;                                   total-budget
-;;                                   estimation-period-ns
-;;                                   estimation-fraction
-;;                                   estimation-frac)
-;;         sample-budget           (toolkit/reduce-budget
-;;                                   total-budget
-;;                                   estimation-budget)]
-;;     (sample/quick pipeline measured estimation-budget sample-budget config)))
-
-;; (defmethod sample-data :full
-;;   [{:keys [estimation-budget warmup-budget sample-budget]}
-;;    measured
-;;    options]
-;;   (let [pipeline (pipeline-from-options options)]
-;;     (output/progress
-;;      "estimation-budget" estimation-budget)
-;;     (output/progress
-;;      "warmup-budget" warmup-budget)
-;;     (output/progress
-;;      "sample-budget" sample-budget)
-;;     (sample/full
-;;      pipeline
-;;      measured
-;;      estimation-budget
-;;      warmup-budget
-;;      sample-budget
-;;      options)))
-
-
-;; (defn measure
-;;   [measured
-;;    {:keys [pipeline sample-scheme analysis] :as  options}]
-
-;;   ;; {:pre [(s/valid? ::options options)]}
-;;   (output/progress "options:   " options)
-;;   (assert (s/valid? ::options options) (s/explain ::options options))
-;;   (output/progress "sample-scheme:   " sample-scheme)
-;;   (output/progress "analysis:  " analysis)
-;;   (let [pipeline (pipeline-from-options options)
-;;         sampled         (sample-scheme/sample
-;;                          pipeline
-;;                          measured
-;;                          sample-scheme)]
-;;     sampled))

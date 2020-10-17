@@ -1,8 +1,7 @@
 (ns criterium.report
-  (:require [criterium
-             [format :as format]
-             [metric :as metric]
-             [util :as util]]))
+  (:require [criterium.format :as format]
+            [criterium.metric :as metric]
+            [criterium.util :as util]))
 
 (util/optional-require
  '[criterium.chart :as chart :refer [histogram view]])
@@ -53,10 +52,10 @@
 
 (defn print-jvm-event-stat
   [title
-   {:keys [total-time-ns sample-count] :as _stat}]
-  (when (pos? total-time-ns)
+   {:keys [total-time-ms sample-count] :as _stat}]
+  (when (pos? total-time-ms)
     (println title "ran for"
-             (format/format-value :time-ns total-time-ns)
+             (format/format-value :time-ms total-time-ms)
              "affecting"
              sample-count
              "samples")))

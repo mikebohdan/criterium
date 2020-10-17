@@ -1,9 +1,8 @@
 (ns criterium.sampled-stats
-  (:require [criterium
-             [metric :as metric]
-             [pipeline :as pipeline]
-             [stats :as stats]
-             [well :as well]]))
+  (:require [criterium.metric :as metric]
+            [criterium.pipeline :as pipeline]
+            [criterium.stats :as stats]
+            [criterium.well :as well]))
 
 (defn stats-for [path batch-size samples opts]
   (let [vs            (mapv (metric/path-accessor path) samples)
@@ -104,7 +103,7 @@
      (let [update-stat (fn [stat time-ns]
                          (if (pos? time-ns)
                            (-> stat
-                               (update :total-time-ns + time-ns)
+                               (update :total-time-ms + time-ns)
                                (update :sample-count inc))
                            stat))
            compilation (-> sample :compilation :compilation-time)
@@ -112,8 +111,8 @@
        (-> stats
            (update :compilation update-stat compilation)
            (update :garbage-collection update-stat gc))))
-   {:compilation        {:total-time-ns 0
+   {:compilation        {:total-time-ms 0
                          :sample-count  0}
-    :garbage-collection {:total-time-ns 0
+    :garbage-collection {:total-time-ms 0
                          :sample-count  0}}
    samples))

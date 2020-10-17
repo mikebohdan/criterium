@@ -3,10 +3,9 @@
   Requires com.hypirion/clj-xchart."
   (:refer-clojure :exclude [spit])
   (:require [com.hypirion.clj-xchart :as c]
-            [criterium
-             [format :as format]
-             [pipeline :as pipeline]
-             [util :as util]]))
+            [criterium.format :as format]
+            [criterium.pipeline :as pipeline]
+            [criterium.util :as util]))
 
 (defn xy-chart [xs ys]
   (c/xy-chart

@@ -1,17 +1,5 @@
-;;;; Copyright (c) Hugo Duncan. All rights reserved.
-
-;;;; The use and distribution terms for this software are covered by the
-;;;; Eclipse Public License 1.0 (http://opensource.org/licenses/eclipse-1.0.php)
-;;;; which can be found in the file epl-v10.html at the root of this distribution.
-;;;; By using this software in any fashion, you are agreeing to be bound by
-;;;; the terms of this license.
-;;;; You must not remove this notice, or any other, from this software.
-
-;;; Implementation of ZIGNOR
-;;; An improved Ziggurat method to generate normal random samples, Doornik, 2005
-
 (ns criterium.ziggurat
-  (:require criterium.well))
+  (:require [criterium.well :as well]))
 
 (def ^:dynamic *zignor-c* 128) ; "Number of blocks."
  ; "Start of the right tail" (R * phi(R) + Pr(X>=R)) * sqrt(2\pi)
@@ -48,17 +36,17 @@
 
 (defn random-normal-zig
   "Pseudo-random normal variates.
-An implementation of ZIGNOR
-See:
- An improved Ziggurat method to generate normal random samples, Doornik, 2005"
+  An implementation of ZIGNOR
+  See:
+    An improved Ziggurat method to generate normal random samples, Doornik, 2005"
   ([]
-   (random-normal-zig (criterium.well/well-rng-1024a)
+   (random-normal-zig (well/well-rng-1024a)
                       (zignor-init *zignor-c* *zignor-r* *zignor-v*)))
   ([rng-seq]
    (random-normal-zig rng-seq (zignor-init *zignor-c* *zignor-r* *zignor-v*)))
   ([rng-seq c r v] (random-normal-zig rng-seq (zignor-init c r v)))
   ([c r v]
-   (random-normal-zig (criterium.well/well-rng-1024a) (zignor-init c r v)))
+   (random-normal-zig (well/well-rng-1024a) (zignor-init c r v)))
   ([rng-seq [#^doubles s-adzigr #^doubles s-adzigx zignor-r mask]]
    (letfn [(random-normal-tail
              [min negative rng-seq]

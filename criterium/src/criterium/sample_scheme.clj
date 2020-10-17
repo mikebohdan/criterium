@@ -1,13 +1,12 @@
 (ns criterium.sample-scheme
   "Sample schemes to control the collection of samples from a measured."
   (:require [clojure.spec.alpha :as s]
-            [criterium
-             [budget :as budget]
-             [domain :as domain]
-             [measured :as measured]
-             [output :as output]
-             [pipeline :as pipeline]
-             [toolkit :as toolkit]]))
+            [criterium.budget :as budget]
+            [criterium.domain :as domain]
+            [criterium.measured :as measured]
+            [criterium.output :as output]
+            [criterium.pipeline :as pipeline]
+            [criterium.toolkit :as toolkit]))
 
 (defmulti required-stages
   "Pipeline stages required for the given schema-type"
@@ -39,35 +38,6 @@
      :elapsed-time-ns (pipeline/elapsed-time sample)
      :eval-count      1
      :samples         [sample]}))
-
-;; (defn quick
-;;   "Sample measured with minimal warmup.
-;;   Does a single warmup followed by forced GC.
-;;   Return a sampled data map."
-;;   [pipeline
-;;    measured
-;;    estimation-budget
-;;    sample-budget
-;;    {:keys [batch-time-ns max-gc-attempts] :as _config}]
-;;   (toolkit/throw-away-sample measured)
-;;   (toolkit/force-gc max-gc-attempts)
-;;   (let [t0         (toolkit/first-estimate measured)
-;;         batch-size (toolkit/estimate-batch-size
-;;                     t0 estimation-budget batch-time-ns)
-;;         t1         (toolkit/estimate-execution-time
-;;                     measured
-;;                     estimation-budget
-;;                     batch-size)
-;;         _          (toolkit/force-gc max-gc-attempts)
-
-;;         batch-size (toolkit/estimate-batch-size
-;;                     t1 sample-budget batch-time-ns)]
-;;     (toolkit/force-gc max-gc-attempts)
-;;     (toolkit/sample
-;;      pipeline
-;;      measured
-;;      sample-budget
-;;      batch-size)))
 
 (defmethod sample :full
   ;; Sample measured with estimation, warmup and forced GC.
@@ -118,7 +88,6 @@
     (assoc sample-data
            :warmup warmup-data
            :final-gc final-gc-data)))
-
 
 (s/def ::scheme-type #{:one-shot :full})
 

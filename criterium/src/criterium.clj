@@ -2,15 +2,14 @@
   "Criterium top level"
   (:refer-clojure :exclude [time])
   (:require [clojure.spec.alpha :as s]
-            [criterium
-             [analyze :as analyze]
-             [config :as config]
-             [domain :as domain]
-             [measured :as measured]
-             [output :as output]
-             [pipeline :as pipeline]
-             [report :as report]
-             [sample-scheme :as sample-scheme]]))
+            [criterium.analyze :as analyze]
+            [criterium.config :as config]
+            [criterium.domain :as domain]
+            [criterium.measured :as measured]
+            [criterium.output :as output]
+            [criterium.pipeline :as pipeline]
+            [criterium.report :as report]
+            [criterium.sample-scheme :as sample-scheme]))
 
 (def ^:no-doc last-time* (volatile! nil))
 
@@ -18,7 +17,6 @@
   "Return the data from the last time invocation."
   []
   @last-time*)
-
 
 (s/def ::limit-eval-count (s/or :empty? nil? :limit ::domain/eval-count))
 (s/def ::limit-time-s (s/or :empty? nil? :limit (s/and number? pos?)))
@@ -39,7 +37,6 @@
           terminator   (filterv pipeline/terminal-fn? pipeline)
           pipeline-fns (remove pipeline/terminal-fn? pipeline)
           scheme-type  (:sample-scheme options-map :full)]
-
 
       ;; (if (or (:histogram options) (:include-samples options))
       ;;   (assoc res :samples (:samples sampled))

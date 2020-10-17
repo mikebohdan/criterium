@@ -1,16 +1,12 @@
 (ns criterium.arg-gen
   "Argument generation"
-  (:require [clojure.test.check
-             [generators :as gen]
-             [random :as random]
-             [rose-tree :as rose]]
-            [criterium
-             [jvm :as jvm]
-             [measured :as measured]]))
-
+  (:require [clojure.test.check.generators :as gen]
+            [clojure.test.check.random :as random]
+            [clojure.test.check.rose-tree :as rose]
+            [criterium.jvm :as jvm]
+            [criterium.measured :as measured]))
 
 ;; from c.t.check (private)
-
 
 (defn- make-rng
   [seed]

@@ -1,41 +1,17 @@
 (ns criterium.platform
   "Platform characterisation"
-  (:require [criterium
-             [jvm :as jvm]
-             [measure :as measure]
-             [measured :as measured]]))
-
+  (:require [criterium.jvm :as jvm]
+            [criterium.measure :as measure]
+            [criterium.measured :as measured]))
 
 ;;; nanoTime latency
 
-;; (defn nanotime-latency-fn
-;;   ^long [^long x]
-;;   (loop [i (dec x)]
-;;     (jvm/timestamp)
-;;     (when (pos? i)
-;;       (recur (unchecked-dec i))))
-;;   (jvm/timestamp))
-
-
-;; (defn nanotime-latency-measured
-;;   [^long n]
-;;   (measured/measured
-;;     (fn ^long [] n)
-;;     nanotime-latency-fn
-;;     n))
-
-
 (defn nanotime-latency [& [options]]
   (measure/measure
-    ;;(nanotime-latency-measured (long n))
    (measured/expr (jvm/timestamp))
    (merge
     {:limit-time 10}
     options)))
-
-;; (nanotime-latency)
-
-;;; nanoTime granularity
 
 (defn- nanotime-granularity-fn
   [_ ^long eval-count]
@@ -64,8 +40,6 @@
    (merge
     {:limit-time 10}
     options)))
-;; (nanotime-granularity)
-
 
 ;; Minimum measured time
 (defn constant-bench [& [options]]

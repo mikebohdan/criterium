@@ -1,9 +1,8 @@
 (ns criterium.analyze
   (:require [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as sgen]
-            [criterium
-             [output :as output]
-             [sampled-stats :as sampled-stats]]))
+            [criterium.output :as output]
+            [criterium.sampled-stats :as sampled-stats]))
 
 (defmulti analyze-samples
   #_{:clj-kondo/ignore [:unused-binding]}

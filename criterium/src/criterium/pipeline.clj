@@ -8,13 +8,11 @@
   A pipeline can be composed via pipeline functions and a pipeline
   terminal function."
   (:require [clojure.spec.alpha :as s]
-            [clojure.spec.gen.alpha :as sgen]
             [clojure.walk :as walk]
-            [criterium
-             [domain :as domain]
-             [jvm :as jvm]
-             [measured :as measured]
-             [util :as util]]))
+            [criterium.domain :as domain]
+            [criterium.jvm :as jvm]
+            [criterium.measured :as measured]
+            [criterium.util :as util]))
 
 ;; Metrics
 

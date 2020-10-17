@@ -2,9 +2,8 @@
   (:require [clojure.pprint :as pprint]
             [clojure.spec.alpha :as s]
             [clojure.spec.gen.alpha :as sgen]
-            [criterium
-             [domain :as domain]
-             [format :as format]]))
+            [criterium.domain :as domain]
+            [criterium.format :as format]))
 
 ;;; Budget
 

@@ -30,6 +30,15 @@
     (< value 60e9) [1e-9 "s"]
     :else          [60e-9 "min"]))
 
+(defmethod scale :time-ms
+  [_ value]
+  (cond
+    (< value 1e-3) [1e6 "ns"]
+    (< value 1)    [1e3 "µs"]
+    (< value 1000) [1 "ms"]
+    (< value 60e3) [1e-3 "s"]
+    :else          [60e-3 "min"]))
+
 (def ONE-KB 1024)
 (def ONE-MB (* 1024 1024))
 (def ONE-GB (* 1024 1024 1024))
@@ -52,6 +61,11 @@
   (format "%d" value))
 
 (defmethod format-value :time
+  [dimension value]
+  (let [[scale unit] (scale dimension value)]
+    (format "%3.3g %s" (double (* scale value)) unit)))
+
+(defmethod format-value :time-ms
   [dimension value]
   (let [[scale unit] (scale dimension value)]
     (format "%3.3g %s" (double (* scale value)) unit)))

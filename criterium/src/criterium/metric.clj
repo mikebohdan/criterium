@@ -22,7 +22,7 @@
                                           :label     "Total Heap Memory"}
    [:class-loader :loaded-count]         {:dimension :count :label "Classes Loaded"}
    [:class-loader :unloaded-count]       {:dimension :count :label "Classes Unloaded"}
-   [:compilation :compilation-time]      {:dimension :time-ns
+   [:compilation :compilation-time]      {:dimension :time-ms
                                           :label "JIT Compilation Time"}
    [:runtime-memory :max]                {:dimension :memory
                                           :label     "Max Memory (runtime)"}
@@ -32,7 +32,7 @@
                                           :label     "Total Memory (runtime)"}
    [:finalization-count :pending]        {:dimension :count
                                           :label     "Finalizations Pending"}
-   [:garbage-collector :total :time]     {:dimension :time-ns :label "GC Time"}
+   [:garbage-collector :total :time]     {:dimension :time-ms :label "GC Time"}
    [:garbage-collector :total :count]    {:dimension :count :label "GC count"}})
 
 (defn path-accessor

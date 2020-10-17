@@ -53,10 +53,7 @@
   [v f]
   (* f (Math/floor (/ v f))))
 
-
 ;; Modified version of clojure.walk to preserve metadata
-
-
 (defn walk
   "Traverses form, an arbitrary data structure.  inner and outer are
   functions.  Applies inner to each element of form, building up a
@@ -97,17 +94,6 @@
   {:added "1.1"}
   [f form]
   (walk (partial postwalk f) f form))
-
-
-;; (defn missing-spec
-;;   [[namespace sep as-sym sep refs]]
-;;   (let [f (fn [namespace ref] `(intern '~namespace '~ref))]
-;;     [namespace as-sym
-;;      (condp = sep
-;;        nil    nil
-;;        :as    nil
-;;        :refer (mapv (partial f namespace) refs))]))
-
 
 (defn missing-spec
   [[namespace-sym & [_sep _as-sym _sep _refs :as args]]]
@@ -175,43 +161,9 @@
           (require [namespace-sym :as as-sym :refer refer-syms])
           nil)))))
 
-;; (defmacro optional-require
-;;   "Optionally require a namespace."
-;;   [& specs]
-;;   (let [defs    (mapv missing-spec specs)
-;;         orig-ns (ns-name *ns*)]
-;;     `(do
-;;        ~@(for [[namespace as-sym missing-defs] defs]
-;;            `(do
-;;               (when (and (find-ns '~namespace)
-;;                          (ns-resolve '~namespace 'stub))
-;;                 (unload-ns '~namespace '~as-sym))
-;;               (try
-;;                 (require '[~namespace :as ~as-sym])
-;;                 (vswap! optional-nses conj '~namespace)
-;;                 true
-;;                 (catch Exception _#
-;;                   (ns ~namespace)
-;;                   (intern '~namespace '~'stub true)
-;;                   ~@missing-defs
-;;                   (in-ns '~orig-ns)
-;;                   (require
-;;                     '[~namespace :as ~as-sym])
-;;                   nil)
-;;                 ))))))
-
 (defn assert-optional-ns [ns-sym message]
   (when-not (has-optional-ns? ns-sym)
     (throw (ex-info message {:missing-ns ns-sym}))))
-
-;; (comment
-;;   (optional-require
-;;     (constantly nil)
-;;     [ab :as ab :refer [a b]])
-;;   (optional-require
-;;     (constantly nil)
-;;     [criterium.stats :as stats :refer [well]]))
-
 
 (defn deep-merge
   "Merge maps recursively."
