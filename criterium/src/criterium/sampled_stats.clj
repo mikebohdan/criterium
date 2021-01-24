@@ -1,8 +1,9 @@
 (ns criterium.sampled-stats
-  (:require [criterium.metric :as metric]
-            [criterium.pipeline :as pipeline]
-            [criterium.stats :as stats]
-            [criterium.well :as well]))
+  (:require
+   [criterium.metric :as metric]
+   [criterium.pipeline :as pipeline]
+   [criterium.stats :as stats]
+   [criterium.well :as well]))
 
 (defn stats-for [path batch-size samples opts]
   (let [vs            (mapv (metric/path-accessor path) samples)

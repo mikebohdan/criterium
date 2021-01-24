@@ -1,10 +1,12 @@
 (ns criterium.toolkit
   "Functions used to implement benchmark measurements."
-  (:require [criterium.budget :as budget]
-            [criterium.jvm :as jvm]
-            [criterium.measured :as measured]
-            [criterium.pipeline :as pipeline])
-  (:import [criterium.budget Budget]))
+  (:require
+   [criterium.budget :as budget]
+   [criterium.jvm :as jvm]
+   [criterium.measured :as measured]
+   [criterium.pipeline :as pipeline])
+  (:import
+   [criterium.budget Budget]))
 
 (set! *unchecked-math* :warn-on-boxed)
 

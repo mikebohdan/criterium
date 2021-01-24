@@ -1,7 +1,8 @@
 (ns criterium.report
-  (:require [criterium.format :as format]
-            [criterium.metric :as metric]
-            [criterium.util :as util]))
+  (:require
+   [criterium.format :as format]
+   [criterium.metric :as metric]
+   [criterium.util :as util]))
 
 (util/optional-require
  '[criterium.chart :as chart :refer [histogram view]])

@@ -1,13 +1,15 @@
 (ns criterium.config
   "Configuration builders"
-  (:require [clojure.spec.alpha :as s]
-            [criterium.analyze :as analyze]
-            [criterium.budget :as budget]
-            [criterium.pipeline :as pipeline]
-            [criterium.sample-scheme :as sample-scheme]
-            [criterium.toolkit :as toolkit]
-            [criterium.util :as util])
-  (:import [criterium.budget Budget]))
+  (:require
+   [clojure.spec.alpha :as s]
+   [criterium.analyze :as analyze]
+   [criterium.budget :as budget]
+   [criterium.pipeline :as pipeline]
+   [criterium.sample-scheme :as sample-scheme]
+   [criterium.toolkit :as toolkit]
+   [criterium.util :as util])
+  (:import
+   [criterium.budget Budget]))
 
 (def ^Long DEFAULT-TIME-BUDGET-NS
   "Default time budget when no limit specified.
@@ -88,10 +90,10 @@
 (s/def ::verbose boolean?)
 (s/def ::pipeline ::pipeline/pipeline-config)
 (s/def ::analysis ::analyze/analysis-config)
-(s/def ::options (s/keys :req-un [::verbose
-                                  ::pipeline
-                                  ::analysis
-                                  ::sample-scheme/sample-scheme]))
+(s/def ::config (s/keys :req-un [::verbose
+                                 ::pipeline
+                                 ::analysis
+                                 ::sample-scheme/sample-scheme]))
 
 (defn- default-analysis [{:keys [sample-scheme]}]
   (if (= :one-shot (:scheme-type sample-scheme))

@@ -1,5 +1,6 @@
 (ns criterium.ziggurat
-  (:require [criterium.well :as well]))
+  (:require
+   [criterium.well :as well]))
 
 (def ^:dynamic *zignor-c* 128) ; "Number of blocks."
  ; "Start of the right tail" (R * phi(R) + Pr(X>=R)) * sqrt(2\pi)

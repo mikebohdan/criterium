@@ -1,12 +1,13 @@
 (ns criterium.sample-scheme
   "Sample schemes to control the collection of samples from a measured."
-  (:require [clojure.spec.alpha :as s]
-            [criterium.budget :as budget]
-            [criterium.domain :as domain]
-            [criterium.measured :as measured]
-            [criterium.output :as output]
-            [criterium.pipeline :as pipeline]
-            [criterium.toolkit :as toolkit]))
+  (:require
+   [clojure.spec.alpha :as s]
+   [criterium.budget :as budget]
+   [criterium.domain :as domain]
+   [criterium.measured :as measured]
+   [criterium.output :as output]
+   [criterium.pipeline :as pipeline]
+   [criterium.toolkit :as toolkit]))
 
 (defmulti required-stages
   "Pipeline stages required for the given schema-type"

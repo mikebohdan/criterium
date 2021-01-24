@@ -1,7 +1,7 @@
 (ns criterium.core-test
-  (:require [clojure.test :refer [deftest is]]
-            [criterium
-             [core :as core]]))
+  (:require
+   [clojure.test :refer [deftest is]]
+   [criterium.core :as core]))
 
 (deftest outliers-test
   (is (= (core/outlier-count 0 0 0 0)

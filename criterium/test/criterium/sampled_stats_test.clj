@@ -1,6 +1,7 @@
 (ns criterium.sampled-stats-test
-  (:require [criterium.sampled-stats :as sampled-stats]
-            [clojure.test :refer [deftest is]]))
+  (:require
+   [clojure.test :refer [deftest is]]
+   [criterium.sampled-stats :as sampled-stats]))
 
 (deftest stats-for-test
   (let [samples (mapv #(hash-map :v %) (repeat 100 1))

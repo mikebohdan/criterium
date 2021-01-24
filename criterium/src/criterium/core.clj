@@ -2,7 +2,7 @@
       :see-also
       [["http://github.com/hugoduncan/criterium" "Source code"]
        ["http://hugoduncan.github.com/criterium" "API Documentation"]]}
- criterium.core
+    criterium.core
   "Criterium measures the computation time of an expression.  It is
   designed to address some of the pitfalls of benchmarking, and benchmarking on
   the JVM in particular.
@@ -30,15 +30,16 @@
 
   See http://hackage.haskell.org/package/criterion for a Haskell benchmarking
   library that applies many of the same statistical techniques."
-  (:require [clojure.set :as set]
-            [criterium.budget :as budget]
-            [criterium.jvm :as jvm]
-            [criterium.measured :as measured]
-            [criterium.pipeline :as pipeline]
-            [criterium.stats :as stats]
-            [criterium.toolkit :as toolkit]
-            [criterium.util :as util]
-            [criterium.well :as well]))
+  (:require
+   [clojure.set :as set]
+   [criterium.budget :as budget]
+   [criterium.jvm :as jvm]
+   [criterium.measured :as measured]
+   [criterium.pipeline :as pipeline]
+   [criterium.stats :as stats]
+   [criterium.toolkit :as toolkit]
+   [criterium.util :as util]
+   [criterium.well :as well]))
 
 
 ;; Default values controlling behaviour

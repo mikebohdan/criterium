@@ -1,10 +1,10 @@
 (ns criterium.pipeline-test
-  (:require [clojure.set :as set]
-            [clojure.spec.test.alpha]
-            [criterium
-             [measured :as measured]
-             [pipeline :as pipeline]]
-            [clojure.test :refer [deftest is testing]]))
+  (:require
+   [clojure.set :as set]
+   [clojure.spec.test.alpha]
+   [clojure.test :refer [deftest is testing]]
+   [criterium.measured :as measured]
+   [criterium.pipeline :as pipeline]))
 
 (clojure.spec.test.alpha/check
  [`pipeline/time-metric

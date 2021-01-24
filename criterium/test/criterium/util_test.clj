@@ -1,6 +1,7 @@
 (ns criterium.util-test
-  (:require [clojure.test :refer [deftest is testing]]
-            [criterium.util :as util]))
+  (:require
+   [clojure.test :refer [deftest is testing]]
+   [criterium.util :as util]))
 
 (def this-ns (ns-name *ns*))
 

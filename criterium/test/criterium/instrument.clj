@@ -1,11 +1,12 @@
 (ns criterium.instrument
   "Add spec instrumentation.
   This is pretty costly, so shouldn't be always enabled."
-  (:require [clojure.spec.alpha :as s]
-            [criterium.budget :as budget]
-            [criterium.measured :as measured]
-            [expound.alpha :as expound]
-            [orchestra.spec.test :as stest]))
+  (:require
+   [clojure.spec.alpha :as s]
+   [criterium.budget :as budget]
+   [criterium.measured :as measured]
+   [expound.alpha :as expound]
+   [orchestra.spec.test :as stest]))
 
 (defn instrument-all []
   (stest/instrument

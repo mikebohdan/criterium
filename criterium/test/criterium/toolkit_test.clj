@@ -1,10 +1,9 @@
 (ns criterium.toolkit-test
-  (:require [clojure.test.check
-             [clojure-test :refer [defspec]]
-             [generators :as gen]
-             [properties :as prop]]
-            [criterium
-             [toolkit :as toolkit]]))
+  (:require
+   [clojure.test.check.clojure-test :refer [defspec]]
+   [clojure.test.check.generators :as gen]
+   [clojure.test.check.properties :as prop]
+   [criterium.toolkit :as toolkit]))
 
 (defspec execution-time-from-batch-returns-pos-long
   (prop/for-all [t gen/pos-int

@@ -1,18 +1,31 @@
 (ns criterium-test
-  (:require [clojure.spec.alpha :as s]
-            [clojure.test :refer [deftest is testing]]
-            [criterium :as criterium]
-            [criterium
-             [config :as config]
-             [pipeline :as pipeline]]))
+  (:require
+   [clojure.spec.alpha :as s]
+   [clojure.test :refer [deftest is testing]]
+   [criterium :as criterium]
+   [criterium.config :as config]
+   [criterium.pipeline :as pipeline]
+   [criterium.sample-scheme :as sample-scheme]))
 
 (deftest config-map-test
-  (is (= config/default-config (criterium/config-map [])))
+  (is (= (assoc-in config/default-config
+                   [:pipeline :stages]
+                   (sample-scheme/required-stages {:scheme-type :full}))
+         (criterium/config-map {})))
   (is (= (assoc config/default-config
-                :pipeline {:stages [:class-loader] :terminator :elapsed-time-ns})
-         (criterium/config-map [:pipeline [:class-loader]])))
-  (is (= (merge config/default-config {:processing [:samples] :sample-mode :one-shot})
-         (criterium/config-map [:sample-mode :one-shot]))))
+                :pipeline {:stages     [:class-loader
+                                        :compilation-time
+                                        :garbage-collector]
+                           :terminator :elapsed-time-ns})
+         (criterium/config-map
+          {:pipeline [:class-loader
+                      :compilation-time
+                      :garbage-collector]})))
+  (is (= (-> config/default-config
+             (assoc-in [:pipeline :stages]
+                       [:compilation-time :garbage-collector]))
+         (criterium/config-map
+          {:sample-mode :one-shot}))))
 
 (deftest time-test
   (testing "time"
@@ -26,4 +39,4 @@
   (testing "time with :stats option"
     (let [out (with-out-str (criterium/time 1 :times 10000))]
       (testing "outputs statistics on stdout"
-        (is (re-find #"xyz" out))))))
+        (is (re-find #"GC count" out))))))

@@ -1,8 +1,8 @@
 (ns criterium.stats-test
-  (:require [clojure.test :refer [deftest is]]
-            [criterium
-             [stats :as stats]
-             [well :as well]]))
+  (:require
+   [clojure.test :refer [deftest is]]
+   [criterium.stats :as stats]
+   [criterium.well :as well]))
 
 (defmacro test-max-error [expected actual max-error]
   `(is (< (Math/abs (- ~expected ~actual)) ~max-error)))

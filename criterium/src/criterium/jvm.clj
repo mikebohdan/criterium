@@ -1,12 +1,14 @@
 (ns criterium.jvm
   "JVM data accessors"
-  (:require [clojure.string :as string]
-            [criterium.util :as util])
-  (:import [java.lang.management
-            GarbageCollectorMXBean
-            ManagementFactory
-            MemoryPoolMXBean
-            MemoryUsage]))
+  (:require
+   [clojure.string :as string]
+   [criterium.util :as util])
+  (:import
+   [java.lang.management
+    GarbageCollectorMXBean
+    ManagementFactory
+    MemoryPoolMXBean
+    MemoryUsage]))
 
 (defmacro timestamp
   "Obtain a timestamp using System/nanoTime."

@@ -1,6 +1,7 @@
 (ns criterium.well-test
-  (:require [clojure.test :refer [deftest is]]
-            [criterium.well :as well]))
+  (:require
+   [clojure.test :refer [deftest is]]
+   [criterium.well :as well]))
 
 (deftest bit-shift-right-ns-test
   (is (= 4 (well/bit-shift-right-ns 8 1)))

@@ -1,17 +1,19 @@
 (ns criterium.platform
   "Platform characterisation"
-  (:require [criterium.jvm :as jvm]
-            [criterium.measure :as measure]
-            [criterium.measured :as measured]))
+  (:require
+   [criterium :as criterium]
+   [criterium.jvm :as jvm]
+   [criterium.measured :as measured]))
 
 ;;; nanoTime latency
 
 (defn nanotime-latency [& [options]]
-  (measure/measure
+  (criterium/measure
    (measured/expr (jvm/timestamp))
-   (merge
-    {:limit-time 10}
-    options)))
+   (criterium/config-map
+    (merge
+     {:limit-time 10}
+     options))))
 
 (defn- nanotime-granularity-fn
   [_ ^long eval-count]
@@ -35,25 +37,27 @@
      nanotime-granularity-fn)))
 
 (defn nanotime-granularity [& [options]]
-  (measure/measure
+  (criterium/measure
    (nanotime-granularity-measured)
-   (merge
-    {:limit-time 10}
-    options)))
+   (criterium/config-map
+    (merge
+     {:limit-time 10}
+     options))))
 
 ;; Minimum measured time
 (defn constant-bench [& [options]]
-  (measure/measure
+  (criterium/measure
    (measured/expr 1)
-    ;; (measured/measured
-    ;;   (fn [] 1)
-    ;;   (fn [x] x)
-    ;;   1)
-   (merge
-    {:limit-time 10
-       ;; :sink-fn criterium.eval/sink-primitive-long
-     }
-    options)))
+   ;; (measured/measured
+   ;;   (fn [] 1)
+   ;;   (fn [x] x)
+   ;;   1)
+   (criterium/config-map
+    (merge
+     {:limit-time 10
+      ;; :sink-fn criterium.eval/sink-primitive-long
+      }
+     options))))
 ;; (constant-bench)
 
 
@@ -73,24 +77,29 @@
      (println (no.disassemble/disassemble-str (toolkit/with-time)))))
 
 (defn empty-bench [& [options]]
-  (measure/measure
+  (criterium/measure
    (measured/expr nil)
-   (merge
-    {:limit-time 10}
-    options)))
+   (criterium/config-map
+    (merge
+     {:limit-time 10}
+     options))))
 
 ;; (empty-bench)
+
+(defn- mean-elapsed-time-ns [result]
+  (-> result :stats :stats :elapsed-time-ns :mean first))
+
 
 (defn platform-stats
   "Return mean estimates for times that describe the accuracy of timing."
   []
-  (let [latency (nanotime-latency)
+  (let [latency     (nanotime-latency)
         granularity (nanotime-granularity)
-        constant (constant-bench)
-        empty (empty-bench)]
-    {:latency (-> latency :stats :time :mean first)
-     :granularity (-> granularity :stats :time :mean first)
-     :constant (-> constant :stats :time :mean first)
-     :empty (-> empty :stats :time :mean first)}))
+        constant    (constant-bench)
+        empty       (empty-bench)]
+    {:latency     (mean-elapsed-time-ns latency)
+     :granularity (mean-elapsed-time-ns granularity)
+     :constant    (mean-elapsed-time-ns constant)
+     :empty       (mean-elapsed-time-ns empty)}))
 
 ;; (platform-stats)

@@ -1,8 +1,8 @@
 (ns criterium.measured-test
-  (:require [clojure.spec.test.alpha]
-            [clojure.test :refer [deftest is testing]]
-            [criterium
-             [measured :as measured]]))
+  (:require
+   [clojure.spec.test.alpha]
+   [clojure.test :refer [deftest is testing]]
+   [criterium.measured :as measured]))
 
 ;; (alias 'stc 'clojure.spec.test.check)
 

@@ -1,13 +1,13 @@
 (ns criterium.format-test
-  (:require [criterium.format :as format]
-            [clojure.test.check
-             [clojure-test :refer [defspec]]
-             [generators :as gen]
-             [properties :as prop]]))
+  (:require
+   [criterium.format :as format]
+   [clojure.test.check.clojure-test :refer [defspec]]
+   [clojure.test.check.generators :as gen]
+   [clojure.test.check.properties :as prop]))
 
 (defspec format-non-dimensional-value-test
   (prop/for-all [i gen/small-integer]
-                (= (str i) (format/format-value :non-dimensional i))))
+    (= (str i) (format/format-value :non-dimensional i))))
 
 (defspec format-time-value-ns-test
   (prop/for-all [t (gen/double* {:max 1e-6 :min 0 :NaN? false})]

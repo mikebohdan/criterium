@@ -7,12 +7,13 @@
 
   A pipeline can be composed via pipeline functions and a pipeline
   terminal function."
-  (:require [clojure.spec.alpha :as s]
-            [clojure.walk :as walk]
-            [criterium.domain :as domain]
-            [criterium.jvm :as jvm]
-            [criterium.measured :as measured]
-            [criterium.util :as util]))
+  (:require
+   [clojure.spec.alpha :as s]
+   [clojure.walk :as walk]
+   [criterium.domain :as domain]
+   [criterium.jvm :as jvm]
+   [criterium.measured :as measured]
+   [criterium.util :as util]))
 
 ;; Metrics
 
@@ -145,7 +146,9 @@
   [{:keys [stages terminator]}]
   (let [terminal-fn (terminal-fns terminator)]
     (when-not terminal-fn
-      (throw (ex-info "Unknown terminator function" {:terminator terminator})))
+      (throw (ex-info "Unknown terminator function"
+                      {:stages     stages
+                       :terminator terminator})))
     (reduce
      (fn [pipeline stage]
        (let [f (pipeline-fns stage)]

@@ -1,11 +1,13 @@
 (ns criterium.measured
   "Defines the Measured type."
-  (:require [clojure.spec.alpha :as s]
-            [clojure.spec.gen.alpha :as sgen]
-            [criterium.domain :as domain]
-            [criterium.jvm :as jvm]
-            [criterium.util :as util])
-  (:import [org.openjdk.jmh.infra Blackhole]))
+  (:require
+   [clojure.spec.alpha :as s]
+   [clojure.spec.gen.alpha :as sgen]
+   [criterium.domain :as domain]
+   [criterium.jvm :as jvm]
+   [criterium.util :as util])
+  (:import
+   [org.openjdk.jmh.infra Blackhole]))
 
 ;;; Measured type
 

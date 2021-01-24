@@ -1,16 +1,22 @@
 (ns criterium.budget
-  (:require [clojure.pprint :as pprint]
-            [clojure.spec.alpha :as s]
-            [clojure.spec.gen.alpha :as sgen]
-            [criterium.domain :as domain]
-            [criterium.format :as format]))
+  (:require
+   [clojure.pprint :as pprint]
+   [clojure.spec.alpha :as s]
+   [clojure.spec.gen.alpha :as sgen]
+   [criterium.domain :as domain]
+   [criterium.format :as format]))
 
 ;;; Budget
 
 (deftype Budget
     ;; use deftype so we cna have long values
-         [^long elapsed-time-ns
-          ^long eval-count])
+    [^long elapsed-time-ns
+     ^long eval-count]
+  Object
+  (equals [_ other]
+    (and (instance? Budget other)
+         (= elapsed-time-ns (.elapsed-time-ns other))
+         (= eval-count (.eval_count other)))))
 
 (defn budget?
   "Predicate for x being a Budget"
