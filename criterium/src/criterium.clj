@@ -95,7 +95,9 @@
                                     options-map))
            (= scheme-type :one-shot) (assoc :sample-scheme
                                             (config/one-shot-sample-scheme
-                                             options-map))
+                                             options-map)
+                                            :analysis []
+                                            :report [{:report-type :metrics}])
            (seq pipeline-fns)        (assoc-in [:pipeline :stages]
                                                (vec pipeline-fns))
            (seq terminator)          (assoc-in [:pipeline :terminator]

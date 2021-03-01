@@ -78,6 +78,10 @@
     (assert (:report-type report))
     (:report-type report)))
 
+(defmethod report-impl :metrics
+  [_report result _config]
+  (print-metrics result))
+
 (defmethod report-impl :stats
   [_report result config]
   (print-stats config result))

@@ -89,7 +89,7 @@
                     :bootstrap-size 100}]
    :report        [{:report-type :stats}
                    {:report-type :jvm-event-stats}
-                   {:report-type :jvm-event-stats}]})
+                   {:report-type :final-gc-warnings}]})
 
 (s/def ::verbose boolean?)
 (s/def ::pipeline ::pipeline/pipeline-config)
