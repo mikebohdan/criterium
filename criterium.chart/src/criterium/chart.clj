@@ -115,25 +115,26 @@
 (defn time-histogram
   [{:keys [samples stats batch-size] :as _res} & [options]]
   {:pre [samples]}
-  (let [{[mean] :mean [variance] :variance} (:time stats)
-        [scale units] (format/scale :ns mean)
-        upper-limit (+ mean (* 2 (Math/sqrt variance)))
-        vs (->>
-            samples
-            (mapv pipeline/elapsed-time)
-            (mapv #(/ % (double batch-size)))
-            (filterv #(< % upper-limit))
-            (mapv #(* % scale)))
-        num-outliers (- (count samples) (count vs))
-        _ (println {:mean mean
-                    :variance variance
-                    :upper-limit upper-limit
-                    :num-outliers num-outliers
-                    :n            (count vs)})
-        chart (histogram
-               vs
-               (merge
-                {:value-label (str "Time [" units "]")}
-                options))]
+  (let [{[mean]     :mean
+         [variance] :variance} (:elapsed-time-ns (:stats stats))
+        [scale units]          (format/scale :ns mean)
+        upper-limit            (+ mean (* 2 (Math/sqrt variance)))
+        vs                     (->>
+                                samples
+                                (mapv pipeline/elapsed-time)
+                                (mapv #(/ % (double batch-size)))
+                                (filterv #(< % upper-limit))
+                                (mapv #(* % scale)))
+        num-outliers           (- (count samples) (count vs))
+        _                      (println {:mean         mean
+                                         :variance     variance
+                                         :upper-limit  upper-limit
+                                         :num-outliers num-outliers
+                                         :n            (count vs)})
+        chart                  (histogram
+                                vs
+                                (merge
+                                 {:value-label (str "Time [" units "]")}
+                                 options))]
     (println "Ignoring n outliers: " num-outliers)
     chart))

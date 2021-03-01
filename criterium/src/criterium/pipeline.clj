@@ -241,6 +241,10 @@
   ^long [sample]
   (-> sample :memory :total :used))
 
+(defn heap-memory
+  ^long [sample]
+  (-> sample :memory :heap :used))
+
 ;;; Spec definitions
 
 (s/def ::state any?)

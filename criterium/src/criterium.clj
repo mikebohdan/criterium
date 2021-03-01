@@ -51,11 +51,6 @@
     (let [result (measure measured config)]
       (vreset! last-time* result)
       (report/report result config)
-      ;; (if (:stats result)
-      ;;   (do (report/print-stats (:stats result) config)
-      ;;       (report/print-jvm-event-stats (:stats result) config)
-      ;;       (report/print-final-gc-warnings (:stats result) config))
-      ;;   (report/print-metrics result))
       (:expr-value result))))
 
 (s/def ::limit-eval-count (s/or :empty? nil? :limit ::domain/eval-count))
@@ -64,22 +59,23 @@
                    (s/or ::pipeline/pipeline-fn-kw
                          ::pipeline/terminal-fn-kw)))
 (s/def ::options (s/keys
-                  :opt-un [::limit-eval-count ::limit-time-s ::pipeline]))
+                  :opt-un [::histogram
+                           ::limit-eval-count
+                           ::limit-time-s
+                           ::pipeline]))
 
 (defn config-map
   "Convert option arguments into a criterium option map.
   The options map specifies how criterium will execute."
   [options-map]
-  (assert (s/valid? ::options options-map))
-  (let [pipeline     (:pipeline options-map)
-        terminator   (filterv pipeline/terminal-fn? pipeline)
-        pipeline-fns (remove pipeline/terminal-fn? pipeline)
-        scheme-type  (:sample-scheme options-map :full)
-        histogram?   (:histogram options-map)]
-
-    ;; (if (or (:histogram options) (:include-samples options))
-    ;;   (assoc res :samples (:samples sampled))
-    ;;   res)
+  (s/assert ::options options-map)
+  (let [pipeline         (:pipeline options-map)
+        terminator       (filterv pipeline/terminal-fn? pipeline)
+        pipeline-fns     (remove pipeline/terminal-fn? pipeline)
+        scheme-type      (:sample-scheme options-map :full)
+        histogram?       (:histogram options-map)
+        limit-time-s     (:limit-time-s options-map)
+        limit-eval-count (:limit-eval-count options-map)]
 
     (when (> (count terminator) 1)
       (throw (ex-info
@@ -87,7 +83,9 @@
               {:terminators terminator})))
     (cond->
         (config/expand-options
-         (cond-> (select-keys options-map [:verbose])
+         (cond-> (select-keys
+                  options-map
+                  [:analysis :sample-scheme :verbose])
            (or
             (= scheme-type :full)
             histogram?)     (assoc :sample-scheme
@@ -102,12 +100,17 @@
                                                (vec pipeline-fns))
            (seq terminator)          (assoc-in [:pipeline :terminator]
                                                (first terminator))
-           ;; (:histogram options-map) (update-in [:analysis] conj
-           ;;                                     {:analysis-type :samples})
-
-           ;; (:histogram options-map)  (assoc-in
-           ;;                            [:output :histogram] true)
-           ))
+           (or limit-time-s
+               limit-eval-count) (assoc
+                                  :sample-scheme
+                                  (config/full-sample-scheme
+                                   (cond-> {}
+                                     limit-eval-count (assoc
+                                                       :limit-eval-count
+                                                       limit-eval-count)
+                                     limit-time-s (assoc
+                                                   :limit-time-s
+                                                   limit-time-s))))))
       histogram? (update-in [:analysis] conj
                             {:analysis-type :samples})
       histogram? (update-in [:report] conj

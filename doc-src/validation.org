@@ -9,6 +9,8 @@
 (require '[criterium
            [chart :as chart]
            [jvm :as jvm]
+           [measured :as measured]
+           [pipeline :as pipeline]
            [platform :as platform]
            [toolkit :as toolkit]])
 #+end_src
@@ -22,18 +24,20 @@ See https://shipilev.net/blog/2014/nanotrusting-nanotime/
 
 Test nanotime latency
 
-#+begin_src clojure :results file graphics :dir "data/images" :file "nanotime-latency.png" :var dir=(concat (file-name-directory (buffer-file-name)) "data/images/")
+#+begin_src clojure :results file graphics :dir "doc-src/data/images" :file "nanotime-latency.png" :var dir=(concat (file-name-directory (buffer-file-name)) "data/images/")
 (chart/spit
  (chart/time-histogram
   (platform/nanotime-latency
-   {:return-samples true
-    :limit-time 10})
+   {:analysis     [{:analysis-type :samples}
+                   {:analysis-type :stats}]
+    :limit-time-s 10})
   {:title "nanoTime Latency"})
- "validation/data/images/nanotime-latency.png")
+ "doc-src/data/images/nanotime-latency.png")
 #+end_src
 
 #+RESULTS:
 [[file:data/images/nanotime-latency.png]]
+
 
 We see that this reports around 31ns.
 
@@ -41,15 +45,15 @@ We see that this reports around 31ns.
 
 Test nanotime granularity
 
-#+begin_src clojure  :results file graphics :dir "data/images" :file "nanotime-granularity.png" :var dir=(concat (file-name-directory (buffer-file-name)) "data/images/")
+#+begin_src clojure  :results file graphics :dir "doc-src/data/images" :file "nanotime-granularity.png" :var dir=(concat (file-name-directory (buffer-file-name)) "data/images/")
 (chart/spit
-  (chart/time-histogram
-    (platform/nanotime-granularity
-        100000
-        {:return-samples true
-         :limit-time 10})
-    {:title "nanoTime Granularity"})
-  "validation/data/images/nanotime-granularity.png")
+ (chart/time-histogram
+  (platform/nanotime-granularity
+   {:analysis     [{:analysis-type :samples}
+                   {:analysis-type :stats}]
+    :limit-time-s 10})
+  {:title "nanoTime Granularity"})
+ "doc-src/data/images/nanotime-granularity.png")
 #+end_src
 
 #+RESULTS:
@@ -60,7 +64,7 @@ Interestingly there seems to be a hard limit to the lower bound, which
 is not seen in the latency.
 
 * Time
-** Zero accuracy
+** Zero accuracy and resolution
 
 The smallest thing criterium can measure is a constant, which is
 evaluated inside the identity function.
@@ -68,25 +72,288 @@ evaluated inside the identity function.
 
 Lets look at a histogram of the distribution
 
-#+begin_src clojure :results file graphics :dir "data/images" :file "constant.png" :var dir=(concat (file-name-directory (buffer-file-name)) "data/images/")
-  (chart/spit
-    (chart/time-histogram
-      (platform/constant-bench
-        {:return-samples true})
-      {:title "Constant"})
-    (str "validation/data/images/constant.png"))
+#+begin_src clojure :results file graphics :dir "doc-src/data/images" :file "constant.png" :var dir=(concat (file-name-directory (buffer-file-name)) "data/images/")
+(chart/spit
+ (chart/time-histogram
+  (platform/constant-bench
+   {:analysis [{:analysis-type :samples}
+               {:analysis-type :stats}]})
+  {:title "Constant"})
+ (str "doc-src/data/images/constant.png"))
 #+end_src
 
 #+RESULTS:
 [[file:data/images/constant.png]]
 
-Gives a mean around 21ns.
+Gives a mean around 1ns.
+
+* Memory
+
+To understand the memory usage of a measurement pipeline, we need to
+look at the memory usage of functions, hash-map and assoc.
+
+** function invocation
+To measure the memory used, we create a simple pipeline, that doesn't
+measure time:
+
+#+begin_src clojure :results pp
+(def res [1 1])
+
+(def constant-time-constant-return-measured
+  "Return a mesaured, that returns constant time."
+  ;; 64
+  (measured/measured
+   (fn state-fn [] 1)
+   (fn measured [_ _] res)))
+
+(def constant-time-measured
+  "Return a mesaured, that returns constant time."
+  ;; 64
+  (measured/measured
+   (fn state-fn [] 1)
+   (fn measured [s _] [1 s])))
+
+(def constant-time-constant-measured
+  "Return a mesaured, that returns constant time."
+  ;; 64
+  (measured/measured
+   (fn state-fn [] 1)
+   (fn measured [_ _] [1 1])))
+
+(defn constant-time-measured-f
+  "Return a mesaured, that returns constant time."
+  ;; 32
+  [x]
+  (measured/measured
+   (fn state-fn [] x)
+   (fn measured [x _] [x x])))
+
+(defn constant-time-measured-f2
+  "Return a mesaured, that returns constant time."
+  ;; 72
+  [x]
+  (measured/measured
+   (fn state-fn [] x)
+   (fn measured [s _] [x s])))
+
+(defn constant-time-measured-f3
+  "Return a mesaured, that returns constant time."
+  ;; 32
+  [x]
+  (measured/measured
+   (fn state-fn [] 1)
+   (fn measured [s _] [x s])))
+
+(defn total-memory-used [measured]
+  (pipeline/total-memory
+   (pipeline/execute memory-pipeline measured 1)))
+
+(def memory-pipeline
+  (pipeline/pipeline
+   {:stages     [:memory]
+    :terminator :elapsed-time-ns}))
+
+(defn heap-memory-used [measured]
+  (pipeline/heap-memory
+   (pipeline/execute memory-pipeline measured 1)))
+#+end_src
+
+#+RESULTS:
+: #'user/total-memory-used
+:
+
+??? The first time a function is called 32 bytes are used. Re-evaluate
+constant-time-measured's definition to see this again.
+
+#+begin_src clojure :results pp
+;; call all the above at least once
+(let [measured constant-time-constant-measured]
+  ;; ((:f measured)
+  ;;  ((:state-fn measured))
+  ;;  1)
+  ;; ((:state-fn measured))
+  ;; ((:f measured) 1 1)
+  [(total-memory-used measured)
+   (total-memory-used measured)
+   (total-memory-used measured)
+   (total-memory-used measured)])
+
+(let [measured constant-time-measured]
+  ;; ((:f measured)
+  ;;  ((:state-fn measured))
+  ;;  1)
+  ;; ((:state-fn measured))
+  ;; ((:f measured) 1 1)
+  [(heap-memory-used measured)
+   (heap-memory-used measured)
+   (heap-memory-used measured)
+   (heap-memory-used measured)])
+
+(let [measured (constant-time-measured-f3 1)]
+  ;; ((:f measured)
+  ;;  ((:state-fn measured))
+  ;;  1)
+  ;; ((:state-fn measured))
+  ;; ((:f measured) 1 1)
+  [(total-memory-used measured)
+   (total-memory-used measured)
+   (total-memory-used measured)
+   (total-memory-used measured)])
+
+(let [measured constant-time-constant-measured]
+  ;; ((:f measured)
+  ;;  ((:state-fn measured))
+  ;;  1)
+  ;; ((:state-fn measured))
+  ;; ((:f measured) 1 1)
+  [(total-memory-used measured)
+   (total-memory-used measured)
+   (total-memory-used measured)
+   (total-memory-used measured)])
+#+end_src
+
+#+RESULTS:
+: [0 0 0 0]
+:
+
+** assoc
 
 
 #+begin_src clojure :results pp
-  (time/measure 1 :limit-evals 10)
-  (time/measure 1 :limit-evals 10000 :batch-size 1000)
+(def distinct-ks (mapv  ; distinct keys to asoc into map
+                  #(keyword (str "k-" %))
+                  (range 256)))
+(def assoc-keys  (fn assoc-keys [[m ks] _]
+                   (loop [m  m
+                          ks ks]
+                     (if (not-empty ks)
+                       (recur
+                        (assoc m (first ks) 1)
+                        (rest ks))
+                       [1 m]))))
+(def one (fn [] 1))
+(assoc-keys [[{} [:a]]] 1)   ; this allocates 32 bytes (one function)
+(one)  ; this allocates 32 bytes (one function)
+(vec (for [i (range 1 256)]
+       (let [;; this-ks  (take i distinct-ks)
+             ;; this-ks  (subvec distinct-ks 0 i)
+             _        (toolkit/force-gc 3)
+             measured (measured/measured
+                       (fn []
+                         [{:x (one)} ;; not a constant
+                          (subvec distinct-ks 0 i)])
+                       assoc-keys)]
+         [i (total-memory-used measured)])))
 #+end_src
+
+#+RESULTS:
+: class clojure.lang.Compiler$CompilerException
+
+
+
+#+begin_src clojure :results pp
+(let [distinct-ks (mapv  ; distinct keys to asoc into map
+                   #(keyword (str "k-" %))
+                   (range 128))
+      assoc-keys  (fn assoc-keys [[m ks] _]
+                    (loop [m  m
+                           ks ks]
+                      (if (not-empty ks)
+                        (recur
+                         (assoc m (first ks) 1)
+                         (rest ks))
+                        [1 m])))
+      one (fn [] 1)]
+  (assoc-keys [[{} [:a]]] 1)  ; this allocates 32 bytes (one function)
+  (vec (for [i (range 1 128)]
+         (let [;;this-ks  (take i distinct-ks)
+               this-ks  (subvec distinct-ks 0 i)
+               measured (measured/measured
+                         (fn []
+                           [{:x (one)} ;; not a constant
+                            this-ks])
+                         assoc-keys)]
+           [i (heap-memory-used measured)]))))
+#+end_src
+
+#+RESULTS:
+: class clojure.lang.ArityException
+
+The first few assoc do do not allocate memory.
+
+#+begin_src clojure :results pp
+(take 16 memory-used-by-assoc)
+#+end_src
+
+#+RESULTS:
+: class clojure.lang.Compiler$CompilerException
+
+Only later in the sequence is memory allocated, when clojure has to
+split a tree node in it's persistent data structure.
+
+
+We can also look at the total memory used by the pipeline, and see
+that it is zero for both terminal functions.
+
+#+begin_src clojure :results pp
+  (def measured-one (toolkit/measured-expr 1))
+  (toolkit/invoke-measured measured-one)  ; initial function allocation
+  (toolkit/total-memory
+    (measure/measure
+      measured-one
+      {:metrics [:memory :with-expr-value]}))
+  (toolkit/total-memory
+    (measure/measure
+      measured-one
+      {:metrics [:memory]}))
+#+end_src
+
+#+RESULTS:
+: class clojure.lang.Compiler$CompilerException
+
+And finally, we can see that all metrics combined have zero
+allocation.
+
+#+begin_src clojure :results pp
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#+begin_src clojure :results pp
+(time 1 :limit-eval-count 10)
+(time 1 :limit-eval-count 10000 :batch-size 1000)
+#+end_src
+
+#+RESULTS:
+: class clojure.lang.Compiler$CompilerException
+
 
 #+begin_example
 sample-stats
@@ -154,11 +421,15 @@ Lets look at a histogram of the distribution
 #+end_src
 
 #+RESULTS:
+[[file:data/images/hist.png]]
 
 
 #+begin_src clojure :results pp
   (time/measure 1 :limit-evals 10)
 #+end_src
+
+#+RESULTS:
+: class clojure.lang.Compiler$CompilerException
 
 #+begin_example
 sample-stats
@@ -211,6 +482,9 @@ measure time:
         (toolkit/instrumented measured memory-pipeline))))
 #+end_src
 
+#+RESULTS:
+: class clojure.lang.Compiler$CompilerException
+
 The first time a function is called 32 bytes are used.
 
 #+begin_src clojure :results pp
@@ -235,6 +509,9 @@ The first time a function is called 32 bytes are used.
      (total-memory-used measured)
      (total-memory-used measured)])
 #+end_src
+
+#+RESULTS:
+: class clojure.lang.Compiler$CompilerException
 
 
 
@@ -262,11 +539,17 @@ The first time a function is called 32 bytes are used.
              (total-memory-used measured)))))
 #+end_src
 
+#+RESULTS:
+: class clojure.lang.Compiler$CompilerException
+
 The first few assoc do do not allocate memory.
 
 #+begin_src clojure :results pp
   (take 16 memory-used-by-assoc)
 #+end_src
+
+#+RESULTS:
+: class clojure.lang.Compiler$CompilerException
 
 Only later in the sequence is memory allocated, when clojure has to
 split a tree node in it's persistent data structure.
@@ -288,6 +571,9 @@ that it is zero for both terminal functions.
       {:metrics [:memory]}))
 #+end_src
 
+#+RESULTS:
+: class clojure.lang.Compiler$CompilerException
+
 And finally, we can see that all metrics combined have zero
 allocation.
 
@@ -299,6 +585,9 @@ allocation.
       measured-one
       {:metrics :all}))
 #+end_src
+
+#+RESULTS:
+: class clojure.lang.Compiler$CompilerException
 
 
 
@@ -315,26 +604,29 @@ allocation.
 
 
 #+begin_src clojure :results file graphics :dir "data/images" :file "hist.png" :var dirn=(concat (file-name-directory (buffer-file-name)) "data/images/")
-  (let [{:keys [samples stats] :as res} (time/measure
-                                          1
-                                          :limit-evals 1000
-                                          :metrics [:with-expr-value :memory])
-        {[mean] :mean [variance] :variance} stats
-        upper-limit (+ mean (* 3 (Math/sqrt variance)))
-        vs (->>
-             samples
-             (mapv toolkit/total-memory)
-             (filterv #(< % upper-limit)))
-        num-outliers (- (count samples) (count vs))
-        chart (chart/histogram vs {:delta 1})
-        ;; path (str dirn "hist.png")
-        ]
-    (println "Ignoring n outliers: " num-outliers)
-    (clojure.pprint/pprint (dissoc res :samples))
-    (chart/view chart)
-    ;; (chart/spit chart path)
-    )
+(let [{:keys [samples stats] :as res} (time/measure
+                                       1
+                                       :limit-evals 1000
+                                       :metrics [:with-expr-value :memory])
+      {[mean] :mean [variance] :variance} stats
+      upper-limit (+ mean (* 3 (Math/sqrt variance)))
+      vs (->>
+          samples
+          (mapv toolkit/total-memory)
+          (filterv #(< % upper-limit)))
+      num-outliers (- (count samples) (count vs))
+      chart (chart/histogram vs {:delta 1})
+      ;; path (str dirn "hist.png")
+      ]
+  (println "Ignoring n outliers: " num-outliers)
+  (clojure.pprint/pprint (dissoc res :samples))
+  (chart/view chart)
+  ;; (chart/spit chart path)
+  )
 #+end_src
+
+#+RESULTS:
+[[file:data/images/hist.png]]
 
 * Backup
 

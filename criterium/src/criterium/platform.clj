@@ -14,7 +14,7 @@
     (measured/expr (jvm/timestamp))
     (criterium/config-map
      (merge
-      {:limit-time 10}
+      {:limit-time-s 10}
       options)))))
 
 (defn- nanotime-granularity-fn
@@ -38,28 +38,32 @@
      state-fn
      nanotime-granularity-fn)))
 
-(defn nanotime-granularity [& [options]]
-  (criterium/measure
-   (nanotime-granularity-measured)
-   (criterium/config-map
-    (merge
-     {:limit-time 10}
-     options))))
+(defn nanotime-granularity
+  ([] (nanotime-granularity {}))
+  ([options]
+   (criterium/measure
+    (nanotime-granularity-measured)
+    (criterium/config-map
+     (merge
+      {:limit-time-s 10}
+      options)))))
 
 ;; Minimum measured time
-(defn constant-bench [& [options]]
-  (criterium/measure
-   (measured/expr 1)
-   ;; (measured/measured
-   ;;   (fn [] 1)
-   ;;   (fn [x] x)
-   ;;   1)
-   (criterium/config-map
-    (merge
-     {:limit-time 10
-      ;; :sink-fn criterium.eval/sink-primitive-long
-      }
-     options))))
+(defn constant-bench
+  ([] (constant-bench {}))
+  ([options]
+   (criterium/measure
+    (measured/expr 1)
+    ;; (measured/measured
+    ;;   (fn [] 1)
+    ;;   (fn [x] x)
+    ;;   1)
+    (criterium/config-map
+     (merge
+      {:limit-time-s 10
+       ;; :sink-fn criterium.eval/sink-primitive-long
+       }
+      options)))))
 ;; (constant-bench)
 
 
