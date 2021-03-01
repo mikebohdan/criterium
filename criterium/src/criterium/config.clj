@@ -5,6 +5,7 @@
    [criterium.analyze :as analyze]
    [criterium.budget :as budget]
    [criterium.pipeline :as pipeline]
+   [criterium.report :as report]
    [criterium.sample-scheme :as sample-scheme]
    [criterium.toolkit :as toolkit]
    [criterium.util :as util])
@@ -83,17 +84,22 @@
    :pipeline      {:stages     []
                    :terminator :elapsed-time-ns}
    :sample-scheme (full-sample-scheme {})
-   :analysis      [{:analysis-type :stats
-                    :tail-quantile 0.025
-                    :bootstrap-size 100}]})
+   :analysis      [{:analysis-type  :stats
+                    :tail-quantile  0.025
+                    :bootstrap-size 100}]
+   :report        [{:report-type :stats}
+                   {:report-type :jvm-event-stats}
+                   {:report-type :jvm-event-stats}]})
 
 (s/def ::verbose boolean?)
 (s/def ::pipeline ::pipeline/pipeline-config)
 (s/def ::analysis ::analyze/analysis-config)
+(s/def ::report ::report/report-config)
 (s/def ::config (s/keys :req-un [::verbose
                                  ::pipeline
                                  ::analysis
-                                 ::sample-scheme/sample-scheme]))
+                                 ::sample-scheme/sample-scheme
+                                 ::report]))
 
 (defn- default-analysis [{:keys [sample-scheme]}]
   (if (= :one-shot (:scheme-type sample-scheme))
@@ -105,13 +111,18 @@
 (defn ensure-pipeline-stages
   "Add any injected stages that aren't already present."
   [{:keys [pipeline sample-scheme] :as options}]
-  (let [stages (set (:stages pipeline))
+  (let [stages   (set (:stages pipeline))
         injected (sample-scheme/required-stages sample-scheme)]
     (update-in
      options
      [:pipeline :stages]
      (fnil into [])
      (remove stages injected))))
+
+(defn- add-metrics
+  "Add any injected stages that aren't already present."
+  [{:keys [pipeline sample-scheme] :as config}]
+  (assoc config :metrics (pipeline/metrics (:pipeline config))))
 
 (defn expand-options
   "Convert option arguments into a criterium config map.
@@ -124,4 +135,5 @@
           (not (:analysis options-map))
           (assoc :analysis (default-analysis options-map))))
        options-map)
-      ensure-pipeline-stages))
+      ensure-pipeline-stages
+      add-metrics))

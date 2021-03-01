@@ -5,12 +5,12 @@
 #+HTML_HEAD: <link rel="stylesheet" type="text/css" href="public/css/criterium.css" />
 
 #+begin_src clojure :results value silent
-  (require '[criterium
-             [chart :as chart]
-             [jvm :as jvm]
-             [platform :as platform]
-             [time :as time]
-             [toolkit :as toolkit]])
+(require 'criterium)
+(require '[criterium
+           [chart :as chart]
+           [jvm :as jvm]
+           [platform :as platform]
+           [toolkit :as toolkit]])
 #+end_src
 
 
@@ -23,14 +23,13 @@ See https://shipilev.net/blog/2014/nanotrusting-nanotime/
 Test nanotime latency
 
 #+begin_src clojure :results file graphics :dir "data/images" :file "nanotime-latency.png" :var dir=(concat (file-name-directory (buffer-file-name)) "data/images/")
-  (chart/spit
-    (chart/time-histogram
-      (platform/nanotime-latency
-        10000
-        {:return-samples true
-         :limit-time 10})
-      {:title "nanoTime Latency"})
-    "validation/data/images/nanotime-latency.png")
+(chart/spit
+ (chart/time-histogram
+  (platform/nanotime-latency
+   {:return-samples true
+    :limit-time 10})
+  {:title "nanoTime Latency"})
+ "validation/data/images/nanotime-latency.png")
 #+end_src
 
 #+RESULTS:

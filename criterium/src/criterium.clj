@@ -14,7 +14,7 @@
 (defn measure
   "Evaluates measured and return measurement data."
   [measured config]
-  (assert (s/valid? :criterium.config/config config))
+  (s/assert :criterium.config/config config)
   (let [pipeline (pipeline/pipeline (:pipeline config))
         sampled  (sample-scheme/sample
                   pipeline
@@ -50,11 +50,12 @@
   (output/with-progress-reporting (:verbose config)
     (let [result (measure measured config)]
       (vreset! last-time* result)
-      (if (:stats result)
-        (do (report/print-stats (:stats result) config)
-            (report/print-jvm-event-stats (:stats result) config)
-            (report/print-final-gc-warnings (:stats result) config))
-        (report/print-metrics result))
+      (report/report result config)
+      ;; (if (:stats result)
+      ;;   (do (report/print-stats (:stats result) config)
+      ;;       (report/print-jvm-event-stats (:stats result) config)
+      ;;       (report/print-final-gc-warnings (:stats result) config))
+      ;;   (report/print-metrics result))
       (:expr-value result))))
 
 (s/def ::limit-eval-count (s/or :empty? nil? :limit ::domain/eval-count))
@@ -73,7 +74,8 @@
   (let [pipeline     (:pipeline options-map)
         terminator   (filterv pipeline/terminal-fn? pipeline)
         pipeline-fns (remove pipeline/terminal-fn? pipeline)
-        scheme-type  (:sample-scheme options-map :full)]
+        scheme-type  (:sample-scheme options-map :full)
+        histogram?   (:histogram options-map)]
 
     ;; (if (or (:histogram options) (:include-samples options))
     ;;   (assoc res :samples (:samples sampled))
@@ -83,16 +85,31 @@
       (throw (ex-info
               "More than one terminal function specified in pipeline"
               {:terminators terminator})))
-    (config/expand-options
-     (cond-> (select-keys options-map [:verbose])
-       (= scheme-type :full)     (assoc :sample-scheme
-                                        (config/full-sample-scheme options-map))
-       (= scheme-type :one-shot) (assoc :sample-scheme
-                                        (config/one-shot-sample-scheme options-map))
-       (seq pipeline-fns)        (assoc-in [:pipeline :stages]
-                                           (vec pipeline-fns))
-       (seq terminator)          (assoc-in [:pipeline :terminator]
-                                           (first terminator))))))
+    (cond->
+        (config/expand-options
+         (cond-> (select-keys options-map [:verbose])
+           (or
+            (= scheme-type :full)
+            histogram?)     (assoc :sample-scheme
+                                   (config/full-sample-scheme
+                                    options-map))
+           (= scheme-type :one-shot) (assoc :sample-scheme
+                                            (config/one-shot-sample-scheme
+                                             options-map))
+           (seq pipeline-fns)        (assoc-in [:pipeline :stages]
+                                               (vec pipeline-fns))
+           (seq terminator)          (assoc-in [:pipeline :terminator]
+                                               (first terminator))
+           ;; (:histogram options-map) (update-in [:analysis] conj
+           ;;                                     {:analysis-type :samples})
+
+           ;; (:histogram options-map)  (assoc-in
+           ;;                            [:output :histogram] true)
+           ))
+      histogram? (update-in [:analysis] conj
+                            {:analysis-type :samples})
+      histogram? (update-in [:report] conj
+                            {:report-type :histogram}))))
 
 (defmacro time
   "Evaluates expr and prints the time it took.

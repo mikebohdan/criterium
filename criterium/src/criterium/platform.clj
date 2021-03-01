@@ -7,13 +7,15 @@
 
 ;;; nanoTime latency
 
-(defn nanotime-latency [& [options]]
-  (criterium/measure
-   (measured/expr (jvm/timestamp))
-   (criterium/config-map
-    (merge
-     {:limit-time 10}
-     options))))
+(defn nanotime-latency
+  ([] (nanotime-latency {}))
+  ([options]
+   (criterium/measure
+    (measured/expr (jvm/timestamp))
+    (criterium/config-map
+     (merge
+      {:limit-time 10}
+      options)))))
 
 (defn- nanotime-granularity-fn
   [_ ^long eval-count]
