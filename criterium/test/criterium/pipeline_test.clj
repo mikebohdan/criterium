@@ -7,7 +7,7 @@
    [criterium.pipeline :as pipeline]))
 
 (clojure.spec.test.alpha/check
- [`pipeline/time-metric
+ [`pipeline/elapsed-time-metric
   `pipeline/with-class-loader-counts
   `pipeline/with-compilation-time
   `pipeline/with-memory
@@ -32,7 +32,7 @@
 (deftest execute-test
   (testing "Execute a measured with time-metric"
     (let [res (pipeline/execute
-               pipeline/time-metric
+               pipeline/elapsed-time-metric
                m
                1)]
       (testing "Has the measured state on the :state key"
@@ -48,10 +48,10 @@
   (doseq [[kw f] pipeline/pipeline-fns]
     (testing (str "Pipeline function " (name kw))
       (let [res (pipeline/execute
-                 (f pipeline/time-metric)
+                 (f pipeline/elapsed-time-metric)
                  m
                  1)
-            ks (set (keys res))]
+            ks  (set (keys res))]
         (is (= base-keys (set/intersection base-keys ks)))))))
 
 (deftest pipeline-test

@@ -399,26 +399,26 @@
         ]
     (def m measured)
     (criterium.measure/measure
-      measured
-      {:limit-time  10
-       :limit-evals 10000000000}))
+     measured
+     {:limit-time  10
+      :limit-evals 10000000000}))
 
   (def mb (measured/batch m 100000 ;; {:sink-fn criterium.eval/sink-primitive-long}
                           ))
   (dotimes [i 1000]
     (->
-      (criterium.toolkit/sample
-        (criterium.pipeline/time-metric)
-        mb)
-      :time
-      (/ 100000.0)))
+     (criterium.toolkit/sample
+      (criterium.pipeline/elapsed-time-metric)
+      mb)
+     :time
+     (/ 100000.0)))
 
   (dotimes [i 100000]
     (->
-      (criterium.toolkit/sample
-        (criterium.pipeline/time-metric)
-        m)
-      :time))
+     (criterium.toolkit/sample
+      (criterium.pipeline/elapsed-time-metric)
+      m)
+     :time))
 
   (let [v        [1 2 3]
         state-fn (fn [] v)
@@ -427,33 +427,33 @@
         measured (measured/measured state-fn f 1)]
     (def m measured)
     (criterium.measure/measure
-      measured
-      {:limit-time  10
-       :limit-evals 10000000000}))
+     measured
+     {:limit-time  10
+      :limit-evals 10000000000}))
 
   (criterium.measure/measure
-    m
-    {:limit-time  10
-     :limit-evals 10000000000})
+   m
+   {:limit-time  10
+    :limit-evals 10000000000})
 
 
   (criterium.measure/measure
-    (criterium.toolkit/measured-batch
-      (vector-destructure-bench 3)
-      1000)
-    {:limit-time 10})
+   (criterium.toolkit/measured-batch
+    (vector-destructure-bench 3)
+    1000)
+   {:limit-time 10})
 
   (criterium.measure/measure
-    (vector-explicit-destructure-bench 3)
-    {:limit-time 10})
+   (vector-explicit-destructure-bench 3)
+   {:limit-time 10})
 
 
   (criterium.chart/view
-    (criterium.chart/time-histogram
-      (criterium.measure/measure
-        (vec-nth-bench 10000)
-        {:limit-time     1
-         :return-samples true}))))
+   (criterium.chart/time-histogram
+    (criterium.measure/measure
+     (vec-nth-bench 10000)
+     {:limit-time     1
+      :return-samples true}))))
 
 
 (comment

@@ -165,24 +165,25 @@
 
 (defn ^:internal ^:no-doc measured-expr-fn
   "Construct a function expression to measure the given expr, with the given args."
-  [arg-syms expr & [{:keys [arg-metas]}]]
+  [arg-syms expr {:keys [arg-metas time-fn]}]
   (let [blackhole-sym  (with-meta (gensym "blachole")
                          {:tag 'org.openjdk.jmh.infra.Blackhole})
-        eval-count-sym  (gensym "eval-count")]
+        eval-count-sym (gensym "eval-count")
+        time-fn        (or time-fn 'criterium.jvm/timestamp)]
     `(fn ~'measured [~arg-syms ~(with-meta eval-count-sym {:tag 'long})]
        (let [~blackhole-sym blackhole ; hoist cast lookup out of loop
              ~@(mapcat binding-with-hint-or-cast arg-syms arg-metas)
              ;; primitive loop coounter.  Decrement since we evaluate
              ;; once outside the loop.
              n#             (long (unchecked-dec ~eval-count-sym))
-             start#         (criterium.jvm/timestamp)
+             start#         (~time-fn)
              val#           ~expr]      ; evaluate once to get a return value
          (loop [i# n#]
            (when (pos? i#)
              ;; don't use a local inside the loop, to avoid locals clearing
              (.consume ~blackhole-sym ~expr)
              (recur (long (unchecked-dec i#)))))
-         (let [finish# (criterium.jvm/timestamp)]
+         (let [finish# (~time-fn)]
            (evaporate)
            [(unchecked-subtract finish# start#) val#])))))
 
@@ -231,10 +232,12 @@
 
   Any expr that is not a List is treated as a constant.  This is mainly
   for internal benchmarking."
-  [expr & [options]]
+  [expr options]
   (let [{:keys [expr arg-vals] :as _f} (factor-expr expr)
-        arg-metas (capture-arg-types (vals arg-vals))
-        options (update options :arg-metas merge-metas arg-metas)]
+        arg-metas                      (capture-arg-types (vals arg-vals))
+        options                        (update
+                                        options
+                                        :arg-metas merge-metas arg-metas)]
     `(measured
       (fn ~'measured-state [] ~(vec (vals arg-vals)))
       ~(measured-expr-fn
@@ -256,8 +259,14 @@
   hoisted into a state function.  The result of the state function is a
   vector that is passed to the function wrapper as a vector and
   destructured."
-  [expr & [options]]
-  (measured-expr* expr options))
+  ([expr]
+   (measured-expr* expr nil))
+  ([expr options]
+   (measured-expr* expr options)))
+
+(expr
+ (jvm/wait 10000)
+ {:time-fn criterium.jvm/current-thread-cpu-time})
 
 ;; (defn batch
 ;;   "Wrap `measured` to run `eval-count` times.
@@ -309,5 +318,7 @@
   :ret ::measured-tuple)
 
 (s/fdef expr
-  :args (s/cat :expr any?)
+  :args (s/alt
+         :unary (s/cat :expr any?)
+         :binary (s/cat :expr any? :options (s/keys :opt-un [::time-fn])))
   :ret ::measured)

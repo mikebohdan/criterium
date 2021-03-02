@@ -28,8 +28,9 @@
   [^long max-attempts]
   (let [measured (measured/expr (jvm/run-finalization-and-force-gc))
         pipeline (pipeline/with-memory
-                   (pipeline/with-finalization-count
-                     pipeline/time-metric))]
+                   (pipeline/with-garbage-collector-stats
+                     (pipeline/with-finalization-count
+                       pipeline/elapsed-time-metric)))]
     (loop [samples  [] ; hold onto data we allocate here
            attempts 0]
       (let [sample                      (pipeline/execute pipeline measured 1)
@@ -42,25 +43,13 @@
                  (inc attempts))
           (conj samples sample))))))
 
-
-;; (defn with-force-gc
-;;   "Pipeline function to Force garbage collection.
-;;   Attempls GC up to max-attempt times before execution."
-;;   [max-attempts next-fn]
-;;   (fn [data measured]
-;;     (-> data
-;;         (force-gc max-attempts)
-;;         (next-fn data measured))))
-
-
 ;;; Timing
-
 
 (defn throw-away-sample
   "The initial evaluation is always un-representative.
   This function throws it away."
   [measured]
-  (pipeline/execute pipeline/time-metric measured 1)
+  (pipeline/execute pipeline/elapsed-time-metric measured 1)
   nil)
 
 (defn first-estimate
@@ -68,7 +57,7 @@
 
   Returns an estimated execution time in ns."
   [measured]
-  (let [pipeline pipeline/time-metric
+  (let [pipeline pipeline/elapsed-time-metric
         ;; The first evaluation is *always* unrepresentative
         _ignore  (pipeline/execute pipeline measured 1)
         s0       (pipeline/execute pipeline measured 1)]
@@ -168,7 +157,7 @@
   limit total execution time. Limit evaluations to eval-budget, or
   elapsed time to time-budget-ns."
   ^long [measured budget batch-size]
-  (let [pipeline          pipeline/time-metric
+  (let [pipeline pipeline/elapsed-time-metric
         {:keys [elapsed-time-ns eval-count _samples]}
         (sample
          pipeline
@@ -189,9 +178,9 @@
   [measured
    budget
    batch-size]
-  (let [pipeline       (pipeline/with-class-loader-counts
+  (let [pipeline (pipeline/with-class-loader-counts
                          (pipeline/with-compilation-time
-                           pipeline/time-metric))]
+                           pipeline/elapsed-time-metric))]
     (loop [eval-count       0
            elapsed-time-ns  0
            delta-free-iters 0

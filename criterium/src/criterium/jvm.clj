@@ -78,7 +78,12 @@
           sum      (util/sum heap non-heap)]
       {:heap     heap
        :non-heap non-heap
-       :total    sum})))
+       :total    sum}))
+
+  (defn set-memory-verbose!
+    "Set whether the memory collection system emits verbose output."
+    [flag]
+    (. mem-bean setVerbose flag)))
 
 (let [pools (.. ManagementFactory getMemoryPoolMXBeans)]
   (defn memory-pools
@@ -91,13 +96,17 @@
        (into {} pool-usaage)
        :total sum))))
 
+(defn- collector-keyword [n]
+  (-> n
+      string/lower-case
+      (string/replace \space \-)
+      keyword))
+
 (let [beans (.. ManagementFactory getGarbageCollectorMXBeans)
       kws   (reduce
              (fn [res ^GarbageCollectorMXBean bean]
                (let [n (. bean getName)]
-                 (assoc res n (keyword (-> n
-                                           string/lower-case
-                                           (string/replace \space \-))))))
+                 (assoc res n (collector-keyword n))))
              {}
              beans)]
   (defn garbage-collector-stats
@@ -120,9 +129,26 @@
                  (vals stats))]
       (assoc stats :total total))))
 
+(let [thread-bean (.. ManagementFactory getThreadMXBean)]
+  (defn threads
+    "Return thread information."
+    []
+    (let [ids (.getAllThreadIds thread-bean)]
+      (mapv
+       (fn [^long id]
+         (hash-map
+          :thread-info (.getThreadInfo thread-bean id)
+          :cpu-time (.getThreadCpuTime thread-bean id)
+          :user-time (.getThreadUserTime thread-bean id)))
+       ids)))
+  (defn current-thread-cpu-time []
+    (.getCurrentThreadCpuTime thread-bean))
+  (defn set-thread-contention-monitoring-enabled [flag]
+    (.setThreadContentionMonitoringEnabled flag))
+  (defn set-thread-cpu-time-enabled [flag]
+    (.setThreadCpuTimeEnabled flag)))
 
 ;;; Memory reporting
-
 
 (defn heap-used
   "Report a (inconsistent) snapshot of the heap memory used."

@@ -131,7 +131,9 @@
   are :time, :garbage-collector, :finalization, :memory, :runtime-memory,
   :compilation, and :class-loader."
   [expr & options]
-  `(time-measured
-    (measured/expr ~expr)
-    (config-map
-     (hash-map ~@options))))
+  (let [options-map      (apply hash-map options)
+        expr-options     (select-keys options-map [:time-fn])
+        measured-options (dissoc options-map :time-fn)]
+    `(time-measured
+      (measured/expr ~expr ~expr-options)
+      (config-map ~measured-options))))

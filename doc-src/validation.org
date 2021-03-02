@@ -144,23 +144,26 @@ measure time:
    (fn state-fn [] 1)
    (fn measured [s _] [x s])))
 
+(def memory-pipeline
+  (pipeline/pipeline
+   {:stages     [:memory :no-gc :compilation-time :garbage-collector]
+    :terminator :elapsed-time-ns}))
+
 (defn total-memory-used [measured]
   (pipeline/total-memory
    (pipeline/execute memory-pipeline measured 1)))
 
-(def memory-pipeline
-  (pipeline/pipeline
-   {:stages     [:memory]
-    :terminator :elapsed-time-ns}))
-
 (defn heap-memory-used [measured]
   (pipeline/heap-memory
    (pipeline/execute memory-pipeline measured 1)))
+
+(defn execute-with-memory [measured]
+  (pipeline/execute memory-pipeline measured 1))
+
 #+end_src
 
 #+RESULTS:
-: #'user/total-memory-used
-:
+: class clojure.lang.Compiler$CompilerException
 
 ??? The first time a function is called 32 bytes are used. Re-evaluate
 constant-time-measured's definition to see this again.
@@ -223,57 +226,71 @@ constant-time-measured's definition to see this again.
 (def distinct-ks (mapv  ; distinct keys to asoc into map
                   #(keyword (str "k-" %))
                   (range 256)))
-(def assoc-keys  (fn assoc-keys [[m ks] _]
+(def assoc-keys  (fn assoc-keys [[m ks v] _]
                    (loop [m  m
                           ks ks]
                      (if (not-empty ks)
                        (recur
-                        (assoc m (first ks) 1)
+                        (assoc m (first ks) v)
                         (rest ks))
-                       [1 m]))))
+                       [v m]))))
 (def one (fn [] 1))
-(assoc-keys [[{} [:a]]] 1)   ; this allocates 32 bytes (one function)
-(one)  ; this allocates 32 bytes (one function)
-(vec (for [i (range 1 256)]
-       (let [;; this-ks  (take i distinct-ks)
-             ;; this-ks  (subvec distinct-ks 0 i)
-             _        (toolkit/force-gc 3)
-             measured (measured/measured
-                       (fn []
-                         [{:x (one)} ;; not a constant
-                          (subvec distinct-ks 0 i)])
-                       assoc-keys)]
-         [i (total-memory-used measured)])))
+(def _a (assoc-keys [[{} [:a] 1]] 1))   ; this allocates 32 bytes (one function)
+(def _b (one))  ; this allocates 32 bytes (one function)
+(for [i (range 1 256)]
+  (let [;; this-ks  (take i distinct-ks)
+        ;; this-ks  (subvec distinct-ks 0 i)
+        ;;_        (toolkit/force-gc 3)
+        _        (jvm/force-gc)
+        measured (measured/measured
+                  (fn []
+                    [{:x (one)} ;; not a constant
+                     (subvec distinct-ks 0 i)
+                     (one)])
+                  assoc-keys)
+        result   (execute-with-memory measured)]
+    (assert
+     (or
+      (zero? (pipeline/heap-memory result))
+      (zero? (pipeline/gc-counts result)))
+     [i
+      (pipeline/heap-memory result)
+      (pipeline/gc-counts result)
+      (pipeline/compilation-time result)])
+    [i
+     (pipeline/heap-memory result)
+     (pipeline/gc-counts result)
+     (pipeline/compilation-time result)]))
 #+end_src
-
-#+RESULTS:
-: class clojure.lang.Compiler$CompilerException
-
 
 
 #+begin_src clojure :results pp
 (let [distinct-ks (mapv  ; distinct keys to asoc into map
-                   #(keyword (str "k-" %))
-                   (range 128))
-      assoc-keys  (fn assoc-keys [[m ks] _]
-                    (loop [m  m
-                           ks ks]
-                      (if (not-empty ks)
-                        (recur
-                         (assoc m (first ks) 1)
-                         (rest ks))
-                        [1 m])))
-      one (fn [] 1)]
-  (assoc-keys [[{} [:a]]] 1)  ; this allocates 32 bytes (one function)
-  (vec (for [i (range 1 128)]
-         (let [;;this-ks  (take i distinct-ks)
-               this-ks  (subvec distinct-ks 0 i)
-               measured (measured/measured
-                         (fn []
-                           [{:x (one)} ;; not a constant
-                            this-ks])
-                         assoc-keys)]
-           [i (heap-memory-used measured)]))))
+#(keyword (str "k-" %))
+(range 128))
+assoc-keys  (fn assoc-keys [[m ks] _]
+(loop [m  m
+ks ks]
+(if (not-empty ks)
+(recur
+(assoc m (first ks) 1)
+(rest ks))
+[1 m])))
+one         (fn [] 1)]
+(assoc-keys [[{} [:a]]] 1)  ; this allocates 32 bytes (one function)
+(vec (for [i (range 1 128)]
+(let [;;this-ks  (take i distinct-ks)
+this-ks  (subvec distinct-ks 0 i)
+measured (measured/measured
+(fn []
+[{:x (one)} ;; not a constant
+this-ks])
+assoc-keys)
+result   (execute-with-memory measured)]
+[i
+(pipeline/heap-memory result)
+(pipeline/gc-count result)
+(pipeline/compilation-time result)]))))
 #+end_src
 
 #+RESULTS:
@@ -296,8 +313,8 @@ We can also look at the total memory used by the pipeline, and see
 that it is zero for both terminal functions.
 
 #+begin_src clojure :results pp
-  (def measured-one (toolkit/measured-expr 1))
-  (toolkit/invoke-measured measured-one)  ; initial function allocation
+(def measured-one (toolkit/measured-expr 1))
+(toolkit/invoke-measured measured-one)  ; initial function allocation
   (toolkit/total-memory
     (measure/measure
       measured-one

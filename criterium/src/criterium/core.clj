@@ -132,7 +132,7 @@
   "Returns a map containing execution time and result of specified function."
   [measured n]
   (let [pline (pipeline/with-garbage-collector-stats
-                pipeline/time-metric)]
+                pipeline/elapsed-time-metric)]
     (toolkit/sample
      pline
      measured
@@ -145,7 +145,7 @@
   [measured eval-count]
   (let [pline (pipeline/with-class-loader-counts
                 (pipeline/with-compilation-time
-                  pipeline/time-metric))]
+                  pipeline/elapsed-time-metric))]
     (toolkit/sample
      pline
      measured

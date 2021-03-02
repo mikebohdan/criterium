@@ -11,6 +11,7 @@
    [clojure.spec.alpha :as s]
    [clojure.walk :as walk]
    [criterium.domain :as domain]
+   [criterium.gc-utils :as gc-utils]
    [criterium.jvm :as jvm]
    [criterium.measured :as measured]
    [criterium.util :as util]))
@@ -19,7 +20,7 @@
 
 ;; Pipeline functions to wrap a Neasured execution.
 
-(defn time-metric
+(defn elapsed-time-metric
   "A terminal function to execute measured, adding results to the data map.
 
   Puts:
@@ -31,8 +32,21 @@
         [elapsed-time expr-value] (f state eval-count)]
     (assoc sample
            :elapsed-time-ns elapsed-time
-           :expr-value expr-value
-           :eval-count eval-count)))
+           :expr-value expr-value)))
+
+(defn with-cpu-time
+  "Execute measured, adding cpu execution time in ns to the data map.
+
+  Adds the :cpu-time-ns key in the sample data.
+
+  Uses the ThreadMXBean."
+  [next-fn]
+  (fn cpu-time [sample measured]
+    (assert (measured/measured? measured))
+    (let [start  (jvm/current-thread-cpu-time)
+          sample (next-fn sample measured)
+          finish (jvm/current-thread-cpu-time)]
+      (assoc sample :cpu-time-ns (unchecked-subtract finish start)))))
 
 (defn with-class-loader-counts
   "Execute measured, adding class loading counts to the data map.
@@ -75,10 +89,28 @@
   [next-fn]
   (fn memory [sample measured]
     (assert (measured/measured? measured))
-    (let [start (jvm/memory)]
-      (-> sample
-          (next-fn measured)
-          (assoc :memory (util/diff (jvm/memory) start))))))
+    (let [start  (jvm/memory)
+          sample (next-fn sample measured)
+          finish (jvm/memory)]
+      (assoc sample :memory (util/diff finish start)))))
+
+(defn with-no-gc
+  "Execute measured, preventing initiation of GC.
+  Experimental - may not work after Java 9.
+  Using this can result in the JVM being completely blocked."
+  [next-fn]
+  (fn no-gc [sample measured]
+    (assert (measured/measured? measured))
+    (gc-utils/with-no-gc
+      (next-fn sample measured))))
+
+(defn with-force-gc
+  "Execute measured, forcing a GC attempt."
+  [next-fn]
+  (fn force-gc [sample measured]
+    (assert (measured/measured? measured))
+    (jvm/force-gc)
+    (next-fn sample measured)))
 
 (defn with-runtime-memory
   "Execute measured, add runtime memory to the data map.
@@ -123,16 +155,19 @@
                  (util/diff (jvm/garbage-collector-stats) start))))))
 
 (def terminal-fns
-  {:elapsed-time-ns time-metric})
+  {:elapsed-time-ns elapsed-time-metric})
 
 (defn terminal-fn?
   [fn-kw]
   ((set (keys terminal-fns)) fn-kw))
 
 (def pipeline-fns
-  {:class-loader       with-class-loader-counts
+  {:cpu-time-ns        with-cpu-time
+   :class-loader       with-class-loader-counts
    :compilation-time   with-compilation-time
    :memory             with-memory
+   :force-gc           with-force-gc
+   :no-gc              with-no-gc
    :runtime-memory     with-runtime-memory
    :finalization-count with-finalization-count
    :garbage-collector  with-garbage-collector-stats})
@@ -164,6 +199,13 @@
   [{:keys [stages terminator]}]
   (conj stages terminator))
 
+(defrecord Sample
+    ;; record to ensure no allocation by the time-metric terminator
+    [^long elapsed-time-ns
+     ^long eval-count
+     expr-value
+     state])
+
 (defn execute
   "Executes a measured pipeline.
 
@@ -175,9 +217,11 @@
        (toolkit/measured-expr some-expr))"
   [pipeline measured eval-count]
   {:pre [(measured/measured? measured)]}
-  (let [state ((:state-fn measured))
-        sample {:state      state
-                :eval-count eval-count}]
+  (let [state  ((:state-fn measured))
+        sample (map->Sample
+                {:elapsed-time-ns 0
+                 :eval-count      eval-count
+                 :state           state})]
     (pipeline sample measured)))
 
 
@@ -244,6 +288,14 @@
 (defn heap-memory
   ^long [sample]
   (-> sample :memory :heap :used))
+
+(defn compilation-time
+  ^long [sample]
+  (-> sample :compilation :compilation-time))
+
+(defn gc-counts
+  ^long [sample]
+  (-> sample :garbage-collector :total :count))
 
 ;;; Spec definitions
 

@@ -18,7 +18,7 @@
     `measured/measured
     `measured/invoke
     `measured/expr
-    `pipeline/time-metric
+    `pipeline/elapsed-time-metric
     `pipeline/with-class-loader-counts
     `pipeline/with-compilation-time
     `pipeline/with-memory
