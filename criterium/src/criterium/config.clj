@@ -133,7 +133,10 @@
         default-config
         (cond-> {}
           (not (:analysis options-map))
-          (assoc :analysis (default-analysis options-map))))
+          (assoc :analysis (default-analysis options-map))
+
+          (:sample-scheme options-map)
+          (assoc :sample-scheme nil)))
        options-map)
-      ensure-pipeline-stages
-      add-metrics))
+      add-metrics
+      ensure-pipeline-stages))

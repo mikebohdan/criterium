@@ -1,15 +1,17 @@
 (ns criterium
   "Criterium top level"
   (:refer-clojure :exclude [time])
-  (:require [clojure.spec.alpha :as s]
-            [criterium.analyze :as analyze]
-            [criterium.config :as config]
-            [criterium.domain :as domain]
-            [criterium.measured :as measured]
-            [criterium.output :as output]
-            [criterium.pipeline :as pipeline]
-            [criterium.report :as report]
-            [criterium.sample-scheme :as sample-scheme]))
+  (:require
+   [clojure.set :as set]
+   [clojure.spec.alpha :as s]
+   [criterium.analyze :as analyze]
+   [criterium.config :as config]
+   [criterium.domain :as domain]
+   [criterium.measured :as measured]
+   [criterium.output :as output]
+   [criterium.pipeline :as pipeline]
+   [criterium.report :as report]
+   [criterium.sample-scheme :as sample-scheme]))
 
 (defn measure
   "Evaluates measured and return measurement data."
@@ -62,7 +64,8 @@
                   :opt-un [::histogram
                            ::limit-eval-count
                            ::limit-time-s
-                           ::pipeline]))
+                           ::pipeline
+                           ::sample-scheme]))
 
 (defn config-map
   "Convert option arguments into a criterium option map.
@@ -75,8 +78,19 @@
         scheme-type      (:sample-scheme options-map :full)
         histogram?       (:histogram options-map)
         limit-time-s     (:limit-time-s options-map)
-        limit-eval-count (:limit-eval-count options-map)]
+        limit-eval-count (:limit-eval-count options-map)
+        unknown-keys     (set/difference
+                          (set (keys options-map))
+                          #{:analysis
+                            :histogram
+                            :pipeline
+                            :limit-eval-count
+                            :limit-time-s
+                            :sample-scheme
+                            :verbose})]
 
+    (when (seq unknown-keys)
+      (throw (ex-info "Unknown options" {:options unknown-keys})))
     (when (> (count terminator) 1)
       (throw (ex-info
               "More than one terminal function specified in pipeline"
@@ -85,12 +99,12 @@
         (config/expand-options
          (cond-> (select-keys
                   options-map
-                  [:analysis :sample-scheme :verbose])
+                  [:analysis :report :sample-scheme :verbose])
            (or
             (= scheme-type :full)
-            histogram?)     (assoc :sample-scheme
-                                   (config/full-sample-scheme
-                                    options-map))
+            histogram?)              (assoc :sample-scheme
+                                            (config/full-sample-scheme
+                                             options-map))
            (= scheme-type :one-shot) (assoc :sample-scheme
                                             (config/one-shot-sample-scheme
                                              options-map)
@@ -101,16 +115,16 @@
            (seq terminator)          (assoc-in [:pipeline :terminator]
                                                (first terminator))
            (or limit-time-s
-               limit-eval-count) (assoc
-                                  :sample-scheme
-                                  (config/full-sample-scheme
-                                   (cond-> {}
-                                     limit-eval-count (assoc
-                                                       :limit-eval-count
-                                                       limit-eval-count)
-                                     limit-time-s (assoc
-                                                   :limit-time-s
-                                                   limit-time-s))))))
+               limit-eval-count)     (assoc
+                                      :sample-scheme
+                                      (config/full-sample-scheme
+                                       (cond-> {}
+                                         limit-eval-count (assoc
+                                                           :limit-eval-count
+                                                           limit-eval-count)
+                                         limit-time-s     (assoc
+                                                           :limit-time-s
+                                                           limit-time-s))))))
       histogram? (update-in [:analysis] conj
                             {:analysis-type :samples})
       histogram? (update-in [:report] conj

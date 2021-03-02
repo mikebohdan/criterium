@@ -3,4 +3,5 @@
   (cider-preferred-build-tool
    . "clojure-cli")
   (cider-clojure-cli-parameters
-   . "-A:dev:kaocha -m nrepl.cmdline --middleware '%s'")))
+   . "-A:dev:kaocha -m nrepl.cmdline --middleware '%s'")
+  ))

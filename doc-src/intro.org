@@ -33,7 +33,7 @@ expression.
 #+end_src
 
 #+RESULTS:
-: "Elapsed time: 0.10276 msecs"
+: "Elapsed time: 0.031854 msecs"
 
 Hundreds of microseconds for a constant is a little large.  This is
 effectively a one-shot measurement, and the first time the JIT runs
@@ -52,18 +52,21 @@ different answers
 #+end_src
 
 #+RESULTS:
-:                         Elapsed Time: 1.11 ± 0.247 ns
+:                 JIT Compilation Time: 0.00 ± 0.00 ns
+:                              GC Time: 0.00 ± 0.00 ns
+:                             GC count: 0.00 ± 0.00
+:                         Elapsed Time: 1.15 ± 0.254 ns
 
 There are 7 orders of magnitude difference here.  Criterium's time by
 default does some warmup on quick functions to activate the JIT
 compiler.  We can tell Criterium to use a one shot measurement.
 
 #+begin_src clojure :results output
-(criterium/time 1 :sample-mode :one-shot)
+(criterium/time 1 :sample-scheme :one-shot)
 #+end_src
 
 #+RESULTS:
-:                     Elapsed time: 235 ns
+:                     Elapsed time: 314 ns
 
 We see there is now just a 3 order of magnitude difference.
 
@@ -84,17 +87,11 @@ the difference by creating a slightly modified version of clojure's
 #+end_src
 
 #+RESULTS:
-: "Elapsed time: 3.12E-4 msecs"
+: "Elapsed time: 2.48E-4 msecs"
+
 
 This is now much more comparable, being the same order of magnitude as
 criterium's one-shot sample.
-
-
-
-
-
-
-
 
 The remaining difference is due to how criterium lifts constants out of
 the timing loop.
@@ -102,16 +99,9 @@ the timing loop.
 Secondly it
 evaluates the constants within the expression within the timing.
 
-
-
-
 Criterium achieves this by running multiple iterations for quick
 expressions.  It only does this when it can without creating an
 appreciable lag (100ms).
-
-
-
-
 
 
 ** Controlling how hard criterium tries to get an answer
@@ -120,17 +110,31 @@ Often I see people putting their expressions in a loop, and then
 adjusting the number of iterations to run to give an answer in a
 reasonable time.
 
-We can achieve the same effect by using the `:limit-time` options to
+We can achieve the same effect by using the `:limit-time-s` options to
 criterium's ~time~, to limit the time in seconds that criterium will
 use.
 
 
 #+begin_src clojure :results output
-;;(require 'criterium.time)
-;;(criterium.time/time 1 :limit-time 1)
+(require 'criterium)
+(criterium/time 1 :limit-time-s 1)
 #+end_src
 
 #+RESULTS:
 :                     Elapsed time: 45.0 ns
 
 In this case Criterium displays a mean and variance.
+
+
+** Examining time distribution
+
+The mean and variance displayed are not always useful.  The distribution
+tends to have a hard lower bound and a long tail, making it skewed. We
+can ask criterium to plot the distribution.
+
+For this to work you will need ~criterium/chart~ on your classpath.
+
+#+begin_src clojure :results output
+(require 'criterium)
+(criterium/time 1 :limit-time-s 1 :histogram true)
+#+end_src
