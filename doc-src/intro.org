@@ -126,7 +126,7 @@ use.
 In this case Criterium displays a mean and variance.
 
 
-** Examining time distribution
+** Examining Time Distribution
 
 The mean and variance displayed are not always useful.  The distribution
 tends to have a hard lower bound and a long tail, making it skewed. We
@@ -135,6 +135,14 @@ can ask criterium to plot the distribution.
 For this to work you will need ~criterium/chart~ on your classpath.
 
 #+begin_src clojure :results output
-(require 'criterium)
 (criterium/time 1 :limit-time-s 1 :histogram true)
+#+end_src
+
+** Using CPU Time rather than Elapsed Time
+
+Using CPU time, if available, may produce less variation in the timings.
+
+#+begin_src clojure :results output
+(require '[criterium.jvm :as jvm])
+(criterium/time 1 :time-fn jvm/current-thread-cpu-time)
 #+end_src
