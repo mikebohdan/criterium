@@ -54,47 +54,23 @@
   ([options]
    (criterium/measure
     (measured/expr 1)
-    ;; (measured/measured
-    ;;   (fn [] 1)
-    ;;   (fn [x] x)
-    ;;   1)
     (criterium/config-map
      (merge
-      {:limit-time-s 10
-       ;; :sink-fn criterium.eval/sink-primitive-long
-       }
+      {:limit-time-s 10}
       options)))))
-;; (constant-bench)
 
-
-(def m (measured/expr 1))
-
-;; (def mb (measured/batch
-;;          m
-;;          100))
-
-#_(comment
-    (require 'no.disassemble)
-    (pprint/pprint
-     (println (no.disassemble/disassemble-str (:f m)))
-     (println (no.disassemble/disassemble-str (:f mb)))
-     (println (no.disassemble/disassemble-str nanotime-latency-fn))
-     (println (no.disassemble/disassemble-str (criterium.eval.ObjectSink. 1 1 nil)))
-     (println (no.disassemble/disassemble-str (toolkit/with-time)))))
-
-(defn empty-bench [& [options]]
-  (criterium/measure
-   (measured/expr nil)
-   (criterium/config-map
-    (merge
-     {:limit-time 10}
-     options))))
-
-;; (empty-bench)
+(defn empty-bench
+  ([] (empty-bench {}))
+  ([options]
+   (criterium/measure
+    (measured/expr nil)
+    (criterium/config-map
+     (merge
+      {:limit-time-s 10}
+      options)))))
 
 (defn- mean-elapsed-time-ns [result]
   (-> result :stats :stats :elapsed-time-ns :mean first))
-
 
 (defn platform-stats
   "Return mean estimates for times that describe the accuracy of timing."

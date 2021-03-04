@@ -1,470 +1,227 @@
 (ns criterium.clojure-core-bench
-  (:require  [clojure.test.check
-              [generators :as gen]]
-             [criterium
-              [arg-gen :as arg-gen]
-              [measured :as measured]
-              [measure :as measure]
-              [stats :as stats]]))
+  (:require
+   [clojure.test.check.generators :as gen]
+   [criterium :as criterium]
+   [criterium.arg-gen :as arg-gen]
+   [criterium.stats :as stats]))
 
 ;;; arg-gen a constant
 
-(defn constant-bench [mx]
-  (arg-gen/measured {:size mx} [i gen/small-integer]
+(defn constant-measured
+  []
+  (arg-gen/measured
+      {}
+      [i gen/small-integer]
     i))
 
-
-(comment
-  (criterium.measure/measure
-    (constant-bench 10)
-    {:limit-time 10})
-  )
+(defn measure-constant
+  ([] (measure-constant {}))
+  ([options]
+   (criterium/time-measured
+    (constant-measured)
+    (criterium/config-map
+     (merge
+      {:limit-time-s 1}
+      options)))))
 
 ;;; Identity
 
 (defmacro recursively
-  "Expand to call  f recursively n times with the initial argument, init."
+  "Expand to call f recursively n times with the initial argument, init."
   [n f init]
   (reduce
-    (fn [expr _n]
-      `(~f ~expr))
-    init
-    (range n)))
+   (fn [expr _n]
+     `(~f ~expr))
+   init
+   (range n)))
 
-;; (defmacro measured-recursively
-;;   [n f init]
-;;   (dotimes [i n]
-;;     (recursively)))
+(def gen-for-identity (gen/vector gen/small-integer))
 
-(def gen-for-identity (gen/vector gen/any))
-
-(defn identity-bench0 [mx]
+(defn identity-measured0 [mx]
   (arg-gen/measured {:size mx} [i gen-for-identity]
     i))
 
-(defn identity-bench [mx]
+(defn identity-measured [mx]
   (arg-gen/measured {:size mx} [i gen-for-identity]
     (identity i)))
 
-(defn identity-bench2 [mx]
+(defn measure-identity
+  ([] (measure-identity {}))
+  ([options]
+   (criterium/time-measured
+    (identity-measured 10)
+    (criterium/config-map
+     (merge
+      {:limit-time-s 1}
+      options)))))
+
+(defn identity-measured2 [mx]
   (arg-gen/measured {:size mx} [i gen-for-identity]
     (recursively 2 identity i)))
 
-(defn identity-bench3 [mx]
+(defn identity-measured3 [mx]
   (arg-gen/measured {:size mx} [i gen-for-identity]
     (recursively 3 identity i)))
 
-(defn identity-bench4 [mx]
+(defn identity-measured4 [mx]
   (arg-gen/measured {:size mx} [i gen-for-identity]
     (recursively 4 identity i)))
 
-(defn identity-regression []
-  ;;(println :hello1)
-  (let [ms [;; (identity-bench0 100)
-            (identity-bench 100)
-            (identity-bench2 100)
-            (identity-bench3 100)
-            (identity-bench4 100)]
-        n  (count ms)
-        xs (range 1 (inc n))
-        ys (reduce
+(defn identity-regression
+  ([] (identity-regression {}))
+  ([options]
+   (let [ms [;; (identity-measured0 100)
+             (identity-measured 10)
+             (identity-measured2 10)
+             (identity-measured3 10)
+             (identity-measured4 10)]
+         n  (count ms)
+         xs (range 1 (inc n))
+         ys (reduce
              (fn [res m]
-               (conj res (-> (criterium.measure/measure
+               (conj res (-> (criterium/measure
                               m
-                              {:limit-time 10})
-                            :stats :time :mean first)))
+                              (criterium/config-map
+                               (merge
+                                {:limit-time-s 10}
+                                options)))
+                             :stats :stats :elapsed-time-ns :mean first)))
              []
              ms)
-        lr (criterium.stats/linear-regression xs ys)
-        ;; _ (println {:xs xs :ys ys})
-        ;;c  (criterium.chart/xy-chart xs ys)
-        ]
-    (println "Regression" lr)
-    ;; (println {:xs xs :ys ys})
-    ;; (println :hello)
-     ;;(criterium.chart/view c)
-    ))
+         ;; _  (println {:xs xs :ys ys})
+         _  (criterium.chart/view (criterium.chart/xy-chart xs ys))
+         lr (criterium.stats/linear-regression xs ys)
+         ]
+     (println "Regression" lr))))
 
 (comment
-  (identity-regression)
-  )
-
-
-
-
-(comment
-  (criterium.measure/measure
-    (identity-bench 100)
-    {:limit-time 10}))
+  (identity-regression))
 
 ;;; inc
 
-(defn inc-bench [mx]
+(defn inc-measured [mx]
   (arg-gen/measured {:size mx} [i (gen/choose 0 1000)]
     (inc i)))
 
-(comment
-  (criterium.measure/measure
-    (inc-bench 10000)
-    {:limit-time 10}))
+(defn measure-inc
+  ([] (measure-inc {}))
+  ([options]
+   (criterium/time-measured
+    (inc-measured 10000)
+    (criterium/config-map
+     (merge
+      {:limit-time-s 1}
+      options)))))
 
+;;; instance?
 
-
-;; nth
-
-(comment
-  (defn inc-depth [x] (vec (repeat 3 (vec (take 3 x)))))
-  (defn v-n [depth]
-    (let [v0 ['a 'b 'c]]
-      (last (take depth (iterate inc-depth v0)))))
-
-  (def v (v-n 5))
-
-  (criterium.measure/measure
-    (measured/expr
-      (nth (nth (nth (nth v 1) 2) 0) 1))
-    {:limit-time  10
-     :limit-evals 1000000000})
-
-  (criterium.measure/measure
-    (measured/expr
-      (nth (nth (nth v 1) 2) 0))
-    {:limit-time  10
-     :limit-evals 1000000000})  ;; 13.23813842438487
-
-  (criterium.measure/measure
-    (measured/expr
-      (nth (nth v 1) 2))
-    {:limit-time  10
-     :limit-evals 1000000000})  ; 13.60222827768907
-
-  (def v [0 1 2 3 4 5 6 7 8 9])
-  (criterium.measure/measure
-    (measured/expr
-      (nth v 2)
-      {:arg-metas [{} {:tag 'int}]}
-      )
-    {:limit-time  10
-     :limit-evals 1000000000})
-
-  (criterium.measure/measure
-    (measured/expr
-      (.nth v 2)
-      #_{:arg-metas [{:tag clojure.lang.Indexed}
-                   {:tag int}]})
-    {:limit-time  10
-     :limit-evals 1000000000})
-
-  (criterium.measure/measure
-    (measured/expr
-      (.nth ^clojure.lang.Indexed (.nth v 2) 1)
-      {:arg-metas [{:tag clojure.lang.Indexed}
-                   {:tag int}
-                   {:tag int}]})
-    {:limit-time  10
-     :limit-evals 1000000000})
-
-(measured/symbolic
-  (measured/expr
-    (.nth ^clojure.lang.Indexed (.nth v 2) 1)
-    {:arg-metas [{:tag clojure.lang.Indexed}
-                 {:tag long}
-                 {:tag long}]}))
-
-  (criterium.measure/measure
-    (measured/expr
-      (.nth [0 1 2 3 4 5 6 7 8 9] 9)
-      {:arg-metas [{:tag clojure.lang.Indexed}
-                   {:tag long}]}
-      )
-    {:limit-time  10
-     :limit-evals 1000000000}) ; 12.833147195100894
-
-  (criterium.measure/measure
-    (measured/expr
-      (nth [0 1 2 3 4 5 6 7 8 9] 9)
-      {:arg-metas [{:tag clojure.lang.Indexed}
-                   {:tag long}]}
-      )
-    {:limit-time  10
-     :limit-evals 1000000000})
-
-  (defn nth-regression []
-    ;;(println :hello1)
-    (let [ms      [;; (identity-bench0 100)
-                   (measured/expr
-                     (nth v 1))
-                   (measured/expr
-                     (nth (nth v 1) 1))
-                   (measured/expr
-                     (nth (nth (nth v 1) 1) 1))
-                   (measured/expr
-                     (nth (nth (nth (nth v 1) 1) 1) 1))
-                   ]
-          n       (count ms)
-          xs      (range 1 (inc n))
-          ys      (reduce
-               (fn [res m]
-                 (conj res (-> (criterium.measure/measure
-                                m
-                                {:limit-time 10})
-                              :stats :time :mean first)))
-               []
-               ms)
-          [a0 a1] (criterium.stats/linear-regression xs ys)
-          ;; _ (println {:xs xs :ys ys})
-          c       (criterium.chart/xy-chart xs ys)
-          ]
-      (println "Regression" [a0 a1])
-      ;; (println {:xs xs :ys ys})
-      ;; (println :hello)
-      (criterium.chart/view c)))
-
-  ;; (nth-regression)
-
-  (require 'no.disassemble)
-
-  (println
-    (no.disassemble/disassemble-str
-      (:f (measured/expr
-            (nth [[1 2 3] [2 3 1] [3 2 1]] 2)))))
-
-  (println
-    (no.disassemble/disassemble-str
-      (:f (measured/expr
-            (nth (nth v 1) 2)))))
-  (println
-    (no.disassemble/disassemble-str
-      (:f (measured/expr
-            (nth v 1)
-            {:arg-metas [{} {:tag 'long}]}
-            ))))
-
-
-  (println
-    (no.disassemble/disassemble-str
-      (:f (measured/expr
-            (.nth v 2)
-            #_{:arg-metas [{:tag clojure.lang.Indexed}
-                         {:tag long}]}
-            ))))
-
-    (println
-    (no.disassemble/disassemble-str
-      (fn [] (.nth [1 2 3] 1)) ))
-
-    (println
-    (no.disassemble/disassemble-str
-      (fn [n]
-        (let [^long n n]
-          (.nth [1 2 3] 1))) ))
-
-    (defmacro sym-meta [s]
-      (println (type (:tag (meta s)))))
-
-    (sym-meta ^long n)
-
-)
-
-
-
-(defn nth-bench [mx]
+(defn instance?-measured []
   (arg-gen/measured
-    {:size mx}
-    [v (gen/vector gen/int 1 1000)
-     i (gen/choose 0 (dec (count v)))]
-    (nth v i)
-    ;; (+
-    ;;   (nth v ^long i)
-    ;;    ;; (nth v ^long (- i 1))
-    ;;    ;; (nth v ^long (- i 2))
-    ;;    )
-    ))
+      {:size 5}
+      [i (gen/elements [Integer String Long Short BigInteger])]
+    (instance? Long i)))
 
-(comment
-  (criterium.measure/measure
-    (nth-bench 10000)
-    {:limit-time 10})
+(defn measure-instance?
+  ([] (measure-instance? {}))
+  ([options]
+   (criterium/time-measured
+    (instance?-measured)
+    (criterium/config-map
+     (merge
+      {:limit-time-s 1}
+      options)))))
 
-  (println
-    (no.disassemble/disassemble-str
-      (:f (nth-bench 1000))))q)
+;;; nth
 
-;; +
-;; 3 133.27992622571227 59
-;; 2 74.414102064389   54
-;; 1 20.50997218893159
-;; ll   16.888833639012905
-
-;; make this a direct linked function, so we don't
-;; end up with getRawRoot calls inside the timing loop.
-(defn ^:const vec-nth [^clojure.lang.Indexed v i]
-  (.nth v i))
-
-(comment
-  (println
-    (no.disassemble/disassemble-str
-      vec-nth)))
-
-(defn vec-nth-bench [mx]
+(defn nth-measured [mx]
+  ;; Uses standard vector generator, with explicit type hints,
+  ;; to allow use of mx in the gen args.
+  ;; This is just an alternative approach to using a custom generator.
   (arg-gen/measured
-    {:size mx}
-    [v (gen/vector gen/int 1 1000)
-     i (gen/choose 0 (dec (count v)))]
-    ;; (vec-nth v i)
-    (.nth  v i)
-    ))
+      {:size      mx
+       :arg-metas []}
+      [v (gen/vector gen/int mx)
+       i (gen/choose 0 (dec (count v)))]
+    (nth v i)))
 
-;; (defn vec-nth-bench [mx]
-;;   (arg-gen/measured [v (gen/vector gen/int 1 mx)
-;;                     i (gen/choose 0 (dec (count v)))]
-;;     (vec-nth v i)))
-
-(comment
-  (criterium.measure/measure
-    (nth-bench 10000)
-    {:limit-time 10})
-
-  (criterium.measure/measure
-    (vec-nth-bench 10000)
-    {:limit-time 10})
-
-
-  (println
-    (no.disassemble/disassemble-str
-      (:f (nth-bench 10000))))
-
-  (criterium.measure/measure
-    (nth-bench 10)
-    {:limit-time 10})
-
-  (criterium.measure/measure
-    (vec-nth-bench 10000)
-    {:limit-time 10})
-
-  (println
-    (no.disassemble/disassemble-str
-      (:f (vec-nth-bench 10000))))
-  (println
-    (no.disassemble/disassemble-str
-      (:f (measured/expr (.nth [0 1 2 3] 3)))))
-
-  (println
-    (no.disassemble/disassemble-str
-      (let [x (clojure.java.api.Clojure/read "(fn [v i] (nth v i))")]
-        (eval x))))
-
-  (println
-    (no.disassemble/disassemble-str
-      (let [x (clojure.java.api.Clojure/read "(fn [v i] (.nth ^clojure.lang.Indexed v i))")]
-        (eval x))))
-
-  (criterium.measure/measure
-    (vec-nth-bench 10)
-    {:limit-time 10})
-
-  (criterium.measure/measure
-    (measured/expr
-      (.nth [0 1 2 3] 3))
-    {:limit-time 10}))
-
-
-(defn vector-destructure-bench [mx]
+(defn vec-nth-measured [mx]
+  ;; Uses standard vector generator, with explicit type hints,
+  ;; to allow use of mx in the gen args.
+  ;; This is just an alternative approach to using a custom generator.
   (arg-gen/measured
-    {:size mx}
-    [v (gen/vector gen/int 3 1000)
-     i (gen/choose 0 (dec (count v)))]
+      {:size      mx
+       :arg-metas [{:tag clojure.lang.PersistentVector}
+                   {:tag 'long}]}
+      [v (gen/vector gen/int mx)
+       i (gen/choose 0 (dec (count v)))]
+    (.nth v i)))
+
+(defn measure-nth
+  "Measure nth.
+  Note that the timing is multi-modal, depending on the depth of the
+  tree backing the vector.
+
+  Compare;
+     (measure-nth 32 {:histogram true})
+     (measure-nth (* 32 32) {:histogram true})"
+  [vec-size options]
+  (criterium/time-measured
+   (nth-measured vec-size)
+   (criterium/config-map
+    (merge
+     {:limit-time-s 1}
+     options))))
+
+(defn measure-vec-nth
+  "Measure .nth on a vector.
+  Note that the timing is multi-modal, depending on the depth of the
+  tree backing the vector.
+
+  Compare;
+     (measure-vec-nth 32 {:histogram true})
+     (measure-vec-nth (* 32 32) {:histogram true})"
+  [vec-size options]
+  (criterium/time-measured
+   (vec-nth-measured vec-size)
+   (criterium/config-map
+    (merge
+     {:limit-time-s 1}
+     options))))
+
+;;; destructuring
+
+(defn vector-destructure-measured
+  []
+  (arg-gen/measured
+      {:size 3}
+      [v (gen/vector gen/int 3)]
     (let [[a b c] v]
       (+ a b c))))
 
-(defn vector-explicit-destructure-bench [mx]
+(defn vector-explicit-destructure-measured
+  []
   (arg-gen/measured
-    {:size mx}
-    [v (gen/vector gen/int 3 1000)
-     i (gen/choose 0 (dec (count v)))]
-    (+ (.nth ^clojure.lang.IPersistentVector v 0)
-       (.nth ^clojure.lang.IPersistentVector v 1)
-       (.nth ^clojure.lang.IPersistentVector v 2))))
+      {:size 3}
+      [v (gen/vector gen/int 3)]
+    (let [w v]
+      (+ (.nth w 0)
+         (.nth w 1)
+         (.nth w 2)))))
 
+(defn measure-vector-destructure
+  [options]
+  (criterium/time-measured
+   (vector-destructure-measured)
+   (criterium/config-map
+    (merge
+     {:limit-time-s 1}
+     options))))
 
-
-(comment
-  (let [v        [1 2 3]
-        state-fn (fn [] v)
-        f        (fn [^clojure.lang.APersistentVector v ^long eval-count]
-                   (let )
-                   (.nth  v  2))
-        measured (measured/measured state-fn f 1)
-        ;; measured (measured/expr (.nth [1 2 3] 2))
-        ]
-    (def m measured)
-    (criterium.measure/measure
-     measured
-     {:limit-time  10
-      :limit-evals 10000000000}))
-
-  (def mb (measured/batch m 100000 ;; {:sink-fn criterium.eval/sink-primitive-long}
-                          ))
-  (dotimes [i 1000]
-    (->
-     (criterium.toolkit/sample
-      (criterium.pipeline/elapsed-time-metric)
-      mb)
-     :time
-     (/ 100000.0)))
-
-  (dotimes [i 100000]
-    (->
-     (criterium.toolkit/sample
-      (criterium.pipeline/elapsed-time-metric)
-      m)
-     :time))
-
-  (let [v        [1 2 3]
-        state-fn (fn [] v)
-        f        (fn [v]
-                   (nth v 2))
-        measured (measured/measured state-fn f 1)]
-    (def m measured)
-    (criterium.measure/measure
-     measured
-     {:limit-time  10
-      :limit-evals 10000000000}))
-
-  (criterium.measure/measure
-   m
-   {:limit-time  10
-    :limit-evals 10000000000})
-
-
-  (criterium.measure/measure
-   (criterium.toolkit/measured-batch
-    (vector-destructure-bench 3)
-    1000)
-   {:limit-time 10})
-
-  (criterium.measure/measure
-   (vector-explicit-destructure-bench 3)
-   {:limit-time 10})
-
-
-  (criterium.chart/view
-   (criterium.chart/time-histogram
-    (criterium.measure/measure
-     (vec-nth-bench 10000)
-     {:limit-time     1
-      :return-samples true}))))
-
-
-(comment
-  (require '[criterium.core :refer [report-result benchmark]])
-  (let [v [1 2 3]]
-    (report-result
-      (benchmark
-        (.nth ^IPersistentVector v 2) {})))) ;; 4.049624 ns
-
-(comment
-  (let [v [1 2 3]]
-    (report-result
-      (benchmark
-        (nth v 2) {})))) ;; 7.456217 ns
+(defn measure-explicit-destructure
+  [options]
+  (criterium/time-measured
+   (vector-explicit-destructure-measured)
+   (criterium/config-map
+    (merge
+     {:limit-time-s 1}
+     options))))

@@ -5,8 +5,7 @@
    [criterium :as criterium]
    [criterium.config :as config]
    [criterium.jvm :as jvm]
-   [criterium.pipeline :as pipeline]
-   [criterium.sample-scheme :as sample-scheme]))
+   [criterium.pipeline :as pipeline]))
 
 (deftest config-map-test
   (is (= (-> config/default-config

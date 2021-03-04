@@ -102,6 +102,10 @@
   [_report {:keys [samples] :as result} _config]
   (print-final-gc-warnings (:stats result)))
 
+(defmethod report-impl :samples
+  [_report {:keys [samples] :as result} _config]
+  (prn :samples samples))
+
 (defn report
   [result {:keys [report] :as config}]
   (doseq [report-config report]

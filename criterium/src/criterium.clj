@@ -65,7 +65,8 @@
                            ::limit-eval-count
                            ::limit-time-s
                            ::pipeline
-                           ::sample-scheme]))
+                           ::sample-scheme
+                           ::report]))
 
 (defn config-map
   "Convert option arguments into a criterium option map.
@@ -83,9 +84,10 @@
                           (set (keys options-map))
                           #{:analysis
                             :histogram
-                            :pipeline
                             :limit-eval-count
                             :limit-time-s
+                            :pipeline
+                            :report
                             :sample-scheme
                             :verbose})]
 

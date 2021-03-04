@@ -19,8 +19,8 @@
   (let [[created-seed rng] (make-rng seed)
         size-seq           (gen/make-size-range-seq max-size)]
     (volatile! {:created-seed created-seed
-                :rng rng
-                :size-seq size-seq})))
+                :rng          rng
+                :size-seq     size-seq})))
 
 (defn state-fn   ; TODO make state-fn-state a mutable field on measured?
   [gen state-fn-state]
@@ -33,44 +33,46 @@
       (rose/root result-map-rose))))
 
 (defn measured-impl
-  "A function version of `for-all`. Takes a sequence of N generators and a function of N
-  args, and returns a measured function, which can be called with generated values, like
-  with `for-all`.
+  "A function version of `for-all`. Takes a sequence of N generators and a
+  function of N args, and returns a measured function, which can be
+  called with generated values, like with `for-all`.
 
   Example:
 
   (for-all* [gen/large-integer gen/large-integer]
             (fn [a b] (+ a b) a))"
   [gen f {:keys [size seed] :or {size 100 seed nil}}]
-  (let [state-fn-state (state-fn-state size seed)
-        ;; gen args ;; (apply gen/tuple args)
-        ]
+  (let [state-fn-state (state-fn-state size seed)]
     (measured/measured
      (state-fn gen state-fn-state)
      f)))
 
-;; (defn- binding-vars
-;;   [bindings]
-;;sddcc   (mapv first (partition 2 bindings)))
-
-;; (defn- binding-gens
-;;   [bindings]
-;;   (mapv second (partition 2 bindings)))
+(defn arg-metas-from-example
+  "Return a vector of type hints for the generated state elements."
+  [binding-gens]
+  (let [example-size  2
+        example-form  `((state-fn
+                         ~binding-gens
+                         (state-fn-state ~example-size nil)))
+        example-state (eval example-form)
+        types         (mapv type example-state)]
+    (mapv measured/tag-meta types)))
 
 (defmacro measured*
-  "Returns a measured, which is the combination of some generators and an expression
-  that should be measured for all generated values.
+  "Returns a measured, which is the combination of some generators and an
+  expression that should be measured for all generated values.
 
-  `for-all` takes a `let`-style bindings vector, where the right-hand side of each
-  binding is a generator.
+  `for-all` takes a `let`-style bindings vector, where the right-hand
+  side of each binding is a generator.
 
-  The body should be an expression of the generated values that will be measured.
+  The body should be an expression of the generated values that will be
+  measured.
 
-  When there are multiple binding pairs, the earlier pairs are visible to the later
-  pairs.
+  When there are multiple binding pairs, the earlier pairs are visible
+  to the later pairs.
 
-  If there are multiple body expressions, all but the last one are executed for side
-  effects, as with `do`.
+  If there are multiple body expressions, all but the last one are
+  executed for side effects, as with `do`.
 
   Example:
 
@@ -83,74 +85,30 @@
     :or   {size 100 seed nil}
     :as   _options}
    bindings & body]
-  (let [pairs (partition 2 bindings)
+  (let [pairs        (partition 2 bindings)
         binding-vars (mapv first pairs)
         binding-gens (reduce
                       (fn [curr [sym code]]
                         `(gen/bind ~code (fn [~sym] ~curr)))
                       `(gen/return ~binding-vars)
                       (reverse pairs))
-        ;; _ (prn "eaxmple-state form"
-        ;;            `((state-fn ~binding-gens (state-fn-state 2 nil))))
-        example-state (eval `((state-fn ~binding-gens (state-fn-state 2 nil))))
-        types (mapv type example-state)
-        arg-metas (mapv measured/tag-meta types)
-        options {:arg-metas arg-metas}]
+        options      {:arg-metas
+                      (or arg-metas
+                          (arg-metas-from-example binding-gens))}]
     `(measured-impl
       ~binding-gens
-       ;; ~(list 'quote `(do ~@body))
       ~(measured/measured-expr-fn
         binding-vars
         `(do ~@body)
         options)
       ~{:size size
-        :seed seed}
-       ;; (fn ~(gensym "for-all-body") [~binding-vars]
-       ;;   ~@body)
-      )))
+        :seed seed})))
 
 (defmacro measured
-  "Return a measured using test.check generators for state."
-  ;; ([binding & body]
-  ;;  `(measured* nil ~for-all-expr))
-  [bindings & body]
-  (if (vector? bindings)
-    `(measured* nil ~bindings ~@body)
-    (do
-      (assert (map? bindings) "options must be passed as a literal map")
-      `(measured* ~bindings ~@body))))
-
-#_(comment
-    (def m (for-all [i (gen/choose 0 1000000000000000000)]
-                    (inc i)))
-
-    (def m (for-all [i (gen/choose 0 1000000000000000000)]
-                    i))
-
-    (def nth-bench
-      (for-all [v (gen/vector gen/int 1 100000)
-                i (gen/choose 0 (dec (count v)))]
-               (nth v i)))
-
-    (def vec-nth-bench
-      (for-all [v (gen/vector gen/int 1 100000)
-                i (gen/choose 0 (dec (count v)))]
-      ;;(.nth ^clojure.lang.APersistentVector v ^int i)
-               (.nth  v  i)))
-
-    ((:state-fn m))
-
-    (criterium.measure/measure m {:limit-time 1})
-    (dissoc (criterium.measure/measure m {:limit-evals 100}) :samples)
-    (dissoc (criterium.measure/measure nth-bench {:limit-time 1}) :samples)
-    (dissoc (criterium.measure/measure vec-nth-bench {:limit-time 1}) :samples)
-    (criterium.measure/measure m {})
-
-    (def g (gen/bind
-            (gen/vector gen/int 1 100000)
-            (fn [v]
-              (gen/bind
-               (gen/choose 0 (dec (count v)))
-               (fn [i] (gen/return [v i])))))))
-
-;; (gen/generate g)
+"Return a measured using test.check generators for state."
+[bindings & body]
+(if (vector? bindings)
+  `(measured* nil ~bindings ~@body)
+  (do
+    (assert (map? bindings) "options must be passed as a literal map")
+    `(measured* ~bindings ~@body))))
