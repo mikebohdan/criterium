@@ -9,7 +9,8 @@
 
 ;;;; A collection of statistical methods used by criterium
 
-(ns criterium.stats)
+(ns criterium.stats
+  (:refer-clojure :exclude [min]))
 
 ;; (set! *warn-on-reflection* true)
 
@@ -32,6 +33,11 @@
 
 ;;; Statistics
 
+(defn min
+  ([data]
+   (reduce clojure.core/min data))
+  ([data _count]
+   (reduce clojure.core/min data)))
 
 (defn mean
   "Arithmetic mean of data."
@@ -140,12 +146,12 @@
    (for [_ (range size)] (statistic (sort (sample data (rng-factory)))))))
 
 (defn confidence-interval
-  "Find the significance of outliers gicen boostrapped mean and variance
+  "Find the significance of outliers given boostrapped mean and variance
    estimates. This uses the bootstrapped statistic's variance, but we should use
    BCa of ABC."
   [mean variance]
-  (let [n-sigma 1.96                    ; use 95% confidence interval
-        delta (* n-sigma (Math/sqrt variance))]
+  (let [n-sigma 1.96 ; use 95% confidence interval
+        delta   (* n-sigma (Math/sqrt variance))]
     [(- mean delta) (+ mean delta)]))
 
 (defn bootstrap-estimate

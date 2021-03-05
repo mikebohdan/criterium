@@ -13,22 +13,23 @@
    (criterium/time-measured
     (measured/expr (jvm/timestamp))
     (merge
-     {:limit-time-s 10}
+     {:limit-time-s 10
+      :return-value ::nil}
      options))))
 
 (defn- nanotime-granularity-fn
   [_ ^long eval-count]
-  (let [start (jvm/timestamp)]
-    (loop [n eval-count
-           t (jvm/timestamp)]
-      (let [t1 (jvm/timestamp)]
-        (if (= t t1)
-          (recur n t1)
-          (if (pos? n)
-            (recur (unchecked-dec n) t1)
-            t1))))
-    (let [finish (jvm/timestamp)]
-      [(unchecked-subtract finish start) nil])))
+  (let [start  (jvm/timestamp)
+        finish (loop [n eval-count
+                      t start]
+                 (let [t1 (jvm/timestamp)]
+                   (if (= t t1)
+                     (recur n t1)
+                     (if (pos? n)
+                       (recur (unchecked-dec n) t1)
+                       t1))))
+        delta  (unchecked-subtract finish start)]
+    [delta (long (/ delta eval-count))]))
 
 (defn nanotime-granularity-measured
   []
@@ -43,12 +44,13 @@
    (criterium/time-measured
     (nanotime-granularity-measured)
     (merge
-     {:limit-time-s 10}
+     {:limit-time-s 10
+      :return-value ::nil}
      options))))
 
 ;; Minimum measured time
-(defn constant-measured
-  ([] (constant-measured {}))
+(defn constant-long
+  ([] (constant-long {}))
   ([options]
    (criterium/time-measured
     (measured/expr 1)
@@ -56,8 +58,26 @@
      {:limit-time-s 10}
      options))))
 
-(defn nil-measured
-  ([] (nil-measured {}))
+(defn constant-double
+  ([] (constant-double {}))
+  ([options]
+   (criterium/time-measured
+    (measured/expr 1.0)
+    (merge
+     {:limit-time-s 10}
+     options))))
+
+(defn constant-object
+  ([] (constant-double {}))
+  ([options]
+   (criterium/time-measured
+    (measured/expr {})
+    (merge
+     {:limit-time-s 10}
+     options))))
+
+(defn constant-nil
+  ([] (constant-nil {}))
   ([options]
    (criterium/time-measured
     (measured/expr nil)
@@ -68,22 +88,29 @@
 (defn- mean-elapsed-time-ns [result]
   (-> result :stats :elapsed-time-ns :mean first))
 
+(defn- min-elapsed-time-ns [result]
+  (-> result :stats :elapsed-time-ns :min first))
+
 (defn platform-stats
   "Return mean estimates for times that describe the accuracy of timing."
   ([] (platform-stats {}))
   ([options]
-   (let [options     (merge
-                      {:report       []
-                       :limit-time-s 10}
-                      options
-                      {:return-value :stats})
-         latency     (nanotime-latency options)
-         granularity (nanotime-granularity options)
-         constant    (constant-measured options)
-         empty       (nil-measured options)]
-     {:latency     (mean-elapsed-time-ns latency)
-      :granularity (mean-elapsed-time-ns granularity)
-      :constant    (mean-elapsed-time-ns constant)
-      :empty       (mean-elapsed-time-ns empty)})))
+   (let [options         (merge
+                          {:report       []
+                           :limit-time-s 10}
+                          options
+                          {:return-value :stats})
+         latency         (nanotime-latency options)
+         granularity     (nanotime-granularity options)
+         constant-long   (constant-long options)
+         constant-double (constant-double options)
+         constant-object (constant-object options)
+         constant-nil    (constant-nil options)]
+     {:latency         (min-elapsed-time-ns latency)
+      :granularity     (min-elapsed-time-ns granularity)
+      :constant-long   (mean-elapsed-time-ns constant-long)
+      :constant-double (mean-elapsed-time-ns constant-double)
+      :constant-object (mean-elapsed-time-ns constant-object)
+      :constant-nil    (mean-elapsed-time-ns constant-nil)})))
 
 ;; (platform-stats)

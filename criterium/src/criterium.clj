@@ -53,7 +53,7 @@
     (let [result (measure measured config)]
       (vreset! last-time* result)
       (report/report result config)
-      (get result (:return-value config)))))
+      ((:return-value config) result))))
 
 (s/def ::limit-eval-count (s/or :empty? nil? :limit ::domain/eval-count))
 (s/def ::limit-time-s (s/or :empty? nil? :limit (s/and number? pos?)))
@@ -77,7 +77,7 @@
         terminator       (filterv pipeline/terminal-fn? pipeline)
         pipeline-fns     (remove pipeline/terminal-fn? pipeline)
         scheme-type      (:sample-scheme options-map :full)
-        histogram?       (:histogram options-map)
+        histogram        (:histogram options-map)
         limit-time-s     (:limit-time-s options-map)
         limit-eval-count (:limit-eval-count options-map)
         unknown-keys     (set/difference
@@ -105,9 +105,9 @@
                   [:analysis :report :return-value :sample-scheme :verbose])
            (or
             (= scheme-type :full)
-            histogram?)              (assoc :sample-scheme
-                                            (config/full-sample-scheme
-                                             options-map))
+            histogram)              (assoc :sample-scheme
+                                           (config/full-sample-scheme
+                                            options-map))
            (= scheme-type :one-shot) (assoc :sample-scheme
                                             (config/one-shot-sample-scheme
                                              options-map)
@@ -128,10 +128,11 @@
                                          limit-time-s     (assoc
                                                            :limit-time-s
                                                            limit-time-s))))))
-      histogram? (update-in [:analysis] conj
-                            {:analysis-type :samples})
-      histogram? (update-in [:report] conj
-                            {:report-type :histogram}))))
+      histogram (update-in [:analysis] conj
+                           {:analysis-type :samples})
+      histogram (update-in [:report] conj
+                           (cond-> {:report-type :histogram}
+                             (map? histogram) (merge histogram))))))
 
 (defn time-measured
   "Evaluates measured and prints the time it took.

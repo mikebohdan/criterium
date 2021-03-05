@@ -1,4 +1,5 @@
 (ns criterium.report
+  (:refer-clojure :exclude [spit])
   (:require
    [clojure.spec.alpha :as s]
    [criterium.format :as format]
@@ -6,7 +7,7 @@
    [criterium.util :as util]))
 
 (util/optional-require
- '[criterium.chart :as chart :refer [histogram view]])
+ '[criterium.chart :as chart :refer [histogram spit view]])
 
 (defn print-stat [path {:keys [mean variance] :as _stat}]
   (let [{:keys [dimension label]} (metric/metric-format path)
@@ -18,10 +19,12 @@
              (* scale 3 (Math/sqrt (first variance)))
              units))))
 
-(defn view-histogram [{:keys [samples batch-size stats] :as _result} path]
+(defn view-histogram
+  [{:keys [file title]}
+   {:keys [samples batch-size stats] :as _result} path]
   (util/assert-optional-ns
    'criterium.chart
-   "Please add com.hypirion/clj-xchart to the classpath to enable histograms")
+   "Please add criterium/chart to the classpath to enable histograms")
   (let [stat                      (get-in (:stats stats) path)
         mean                      (first (:mean stat))
         {:keys [dimension label]} (metric/metric-format path)
@@ -31,12 +34,14 @@
                                    (mapv (metric/path-accessor path))
                                    (mapv #(/ % (double batch-size)))
                                    (mapv #(* % scale)))
-        chart-options             {:title       label
-                                   :value-label (str "value [" units "]")}]
-    (view
-     (histogram
-      vs
-      chart-options))))
+        chart-options             {:title       (or title label)
+                                   :value-label (str "value [" units "]")}
+        chart                     (histogram
+                                   vs
+                                   chart-options)]
+    (if file
+      (spit chart file)
+      (view chart))))
 
 (defn print-stats [config result]
   (doseq [metric (:metrics config)]
@@ -87,12 +92,10 @@
   (print-stats config result))
 
 (defmethod report-impl :histogram
-  [_report {:keys [samples] :as result} config]
+  [report {:keys [samples] :as result} config]
   (doseq [metric (:metrics config)]
-    (doseq [path (metric/metric-paths metric)
-            ;; samples (mapv #(get-in % path) samples)
-            ]
-      (view-histogram result path))))
+    (doseq [path (metric/metric-paths metric)]
+      (view-histogram report result path))))
 
 (defmethod report-impl :jvm-event-stats
   [_report {:keys [samples] :as result} _config]

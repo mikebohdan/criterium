@@ -108,7 +108,8 @@
     [{:analysis-type :samples}]
     [{:analysis-type  :stats
       :tail-quantile  0.025
-      :bootstrap-size 100}]))
+      ;; :bootstrap-size 100
+      }]))
 
 (defn ensure-pipeline-stages
   "Add any injected stages that aren't already present."

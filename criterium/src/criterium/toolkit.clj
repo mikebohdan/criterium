@@ -80,12 +80,13 @@
       (max 2 (quot n-avail 10))
 
       :else
-      (loop [n-desired n-desired]
-        ;; reduce to less than a predicted 1000 batches
-        (if (or (< (quot (.elapsed-time-ns budget) (* t0 n-desired)) 1000)
-                (< (quot (.eval-count budget) n-desired) 1000))
-          n-desired
-          (recur (* n-desired 10)))))))
+      (do
+        (loop [n-desired n-desired]
+          ;; reduce to less than a predicted 1000 batches
+          (if (or (< (quot (.elapsed-time-ns budget) (* t0 n-desired)) 1000)
+                  (< (quot (.eval-count budget) n-desired) 1000))
+            n-desired
+            (recur (* n-desired 2))))))))
 
 (defn estimate-batch-size
   "Estimate batch-size for the given budget and batch execution-time."

@@ -11,46 +11,49 @@
         stats         (stats/bootstrap-bca
                        (mapv double vs)
                        (juxt
+                        stats/min
                         stats/mean
                         stats/variance
                         (partial stats/quantile 0.5)
                         (partial stats/quantile tail-quantile)
                         (partial stats/quantile (- 1.0 tail-quantile)))
-                       (:bootstrap-size opts 100)
+                       (:bootstrap-size opts (long (/ (count vs) 10)))
                        [0.5 tail-quantile (- 1.0 tail-quantile)]
                        well/well-rng-1024a)
-        ks [:mean :variance :median :0.025 :0.975]
-        sqr-batch-size (stats/sqr batch-size)
-        scale-1 (fn [[p [l u]]]
-                  [(/ p batch-size)
-                   [(/ l batch-size) (/ u batch-size)]])
-        scale-2 (fn [[p [l u]]]
-                  [(/ p sqr-batch-size)
-                   [(/ l sqr-batch-size) (/ u sqr-batch-size)]]) ;; TODO FIXME
-        scale-fns {:mean scale-1
-                   :variance scale-2
-                   :median scale-1
-                   :0.025 scale-1
-                   :0.975 scale-1}
 
-        stats (zipmap ks stats)
-        stats (zipmap ks
-                      (mapv
-                       (fn [k]
-                         ((scale-fns k) (k stats)))
-                       ks))]
+        ks             [:min :mean :variance :median :0.025 :0.975]
+        sqr-batch-size (stats/sqr batch-size)
+        scale-1        (fn [[p [l u]]]
+                         [(/ p batch-size)
+                          [(/ l batch-size) (/ u batch-size)]])
+        ;; TODO check this
+        scale-2        (fn [[p [l u]]]
+                         [(/ p sqr-batch-size)
+                          [(/ l sqr-batch-size) (/ u sqr-batch-size)]])
+        scale-fns      {:min      scale-1
+                        :mean     scale-1
+                        :variance scale-2
+                        :median   scale-1
+                        :0.025    scale-1
+                        :0.975    scale-1}
+        stats          (zipmap ks stats)
+        stats          (zipmap ks
+                               (mapv
+                                (fn [k]
+                                  ((scale-fns k) (k stats)))
+                                ks))]
     stats))
 
 (defn sample-stats [metrics batch-size samples config]
-  ;;(clojure.pprint/pprint samples)
   (let [sum        (pipeline/total samples)
-        ;; _ (clojure.pprint/pprint sum)
         eval-count (:eval-count sum)
         avg        (pipeline/divide sum eval-count)
         paths      (mapcat metric/metric-paths metrics)
         stats      (reduce
                     (fn [res path]
-                      (assoc-in res path (stats-for path batch-size samples config)))
+                      (assoc-in
+                       res path
+                       (stats-for path batch-size samples config)))
                     {}
                     paths)
 

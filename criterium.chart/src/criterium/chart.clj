@@ -108,10 +108,6 @@
 (defn spit [chart path]
   (c/spit chart path))
 
-;; (let [chart (histogram [1 2 2 3 3 3 4 4 5 5 6 8] {})]
-;;   (view chart))
-
-
 (defn time-histogram
   [{:keys [samples stats batch-size] :as _res} & [options]]
   {:pre [samples]}

@@ -49,7 +49,8 @@
            batch-time-ns
            estimation-budget
            warmup-budget
-           sample-budget] :as config}]
+           sample-budget]
+    :as   config}]
   {:pre [pipeline
          (measured/measured? measured)
          (s/valid? ::full-config config)]}
