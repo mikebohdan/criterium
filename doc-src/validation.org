@@ -99,14 +99,10 @@ expression types.
 *** long values
 
 #+begin_src clojure :results file graphics :dir "data/images" :file "constant-long.png" :var dir=(concat (file-name-directory (buffer-file-name)) "data/images/")
-(chart/spit
- (chart/time-histogram
-  (platform/constant-long
-   {:analysis     [{:analysis-type :samples}
-                   {:analysis-type :stats}]
-    :return-value identity})
-  {:title "Constant long"})
- (str "doc-src/data/images/constant-long.png"))
+(platform/constant-long
+ {:histogram
+  {:title "Constant long"
+   :file  (str "doc-src/data/images/constant-long.png")}})
 #+end_src
 
 #+RESULTS:
@@ -118,14 +114,10 @@ Gives a mean around 1ns.
 *** double values
 
 #+begin_src clojure :results file graphics :dir "data/images" :file "constant-double.png" :var dir=(concat (file-name-directory (buffer-file-name)) "data/images/")
-(chart/spit
- (chart/time-histogram
-  (platform/constant-double
-   {:analysis     [{:analysis-type :samples}
-                   {:analysis-type :stats}]
-    :return-value identity})
-  {:title "Constant double"})
- (str "doc-src/data/images/constant-double.png"))
+(platform/constant-double
+ {:histogram
+  {:title "Constant double"
+   :file  (str "doc-src/data/images/constant-double.png")}})
 #+end_src
 
 #+RESULTS:
@@ -136,14 +128,10 @@ Gives a mean around 1.3ns.
 *** object values
 
 #+begin_src clojure :results file graphics :dir "data/images" :file "constant-object.png" :var dir=(concat (file-name-directory (buffer-file-name)) "data/images/")
-(chart/spit
- (chart/time-histogram
-  (platform/constant-object
-   {:analysis     [{:analysis-type :samples}
-                   {:analysis-type :stats}]
-    :return-value identity})
-  {:title "Constant Object"})
- (str "doc-src/data/images/constant-object.png"))
+(platform/constant-object
+ {:histogram
+  {:title "Constant Object"
+   :file  (str "doc-src/data/images/constant-object.png")}})
 #+end_src
 
 #+RESULTS:
