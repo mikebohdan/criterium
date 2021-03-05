@@ -10,12 +10,11 @@
 (defn nanotime-latency
   ([] (nanotime-latency {}))
   ([options]
-   (criterium/measure
+   (criterium/time-measured
     (measured/expr (jvm/timestamp))
-    (criterium/config-map
-     (merge
-      {:limit-time-s 10}
-      options)))))
+    (merge
+     {:limit-time-s 10}
+     options))))
 
 (defn- nanotime-granularity-fn
   [_ ^long eval-count]
@@ -41,47 +40,50 @@
 (defn nanotime-granularity
   ([] (nanotime-granularity {}))
   ([options]
-   (criterium/measure
+   (criterium/time-measured
     (nanotime-granularity-measured)
-    (criterium/config-map
-     (merge
-      {:limit-time-s 10}
-      options)))))
+    (merge
+     {:limit-time-s 10}
+     options))))
 
 ;; Minimum measured time
-(defn constant-bench
-  ([] (constant-bench {}))
+(defn constant-measured
+  ([] (constant-measured {}))
   ([options]
-   (criterium/measure
+   (criterium/time-measured
     (measured/expr 1)
-    (criterium/config-map
-     (merge
-      {:limit-time-s 10}
-      options)))))
+    (merge
+     {:limit-time-s 10}
+     options))))
 
-(defn empty-bench
-  ([] (empty-bench {}))
+(defn nil-measured
+  ([] (nil-measured {}))
   ([options]
-   (criterium/measure
+   (criterium/time-measured
     (measured/expr nil)
-    (criterium/config-map
-     (merge
-      {:limit-time-s 10}
-      options)))))
+    (merge
+     {:limit-time-s 10}
+     options))))
 
 (defn- mean-elapsed-time-ns [result]
-  (-> result :stats :stats :elapsed-time-ns :mean first))
+  (-> result :stats :elapsed-time-ns :mean first))
 
 (defn platform-stats
   "Return mean estimates for times that describe the accuracy of timing."
-  []
-  (let [latency     (nanotime-latency)
-        granularity (nanotime-granularity)
-        constant    (constant-bench)
-        empty       (empty-bench)]
-    {:latency     (mean-elapsed-time-ns latency)
-     :granularity (mean-elapsed-time-ns granularity)
-     :constant    (mean-elapsed-time-ns constant)
-     :empty       (mean-elapsed-time-ns empty)}))
+  ([] (platform-stats {}))
+  ([options]
+   (let [options     (merge
+                      {:report       []
+                       :limit-time-s 10}
+                      options
+                      {:return-value :stats})
+         latency     (nanotime-latency options)
+         granularity (nanotime-granularity options)
+         constant    (constant-measured options)
+         empty       (nil-measured options)]
+     {:latency     (mean-elapsed-time-ns latency)
+      :granularity (mean-elapsed-time-ns granularity)
+      :constant    (mean-elapsed-time-ns constant)
+      :empty       (mean-elapsed-time-ns empty)})))
 
 ;; (platform-stats)

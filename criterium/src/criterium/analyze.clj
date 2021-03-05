@@ -32,10 +32,12 @@
     (assoc result :stats res)))
 
 (defn analyze
-  [sampled metrics analysis-config]
+  [{:keys [samples] :as sampled} metrics analysis-config]
   (reduce
-   #(analyze-samples %2 %1 (:samples sampled) metrics)
-   (dissoc sampled :samples)
+   #(analyze-samples %2 %1 samples metrics)
+   (-> sampled
+       (dissoc :samples)
+       (assoc :expr-value (:expr-value (first samples))))
    analysis-config))
 
 (s/def ::tail-quantile

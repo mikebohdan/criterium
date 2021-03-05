@@ -89,7 +89,8 @@
                     :bootstrap-size 100}]
    :report        [{:report-type :stats}
                    {:report-type :jvm-event-stats}
-                   {:report-type :final-gc-warnings}]})
+                   {:report-type :final-gc-warnings}]
+   :return-value  :expr-value})
 
 (s/def ::verbose boolean?)
 (s/def ::pipeline ::pipeline/pipeline-config)
@@ -99,7 +100,8 @@
                                  ::pipeline
                                  ::analysis
                                  ::sample-scheme/sample-scheme
-                                 ::report]))
+                                 ::report
+                                 ::return-value]))
 
 (defn- default-analysis [{:keys [sample-scheme]}]
   (if (= :one-shot (:scheme-type sample-scheme))

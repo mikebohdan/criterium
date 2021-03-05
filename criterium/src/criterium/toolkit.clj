@@ -98,27 +98,6 @@
                         batch-time-ns)]
     est-eval-count))
 
-
-;; (defn warmup-params
-;;   "Estimate budget and batch-size for warmup"
-;;   [measured
-;;    t0
-;;    budget
-;;    warmup-fraction
-;;    {:keys [warmup-period-ns]
-;;     :as   options}]
-;;   (let [warmup-budget        (budget/phase-budget
-;;                               budget warmup-period-ns warmup-fraction default-fraction)
-;;         ^long est-eval-count (estimate-eval-count
-;;                                t0
-;;                                (merge
-;;                                  warmup-budget
-;;                                  (select-keys options [:target-batch-time-ns])))
-;;         batch-size           (max 1 (long (quot est-eval-count
-;;                                           ^long (:eval-count measured))))]
-;;     [warmup-budget batch-size]))
-
-
 (defn sample
   "Sample measured for the given budget and batch size."
   [pipeline

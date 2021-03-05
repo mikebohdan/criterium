@@ -19,10 +19,10 @@
   ([options]
    (criterium/time-measured
     (constant-measured)
-    (criterium/config-map
-     (merge
-      {:limit-time-s 1}
-      options)))))
+    (merge
+     {:limit-time-s 1
+      :return-value ::nil}
+     options))))
 
 ;;; Identity
 
@@ -50,10 +50,10 @@
   ([options]
    (criterium/time-measured
     (identity-measured 10)
-    (criterium/config-map
-     (merge
-      {:limit-time-s 1}
-      options)))))
+    (merge
+     {:limit-time-s 1
+      :return-value ::nil}
+     options))))
 
 (defn identity-measured2 [mx]
   (arg-gen/measured {:size mx} [i gen-for-identity]
@@ -108,10 +108,10 @@
   ([options]
    (criterium/time-measured
     (inc-measured 10000)
-    (criterium/config-map
-     (merge
-      {:limit-time-s 1}
-      options)))))
+    (merge
+     {:limit-time-s 1
+      :return-value ::nil}
+     options))))
 
 ;;; instance?
 
@@ -126,10 +126,10 @@
   ([options]
    (criterium/time-measured
     (instance?-measured)
-    (criterium/config-map
-     (merge
-      {:limit-time-s 1}
-      options)))))
+    (merge
+     {:limit-time-s 1
+      :return-value ::nil}
+     options))))
 
 ;;; nth
 
@@ -167,10 +167,10 @@
   [vec-size options]
   (criterium/time-measured
    (nth-measured vec-size)
-   (criterium/config-map
-    (merge
-     {:limit-time-s 1}
-     options))))
+   (merge
+    {:limit-time-s 1
+     :return-value ::nil}
+    options)))
 
 (defn measure-vec-nth
   "Measure .nth on a vector.
@@ -183,10 +183,10 @@
   [vec-size options]
   (criterium/time-measured
    (vec-nth-measured vec-size)
-   (criterium/config-map
-    (merge
-     {:limit-time-s 1}
-     options))))
+   (merge
+    {:limit-time-s 1
+     :return-value ::nil}
+    options)))
 
 ;;; destructuring
 
@@ -212,16 +212,16 @@
   [options]
   (criterium/time-measured
    (vector-destructure-measured)
-   (criterium/config-map
-    (merge
-     {:limit-time-s 1}
-     options))))
+   (merge
+    {:limit-time-s 1
+     :return-value ::nil}
+    options)))
 
 (defn measure-explicit-destructure
   [options]
   (criterium/time-measured
    (vector-explicit-destructure-measured)
-   (criterium/config-map
-    (merge
-     {:limit-time-s 1}
-     options))))
+   (merge
+    {:limit-time-s 1
+     :return-value ::nil}
+    options)))

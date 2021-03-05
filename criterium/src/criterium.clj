@@ -34,7 +34,7 @@
   []
   @last-time*)
 
-(defn time-measured
+(defn time-measured*
   "Evaluates measured and prints the time it took.
   Return the value of calling the measured's wrapped function.
 
@@ -53,7 +53,7 @@
     (let [result (measure measured config)]
       (vreset! last-time* result)
       (report/report result config)
-      (:expr-value result))))
+      (get result (:return-value config)))))
 
 (s/def ::limit-eval-count (s/or :empty? nil? :limit ::domain/eval-count))
 (s/def ::limit-time-s (s/or :empty? nil? :limit (s/and number? pos?)))
@@ -88,6 +88,7 @@
                             :limit-time-s
                             :pipeline
                             :report
+                            :return-value
                             :sample-scheme
                             :verbose})]
 
@@ -101,7 +102,7 @@
         (config/expand-options
          (cond-> (select-keys
                   options-map
-                  [:analysis :report :sample-scheme :verbose])
+                  [:analysis :report :return-value :sample-scheme :verbose])
            (or
             (= scheme-type :full)
             histogram?)              (assoc :sample-scheme
@@ -132,6 +133,23 @@
       histogram? (update-in [:report] conj
                             {:report-type :histogram}))))
 
+(defn time-measured
+  "Evaluates measured and prints the time it took.
+  Return the value of calling the measured's wrapped function.
+
+  The timing info is available as a data structure by calling last-time.
+
+  The :times option can be passed an integer specifying how many times
+  to evaluate the expression.  The default is 1.  If a value greater
+  than 1 is specified, then the value of the expression is not returned.
+
+  The :metrics option accepts either :all, for all metrics, or a
+  sequence of metric keyword selectors. Valid metrics
+  are :time, :garbage-collector, :finalization, :memory, :runtime-memory,
+  :compilation, and :class-loader."
+  [measured options]
+  (time-measured* measured (config-map options)))
+
 (defmacro time
   "Evaluates expr and prints the time it took.
   Return the value of expr.
@@ -152,4 +170,4 @@
         measured-options (dissoc options-map :time-fn)]
     `(time-measured
       (measured/expr ~expr ~expr-options)
-      (config-map ~measured-options))))
+      ~measured-options)))
