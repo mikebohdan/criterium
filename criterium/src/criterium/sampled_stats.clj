@@ -55,46 +55,11 @@
                        res path
                        (stats-for path batch-size samples config)))
                     {}
-                    paths)
-
-        ;; times         (mapv toolkit/elapsed-time samples)
-        ;; tail-quantile (:tail-quantile opts 0.025)
-        ;; stats         (stats/bootstrap-bca
-        ;;                 (mapv double times)
-        ;;                 (juxt
-        ;;                   stats/mean
-        ;;                   stats/variance
-        ;;                   (partial stats/quantile 0.5)
-        ;;                   (partial stats/quantile tail-quantile)
-        ;;                   (partial stats/quantile (- 1.0 tail-quantile)))
-        ;;                 (:bootstrap-size opts 100)
-        ;;                 [0.5 tail-quantile (- 1.0 tail-quantile)]
-        ;;                 well/well-rng-1024a)
-
-        ;; ks [:mean :variance :median :0.025 :0.975 ]
-        ;; stats (zipmap ks stats)
-        ;; sqr-batch-size (stats/sqr batch-size)
-        ;; scale-1 (fn [[p [l u]]]
-        ;;            [(/ p batch-size)
-        ;;             [(/ l batch-size) (/ u batch-size)]])
-        ;; scale-2 (fn [[p [l u]]]
-        ;;            [(/ p sqr-batch-size)
-        ;;             [(/ l sqr-batch-size) (/ u sqr-batch-size)]]) ;; TODO FIXME
-        ;; scale-fns {:mean scale-1
-        ;;            :variance scale-2
-        ;;            :median scale-1
-        ;;            :0.025 scale-1
-        ;;            :0.975 scale-1}
-        ]
+                    paths)]
 
     {:eval-count  eval-count
      :avg         avg
      :stats       stats
-     ;; (zipmap ks
-     ;;                      (mapv
-     ;;                        (fn [k]
-     ;;                          ((scale-fns k) (k stats)))
-     ;;                        ks))
      :num-samples (count samples)
      :batch-size  batch-size
      :metrics     metrics}))
