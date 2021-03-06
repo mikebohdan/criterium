@@ -22,6 +22,8 @@
                   pipeline
                   measured
                   (:sample-scheme config))]
+    (output/progress "Num samples" (count (:samples sampled)))
+    (output/progress "Batch size" (:batch-size sampled))
     (analyze/analyze
      sampled
      (pipeline/metrics (:pipeline config))

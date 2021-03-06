@@ -11,22 +11,65 @@
 
 (defn print-stat [path {:keys [mean variance] :as _stat}]
   (let [{:keys [dimension label]} (metric/metric-format path)
-        [scale units] (format/scale dimension (first mean))]
+        [scale units]             (format/scale dimension mean)]
     (println
      (format "%36s: %.3g ± %.3g %s"
              label
-             (* scale (first mean))
-             (* scale 3 (Math/sqrt (first variance)))
+             (* scale mean)
+             (* scale 3 (Math/sqrt variance))
              units))))
+
+(defn print-bootstrap-stat [path {:keys [mean variance] :as _stat}]
+  (let [{:keys [dimension label]} (metric/metric-format path)
+        [scale units]             (format/scale
+                                   dimension
+                                   (:point-estimate mean))
+        quantiles                 (:estimate-quantiles mean)
+        var-quantiles             (:estimate-quantiles variance)]
+    (println
+     (format "%36s: %.3g %s CI [%.3g %.3g] (%.3f %.3f)"
+             label
+             (* scale (:point-estimate mean))
+             units
+             (* scale (-> quantiles first :value))
+             (* scale (-> quantiles second :value))
+             (-> quantiles first :alpha)
+             (-> quantiles second :alpha)))
+    (println
+     (format "%36s: %.3g %s CI [%.3g %.3g] (%.3f %.3f)"
+             (str label " σ")
+             (* scale (Math/sqrt (:point-estimate variance)))
+             units
+             (* scale (Math/sqrt (-> var-quantiles first :value)))
+             (* scale (Math/sqrt (-> var-quantiles second :value)))
+             (-> var-quantiles first :alpha)
+             (-> var-quantiles second :alpha)))))
+
+(defn print-stats [config result]
+  (doseq [metric (:metrics config)]
+    (doseq [path (metric/metric-paths metric)]
+      (let [stat (get-in (:stats (:stats result)) path)]
+        (print-stat path stat)))))
+
+(defn print-bootstrap-stats [config result]
+  (doseq [metric (:metrics config)]
+    (doseq [path (metric/metric-paths metric)]
+      (let [stat (get-in (:bootstrap-stats (:bootstrap-stats result)) path)]
+        (print-bootstrap-stat path stat)))))
 
 (defn view-histogram
   [{:keys [file title]}
-   {:keys [samples batch-size stats] :as _result} path]
+   {:keys [samples batch-size bootstrap-stats stats] :as _result} path]
   (util/assert-optional-ns
    'criterium.chart
    "Please add criterium/chart to the classpath to enable histograms")
   (let [stat                      (get-in (:stats stats) path)
-        mean                      (first (:mean stat))
+        bootstrap-stat            (get-in (:bootstrap-stats bootstrap-stats)
+                                          path)
+        mean                      (or (first (:mean bootstrap-stat))
+                                      (:mean stat))
+        _                         (assert mean
+                                          "histogram requires stats analysis")
         {:keys [dimension label]} (metric/metric-format path)
         [scale units]             (format/scale dimension mean)
         vs                        (->>
@@ -42,12 +85,6 @@
     (if file
       (spit chart file)
       (view chart))))
-
-(defn print-stats [config result]
-  (doseq [metric (:metrics config)]
-    (doseq [path (metric/metric-paths metric)]
-      (let [stat (get-in (:stats (:stats result)) path)]
-        (print-stat path stat)))))
 
 (defn print-metrics
   [metrics]
@@ -90,6 +127,10 @@
 (defmethod report-impl :stats
   [_report result config]
   (print-stats config result))
+
+(defmethod report-impl :bootstrap-stats
+  [_report result config]
+  (print-bootstrap-stats config result))
 
 (defmethod report-impl :histogram
   [report {:keys [samples] :as result} config]

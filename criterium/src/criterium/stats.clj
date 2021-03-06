@@ -58,7 +58,14 @@
      (+ s (* v v))) 0.0 data))
 
 (defn variance
-  "Sample variance. Returns variance.
+  "Return the variance of data.
+
+  By default returns the sample variance with (- (count data) 1) degrees
+  of freedom.
+
+  The population variance can be returned using (variance data 0), which uses
+  (count data) degrees of freedom.
+
    Ref: Chan et al. Algorithms for computing the sample variance: analysis and
         recommendations. American Statistician (1983)."
   ([data] (variance data 1))
@@ -80,8 +87,9 @@
 
 ;; For the moment we take the easy option of sorting samples
 (defn median
-  "Calculate the median of a sorted data set
-   References: http://en.wikipedia.org/wiki/Median"
+  "Calculate the median of a sorted data set.
+  Return [median, [vals less than median] [vals greater than median]]
+  References: http://en.wikipedia.org/wiki/Median"
   [data]
   (let [n (count data)
         i (bit-shift-right n 1)]
@@ -104,12 +112,16 @@
   "Calculate the quantile of a sorted data set
    References: http://en.wikipedia.org/wiki/Quantile"
   [quantile data]
-  (let [n (dec (count data))
+  (let [n      (dec (count data))
         interp (fn [x]
                  (let [f (Math/floor x)
                        i (long f)
                        p (- x f)]
-                   (+ (* p (nth data (inc i))) (* (- 1.0 p) (nth data i)))))]
+                   (cond
+                     (zero? p) (nth data i)
+                     (= 1.0 p) (nth data (inc i))
+                     :else     (+ (* p (nth data (inc i)))
+                                  (* (- 1.0 p) (nth data i))))))]
     (interp (* quantile n))))
 
 (defn boxplot-outlier-thresholds
@@ -274,9 +286,10 @@ descending order (so the last element of coefficients is the constant term)."
 
 (defn trunc
   "Round towards zero to an integeral value."
-  [x] (if (pos? x)
-        (Math/floor x)
-        (Math/ceil x)))
+  [x]
+  (if (pos? x)
+    (Math/floor x)
+    (Math/ceil x)))
 
 (defn jacknife
   "Jacknife statistics on data."
@@ -328,10 +341,14 @@ descending order (so the last element of coefficients is the constant term)."
        estimate samples jack-samples)
       (bca-nonparametric-eval size z-alpha estimate samples jack-samples))))
 
-(defn bca-to-estimate
-  [bca-estimate]
-  [(first (first bca-estimate))
-   (next (first bca-estimate))])
+(defn- bca-to-estimate
+  [alpha bca-estimate]
+  (assert (= 0.5 (first alpha)) alpha)
+  {:point-estimate     (first (first bca-estimate))
+   :estimate-quantiles (mapv
+                        (fn [value z] {:value value :alpha z})
+                        (next (first bca-estimate))
+                        (next alpha))})
 
 (defn bootstrap-bca
   "Bootstrap a statistic. Statistic can produce multiple statistics as a vector
@@ -340,8 +357,8 @@ descending order (so the last element of coefficients is the constant term)."
   [data statistic size alpha rng-factory]
   (let [bca (bca-nonparametric data statistic size alpha rng-factory)]
     (if (vector? bca)
-      (bca-to-estimate bca)
-      (map bca-to-estimate bca))))
+      (bca-to-estimate alpha bca)
+      (map (partial bca-to-estimate alpha) bca))))
 
 (defn bootstrap
   "Bootstrap a statistic. Statistic can produce multiple statistics as a vector

@@ -53,7 +53,7 @@ minimum.
 #+RESULTS:
 : class clojure.lang.Compiler$CompilerException
 
-We can see there is a very tight bound for the minimum, at about 30.65ns.
+We can see there is a very tight bound for the minimum, at about 30.66ns.
 
 ** granularity
 

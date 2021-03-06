@@ -2,8 +2,8 @@
   (:require
    [clojure.spec.alpha :as s]
    [clojure.spec.gen.alpha :as sgen]
-   [criterium.output :as output]
-   [criterium.sampled-stats :as sampled-stats]))
+   [criterium.sampled-stats :as sampled-stats]
+   [criterium.stats :as stats]))
 
 (defmulti analyze-samples
   #_{:clj-kondo/ignore [:unused-binding]}
@@ -11,25 +11,52 @@
     (:analysis-type analysis)))
 
 (defmethod analyze-samples :samples
-  ;; mode to just return the samples
+  ;; add samples to the result
   [_analysis result samples _metrics]
   (assoc result :samples samples))
 
 (defmethod analyze-samples :stats
-  ;; mode to just return the samples
+  ;; add stats to the result
   [analysis result samples metrics]
-  (output/progress "Num samples" (count samples))
-  (output/progress "Batch size" (:batch-size result))
   (let [res (sampled-stats/sample-stats
              metrics
              (:batch-size result)
              samples
              analysis)
-        res  (assoc
-              res
-              :jvm-event-stats
-              (sampled-stats/jvm-event-stats samples))]
+        res (assoc
+             res
+             :jvm-event-stats
+             (sampled-stats/jvm-event-stats samples))]
     (assoc result :stats res)))
+
+(defmethod analyze-samples :bootstrap-stats
+  ;; add stats to the result
+  [analysis result samples metrics]
+  (let [res (sampled-stats/bootstrap-stats
+             metrics
+             (:batch-size result)
+             samples
+             analysis)
+        res (assoc
+             res
+             :jvm-event-stats
+             (sampled-stats/jvm-event-stats samples))]
+    (assoc result :bootstrap-stats res)))
+
+(defmethod analyze-samples :outliers
+  ;; add outliers to the results
+  [analysis result samples metrics]
+  (let [stats (:stats result)]
+    (when-not stats
+      (throw (ex-info "outlier analysis requires stats analysis" {})))
+    (reduce
+     (fn [result [metric stat]]
+       (let [thresholds (stats/boxplot-outlier-thresholds
+                         (:0.25 stat)
+                         (:0.75 stat))])
+       )
+     result
+     (:stats stats))))
 
 (defn analyze
   [{:keys [samples] :as sampled} metrics analysis-config]
