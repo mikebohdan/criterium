@@ -57,7 +57,15 @@
   ;; Start by running GC until it has nothing to do.
   (toolkit/throw-away-sample measured)
   (toolkit/force-gc max-gc-attempts)
-  (let [t0         (toolkit/first-estimate measured)
+  (let [
+        ;; lock            (net.openhft.affinity.AffinityLock/acquireLock)
+        ;; TODO make this configurable
+        thread-priority (.getPriority (Thread/currentThread))
+        _               (.setPriority
+                         (Thread/currentThread)
+                         Thread/MAX_PRIORITY)
+
+        t0         (toolkit/first-estimate measured)
         batch-size (toolkit/estimate-batch-size
                     t0 estimation-budget batch-time-ns)
         t1         (toolkit/estimate-execution-time
@@ -87,6 +95,8 @@
                        sample-budget
                        batch-size)
         final-gc-data (toolkit/force-gc max-gc-attempts)]
+    (.setPriority (Thread/currentThread) thread-priority)
+    ;;(.release lock)
     (assoc sample-data
            :warmup warmup-data
            :final-gc final-gc-data)))

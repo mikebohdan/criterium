@@ -23,14 +23,6 @@
   (is (= :moderate (core/outlier-effect 0.49)))
   (is (= :severe (core/outlier-effect 0.51))))
 
-(deftest outlier-significance-test
-  ;; http://www.ellipticgroup.com/misc/article_supplement.pdf, p22
-  (is (= 0.9960022873987793
-         (core/outlier-significance
-          [1.395522860870968 []]
-          [(* 0.0013859776344426547 0.0013859776344426547) []]
-          67108864))))
-
 (deftest bench-test
   (let [s (with-out-str
             (core/bench 1 :target-execution-time 1))]

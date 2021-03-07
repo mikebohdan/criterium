@@ -3,43 +3,59 @@
    [criterium.metric :as metric]
    [criterium.pipeline :as pipeline]
    [criterium.stats :as stats]
+   [criterium.util :as util]
    [criterium.well :as well]))
 
 
 (def ^:private ks
-  [:min :mean :variance :median :0.25 :0.75 :lower-tail :upper-tail])
+  [:mean :variance :min :median :0.25 :0.75 :lower-tail :upper-tail])
 
 (defn- stats-fns [tail-quantile]
   (juxt
-   stats/min
    stats/mean
    stats/variance
+   stats/min
    (partial stats/quantile 0.5)
    (partial stats/quantile 0.25)
    (partial stats/quantile 0.75)
    (partial stats/quantile tail-quantile)
    (partial stats/quantile (- 1.0 tail-quantile))))
 
-(defn stats-for [path batch-size samples opts]
-  (let [vs             (->> samples
-                            (mapv (metric/path-accessor path))
-                            (mapv double)
-                            sort)
-        tail-quantile  (:tail-quantile opts 0.025) ; TODO pull out default into config
-        stats          ((stats-fns tail-quantile) vs)
-        sqr-batch-size (stats/sqr batch-size)
-        scale-1        (fn [v] (/ v batch-size))
-        scale-2        (fn [v] (/ v sqr-batch-size))
-        scale-fns      {:variance scale-2}
-        stats          (zipmap ks
-                               (mapv
-                                (fn [k stat]
-                                  ((scale-fns k scale-1) stat))
-                                ks
-                                stats))]
-    stats))
+(defn update-mean-3-sigma [{:keys [mean variance] :as stats} scale-1]
+  (let [three-sigma       (* 3.0 (Math/sqrt variance))
+        mean-plus-3sigma  (+ mean three-sigma)
+        mean-minus-3sigma (- mean three-sigma)]
+    (assoc stats
+           :mean (scale-1 mean)
+           :variance (scale-1 variance)
+           :mean-plus-3sigma (scale-1 mean-plus-3sigma)
+           :mean-minus-3sigma (scale-1 mean-minus-3sigma))))
 
-(defn sample-stats [metrics batch-size samples config]
+(defn sorted-samples-for-path [samples path]
+  (->> samples
+       (mapv (metric/path-accessor path))
+       (mapv double)
+       sort))
+
+(defn scale-key-values [stats scale-1 ks]
+  (reduce
+   (fn [stats k]
+     (update stats k scale-1))
+   stats
+   ks))
+
+(defn stats-for [path batch-size samples opts transforms]
+  (let [tail-quantile (:tail-quantile opts 0.025) ; TODO pull out default into config
+        vs            (sorted-samples-for-path samples path)
+        fns           (stats-fns tail-quantile)
+        scale-1       (fn [v]
+                        (/ (util/transform v transforms)
+                           batch-size))]
+    (-> (zipmap ks (fns vs))
+        (update-mean-3-sigma scale-1)
+        (scale-key-values scale-1 (drop 2 ks)))))
+
+(defn sample-stats [result metrics batch-size samples config]
   (let [sum        (pipeline/total samples)
         eval-count (:eval-count sum)
         avg        (pipeline/divide sum eval-count)
@@ -48,7 +64,12 @@
                     (fn [res path]
                       (assoc-in
                        res path
-                       (stats-for path batch-size samples config)))
+                       (stats-for
+                        path
+                        batch-size
+                        samples
+                        config
+                        (util/get-transforms result path))))
                     {}
                     paths)]
 
@@ -59,7 +80,34 @@
      :batch-size  batch-size
      :metrics     metrics}))
 
-(defn bootstrap-stats-for [path batch-size samples opts]
+(defn- scale-bootstrap-stat [scale-f stat]
+  (-> stat
+      (update :point-estimate scale-f)
+      (update :estimate-quantiles
+              #(mapv (fn [q] (update q :value scale-f)) %))))
+
+(defn update-bootstrap-mean-3-sigma
+  [{:keys [mean variance] :as stats} scale-f]
+  (let [three-sigma       (* 3 (Math/sqrt (:point-estimate variance)))
+        mean-plus-3sigma  (+ (:point-estimate mean) three-sigma)
+        mean-minus-3sigma (- (:point-estimate mean) three-sigma)]
+    (assoc stats
+           :mean (scale-f mean)
+           :variance (scale-f variance)
+           :mean-plus-3sigma (scale-f
+                              {:point-estimate mean-plus-3sigma})
+           :mean-minus-3sigma (scale-f
+                               {:point-estimate mean-minus-3sigma}))))
+
+(defn scale-key-bootstrap-values [stats f ks]
+  (reduce
+   (fn [stats k]
+     (update stats k f))
+   stats
+   ks))
+
+(defn bootstrap-stats-for
+  [path batch-size samples opts transforms]
   (let [vs            (->>  samples
                             (mapv (metric/path-accessor path))
                             (mapv double))
@@ -70,25 +118,14 @@
                        (:bootstrap-size opts (long (* (count vs) 0.8)))
                        [0.5 tail-quantile (- 1.0 tail-quantile)]
                        well/well-rng-1024a)
+        scale-1       (fn [v] (/ (util/transform v transforms) batch-size))
+        scale-f       (partial scale-bootstrap-stat scale-1)]
+    (-> (zipmap ks stats)
+        (update-bootstrap-mean-3-sigma scale-f)
+        (scale-key-bootstrap-values scale-f (drop 2 ks)))))
 
-        sqr-batch-size (stats/sqr batch-size)
-        scale-1        (fn [[p [l u]]]
-                         [(/ p batch-size)
-                          [(/ l batch-size) (/ u batch-size)]])
-        ;; TODO check this
-        scale-2        (fn [[p [l u]]]
-                         [(/ p sqr-batch-size)
-                          [(/ l sqr-batch-size) (/ u sqr-batch-size)]])
-        scale-fns      {:variance scale-2}
-        stats          (zipmap ks
-                               (mapv
-                                (fn [k stat]
-                                  ((scale-fns k scale-1) stat))
-                                ks
-                                stats))]
-    stats))
-
-(defn bootstrap-stats [metrics batch-size samples config]
+(defn bootstrap-stats
+  [result metrics batch-size samples config]
   (let [sum        (pipeline/total samples)
         eval-count (:eval-count sum)
         avg        (pipeline/divide sum eval-count)
@@ -97,7 +134,12 @@
                     (fn [res path]
                       (assoc-in
                        res path
-                       (bootstrap-stats-for path batch-size samples config)))
+                       (bootstrap-stats-for
+                        path
+                        batch-size
+                        samples
+                        config
+                        (util/get-transforms result path))))
                     {}
                     paths)]
 

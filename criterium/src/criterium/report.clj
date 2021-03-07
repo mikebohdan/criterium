@@ -9,17 +9,30 @@
 (util/optional-require
  '[criterium.chart :as chart :refer [histogram spit view]])
 
-(defn print-stat [path {:keys [mean variance] :as _stat}]
+(defn print-stat
+  [path
+   {:keys [mean
+           mean-minus-3sigma
+           mean-plus-3sigma
+           variance]
+    :as   _stat}]
   (let [{:keys [dimension label]} (metric/metric-format path)
         [scale units]             (format/scale dimension mean)]
     (println
-     (format "%36s: %.3g ± %.3g %s"
+     (format "%36s: %.3g %s  3σ [%.3g %.3g]"
              label
              (* scale mean)
-             (* scale 3 (Math/sqrt variance))
-             units))))
+             units
+             (* scale mean-minus-3sigma)
+             (* scale mean-plus-3sigma)))))
 
-(defn print-bootstrap-stat [path {:keys [mean variance] :as _stat}]
+(defn print-bootstrap-stat
+  [path
+   {:keys [mean
+           mean-minus-3sigma
+           mean-plus-3sigma
+           variance]
+    :as   _stat}]
   (let [{:keys [dimension label]} (metric/metric-format path)
         [scale units]             (format/scale
                                    dimension
@@ -36,26 +49,80 @@
              (-> quantiles first :alpha)
              (-> quantiles second :alpha)))
     (println
-     (format "%36s: %.3g %s CI [%.3g %.3g] (%.3f %.3f)"
-             (str label " σ")
-             (* scale (Math/sqrt (:point-estimate variance)))
+     (format "%36s: [%.3g %.3g] %s "
+             (str label " 3σ")
+             (* scale (:point-estimate mean-minus-3sigma))
+             (* scale (:point-estimate mean-plus-3sigma))
              units
-             (* scale (Math/sqrt (-> var-quantiles first :value)))
-             (* scale (Math/sqrt (-> var-quantiles second :value)))
-             (-> var-quantiles first :alpha)
-             (-> var-quantiles second :alpha)))))
+             ;; (* scale (Math/sqrt (-> var-quantiles first :value)))
+             ;; (* scale (Math/sqrt (-> var-quantiles second :value)))
+             ;; (-> var-quantiles first :alpha)
+             ;; (-> var-quantiles second :alpha)
+             ))))
+
+(defn print-outlier-count
+  [num-samples
+   {:keys [outlier-counts] :as _stat}]
+  (let [values (vals outlier-counts)
+        types  ["low-severe" "low-mild" "high-mild" "high-severe"]]
+    (when (some pos? values)
+      (let [sum (reduce + values)]
+        (util/report "Found %d outliers in %d samples (%.3g %%)\n"
+                     sum num-samples (* 100.0 (/ sum num-samples))))
+      (doseq [[v c] (->> (interleave values types)
+                         (partition 2)
+                         (filter #(pos? (first %))))]
+        (util/report
+         "\t%s\t %d (%2.4f %%)\n"
+         c v (* 100.0 (/ v num-samples)))))))
+
+(defn- outlier-effect
+  "Return a keyword describing the effect of outliers on a point estimate."
+  [var-out-min]
+  (cond
+    (< var-out-min 0.01) :unaffected
+    (< var-out-min 0.1)  :slight
+    (< var-out-min 0.5)  :moderate
+    :else                :severe))
+
+(defn print-outlier-significance
+  [{:keys [outlier-counts
+           outlier-significance]
+    :as   _stat}]
+  (let [values (vals outlier-counts)
+        labels {:unaffected "unaffected"
+                :slight     "slightly inflated"
+                :moderate   "moderately inflated"
+                :severe     "severely inflated"}]
+    (when (some pos? values)
+      (util/report " Variance contribution from outliers : %.3g %%"
+                   (* outlier-significance 100.0))
+      (util/report " Variance is %s by outliers\n"
+                   (-> outlier-significance outlier-effect labels)))))
+
+(defn get-transforms [result path]
+  (get-in result (into [:value-transforms] path)))
 
 (defn print-stats [config result]
   (doseq [metric (:metrics config)]
     (doseq [path (metric/metric-paths metric)]
-      (let [stat (get-in (:stats (:stats result)) path)]
+      (let [stat       (get-in (:stats (:stats result)) path)
+            transforms (get-transforms result path)]
         (print-stat path stat)))))
 
 (defn print-bootstrap-stats [config result]
   (doseq [metric (:metrics config)]
     (doseq [path (metric/metric-paths metric)]
-      (let [stat (get-in (:bootstrap-stats (:bootstrap-stats result)) path)]
+      (let [stat       (get-in (:bootstrap-stats (:bootstrap-stats result)) path)
+            transforms (get-transforms result path)]
         (print-bootstrap-stat path stat)))))
+
+(defn print-outlier-counts [config {:keys [stats] :as _result}]
+  (doseq [metric (:metrics config)]
+    (doseq [path (metric/metric-paths metric)]
+      (let [stat (get-in (:stats stats) path)]
+        (print-outlier-count (:num-samples stats) stat)
+        (print-outlier-significance stat)))))
 
 (defn view-histogram
   [{:keys [file title]}
@@ -66,7 +133,7 @@
   (let [stat                      (get-in (:stats stats) path)
         bootstrap-stat            (get-in (:bootstrap-stats bootstrap-stats)
                                           path)
-        mean                      (or (first (:mean bootstrap-stat))
+        mean                      (or (:point-estimate (:mean bootstrap-stat))
                                       (:mean stat))
         _                         (assert mean
                                           "histogram requires stats analysis")
@@ -131,6 +198,10 @@
 (defmethod report-impl :bootstrap-stats
   [_report result config]
   (print-bootstrap-stats config result))
+
+(defmethod report-impl :outlier-counts
+  [_report result config]
+  (print-outlier-counts config result))
 
 (defmethod report-impl :histogram
   [report {:keys [samples] :as result} config]

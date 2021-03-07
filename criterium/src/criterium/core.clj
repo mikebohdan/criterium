@@ -415,9 +415,9 @@
                                                 (collect-samples
                                                  1 n-exec f gc-before-sample)))))))))
 
-        ;; 'transpose' all-samples so that all samples for a
-        ;; particular expression are in a sequence together, and
-        ;; all-samples is a sequence of one map per expression.
+          ;; 'transpose' all-samples so that all samples for a
+          ;; particular expression are in a sequence together, and
+          ;; all-samples is a sequence of one map per expression.
           all-samples (group-by :index (apply concat all-samples))
           all-samples
           (map (fn [[idx data-seq]]
@@ -429,11 +429,11 @@
                        final-gc-time   (pipeline/elapsed-time gc-deltas)
                        sample-times    (map pipeline/elapsed-time samples)
                        total           (reduce + 0 sample-times)
-                     ;; TBD: Doesn't make much sense to attach final
-                     ;; GC warning to the expression that happened
-                     ;; to be first in the sequence, but that is
-                     ;; what this probably does right now.  Think
-                     ;; what might be better to do.
+                       ;; TBD: Doesn't make much sense to attach final
+                       ;; GC warning to the expression that happened
+                       ;; to be first in the sequence, but that is
+                       ;; what this probably does right now.  Think
+                       ;; what might be better to do.
                        _               (progress "Checking GC..." total final-gc-time)
                        final-gc-result (final-gc-warn total final-gc-time)]
                    {:execution-count n-exec
@@ -451,82 +451,14 @@
 ;;; Outliers
 
 
-(defn outlier-effect
-  "Return a keyword describing the effect of outliers on the estimate of mean
-  runtime."
-  [var-out-min]
-  (cond
-    (< var-out-min 0.01) :unaffected
-    (< var-out-min 0.1)  :slight
-    (< var-out-min 0.5)  :moderate
-    :else                :severe))
-
-(defn point-estimate [estimate]
-  (first estimate))
-
-(defn point-estimate-ci [estimate]
-  (last estimate))
-
-(defn outlier-significance
-  "Find the significance of outliers given boostrapped mean and variance
-  estimates.
-  See http://www.ellipticgroup.com/misc/article_supplement.pdf, p17."
-  [mean-estimate variance-estimate n]
-  (progress "Checking outlier significance")
-  (debug "mean-estimate" mean-estimate
-         "variance-estimate" variance-estimate
-         "n" n)
-  (let [mean-block     (point-estimate mean-estimate)
-        variance-block (point-estimate variance-estimate)
-        std-dev-block  (Math/sqrt variance-block)
-        mean-action    (/ mean-block n)
-        mean-g-min     (/ mean-action 2)
-        sigma-g        (min (/ mean-g-min 4) (/ std-dev-block (Math/sqrt n)))
-        variance-g     (* sigma-g sigma-g)
-        c-max          (fn [t-min]
-                         (let [j0  (- mean-action t-min)
-                               k0  (- (* n n j0 j0))
-                               k1  (+ variance-block (- (* n variance-g)) (* n j0 j0))
-                               det (- (* k1 k1) (* 4 variance-g k0))]
-                           (Math/floor (/ (* -2 k0) (+ k1 (Math/sqrt det))))))
-        var-out        (fn [c]
-                         (let [nmc (- n c)]
-                           (* (/ nmc n) (- variance-block (* nmc variance-g)))))
-        min-f          (fn [f q r]
-                         (min (f q) (f r)))]
-    (if (zero? variance-block)
-      0
-      (/ (min-f var-out 1 (min-f c-max 0 mean-g-min)) variance-block))))
-
-(defrecord OutlierCount [low-severe low-mild high-mild high-severe])
-
-(defn outlier-count
-  [low-severe low-mild high-mild high-severe]
-  (OutlierCount. low-severe low-mild high-mild high-severe))
-
-(defn add-outlier [low-severe low-mild high-mild high-severe counts x]
-  (outlier-count
-   (if (<= x low-severe)
-     (inc (:low-severe counts))
-     (:low-severe counts))
-   (if (< low-severe x low-mild)
-     (inc (:low-mild counts))
-     (:low-mild counts))
-   (if (> high-severe x high-mild)
-     (inc (:high-mild counts))
-     (:high-mild counts))
-   (if (>= x high-severe)
-     (inc (:high-severe counts))
-     (:high-severe counts))))
-
 (defn outliers
   "Find the outliers in the data using a boxplot technique."
   [data]
   (progress "Finding outliers ...")
-  (reduce (apply partial add-outlier
+  (reduce (apply partial analyze/add-outlier
                  (apply stats/boxplot-outlier-thresholds
                         ((juxt first last) (stats/quartiles (sort data)))))
-          (outlier-count 0 0 0 0)
+          (analyze/outlier-count 0 0 0 0)
           data))
 
 
@@ -602,9 +534,9 @@
                        (:bootstrap-size opts)
                        [0.5 tail-quantile (- 1.0 tail-quantile)]
                        well/well-rng-1024a)
-        analysis      (outlier-significance
-                       (first stats)
-                       (second stats)
+        analysis      (analyze/outlier-significance
+                       (analyze/point-estimte (first stats))
+                       (analyze/point-estimte (second stats))
                        sample-count)
         sqr           (fn [x] (* x x))
         m             (stats/mean (map double values))

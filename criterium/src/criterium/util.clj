@@ -173,3 +173,21 @@
               (apply merge-with merge* xs)
               (last xs)))]
     (reduce merge* ms)))
+
+(defn report
+  "Print format output"
+  [format-string & values]
+  (print (apply format format-string values)))
+
+;;; Value transforms
+
+(defn add-transform [result path transform]
+  (update-in result (into [:value-transforms] path)
+             (fnil conj [])
+             transform))
+
+(defn get-transforms [result path]
+  (get-in result (into [:value-transforms] path)))
+
+(defn transform [value transforms]
+  (reduce (fn [v f] (f v)) value transforms))

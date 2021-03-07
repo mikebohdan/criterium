@@ -57,6 +57,11 @@
    (fn [s v]
      (+ s (* v v))) 0.0 data))
 
+(defn variance*
+  "variance based on subtracting mean"
+  [data mean df]
+  (/ (reduce #(+ %1 (sqr (- %2 mean))) 0.0 data) df))
+
 (defn variance
   "Return the variance of data.
 
@@ -69,21 +74,19 @@
    Ref: Chan et al. Algorithms for computing the sample variance: analysis and
         recommendations. American Statistician (1983)."
   ([data] (variance data 1))
+  ;; ([data df]
+  ;;  (let [mean (mean data)]
+  ;;    (variance* data mean (- (count data) df))))
   ([data df]
    ;; Uses a single pass, non-pairwise algorithm, without shifting.
    (letfn [(update-estimates [[m q k] x]
-             (let [kp1 (inc k)
+             (let [kp1   (inc k)
                    delta (- x m)]
                [(+ m (/ delta kp1))
                 (+ q (/ (* k (sqr delta)) kp1))
                 kp1]))]
      (let [[_ q k] (reduce update-estimates [0.0 0.0 0] data)]
        (/ q (- k df))))))
-
-(defn variance*
-  "variance based on subtracting mean"
-  [data mean count]
-  (/ (reduce #(+ %1 (sqr (- %2 mean))) 0.0 data) (dec count)))
 
 ;; For the moment we take the easy option of sorting samples
 (defn median
