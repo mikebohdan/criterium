@@ -107,9 +107,19 @@
                   [:analysis :report :return-value :sample-scheme :verbose])
            (or
             (= scheme-type :full)
-            histogram)              (assoc :sample-scheme
-                                           (config/full-sample-scheme
-                                            options-map))
+            histogram
+            limit-time-s
+            limit-eval-count) (assoc
+                               :sample-scheme
+                               (config/full-sample-scheme
+                                (cond-> (if (map? scheme-type) scheme-type {})
+                                  limit-eval-count (assoc
+                                                    :limit-eval-count
+                                                    limit-eval-count)
+                                  limit-time-s     (assoc
+                                                    :limit-time-s
+                                                    limit-time-s))))
+
            (= scheme-type :one-shot) (assoc :sample-scheme
                                             (config/one-shot-sample-scheme
                                              options-map)
@@ -118,18 +128,7 @@
            (seq pipeline-fns)        (assoc-in [:pipeline :stages]
                                                (vec pipeline-fns))
            (seq terminator)          (assoc-in [:pipeline :terminator]
-                                               (first terminator))
-           (or limit-time-s
-               limit-eval-count)     (assoc
-                                      :sample-scheme
-                                      (config/full-sample-scheme
-                                       (cond-> {}
-                                         limit-eval-count (assoc
-                                                           :limit-eval-count
-                                                           limit-eval-count)
-                                         limit-time-s     (assoc
-                                                           :limit-time-s
-                                                           limit-time-s))))))
+                                               (first terminator))))
       histogram (update-in [:analysis] conj
                            {:analysis-type :samples})
       histogram (update-in [:report] conj

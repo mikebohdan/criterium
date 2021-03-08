@@ -200,3 +200,32 @@
 
 (defn transform->sample [value transforms]
   (reduce (fn [v f] (f v)) value (:->sample transforms)))
+
+;;; thread
+(defn valid-thread-priority
+  [p]
+  (when p
+    (cond
+      (= :max-priority p)            Thread/MAX_PRIORITY
+      (= :min-priority p)            Thread/MIN_PRIORITY
+      (and (integer? p)
+           (<= Thread/MIN_PRIORITY
+               p
+               Thread/MAX_PRIORITY)) p
+      :else
+      (throw (ex-info "Invalid thread priority"
+                      {:priority     p
+                       :min-priority Thread/MIN_PRIORITY
+                       :max-priority Thread/MAX_PRIORITY})))))
+
+(defmacro with-thread-priority
+  [p & body]
+  `(let [priority#      (valid-thread-priority ~p)
+         orig-priority# (.getPriority (Thread/currentThread))]
+     (when priority#
+       (.setPriority (Thread/currentThread) priority#))
+     (try
+       ~@body
+       (finally
+         (when priority#
+           (.setPriority (Thread/currentThread) orig-priority#))))))

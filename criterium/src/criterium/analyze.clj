@@ -82,22 +82,21 @@
   [low-severe low-mild high-mild high-severe]
   (->OutlierCount low-severe low-mild high-mild high-severe))
 
-(defn add-outlier [low-severe low-mild high-mild high-severe counts x]
-  (if (<= low-mild x high-mild)
-    counts
-    (outlier-count
-     (if (<= x low-severe)
-       (inc (:low-severe counts))
-       (:low-severe counts))
-     (if (< low-severe x low-mild)
-       (inc (:low-mild counts))
-       (:low-mild counts))
-     (if (> high-severe x high-mild)
-       (inc (:high-mild counts))
-       (:high-mild counts))
-     (if (>= x high-severe)
-       (inc (:high-severe counts))
-       (:high-severe counts)))))
+(defn classify-value-as-outlier
+  [low-severe low-mild high-mild high-severe x]
+  (when-not (<= low-mild x high-mild)
+    (cond
+      (<= x low-severe)           :low-severe
+      (< low-severe x low-mild)   :low-mild
+      (> high-severe x high-mild) :high-mild
+      (>= x high-severe)          :high-severe)))
+
+(defn add-outlier
+  [low-severe low-mild high-mild high-severe counts x]
+  (if-let [outlier-class (classify-value-as-outlier
+                          low-severe low-mild high-mild high-severe x)]
+    (update counts outlier-class inc)
+    counts))
 
 (defn point-estimate [estimate]
   (first estimate))
@@ -174,6 +173,45 @@
       result
       metrics)
      samples]))
+
+(defn outlier-in-range?
+  [ranges low-severe low-mild high-mild high-severe x]
+  (let [outlier-class (classify-value-as-outlier
+                       low-severe low-mild high-mild high-severe x)]
+    (ranges outlier-class)))
+
+(defmethod analyze-samples :remove-outliers
+  ;; add outliers to the results
+  [{:keys [remove-ranges]
+    :or   {remove-ranges #{:high-mild :high-severe}}}
+   [{:keys [batch-size] :as result} samples] metrics]
+  (let [stats (:stats result)]
+    (when-not stats
+      (throw (ex-info "outlier analysis requires stats analysis" {})))
+    [result
+     (reduce
+      (fn [samples metric]
+        (reduce
+         (fn [samples path]
+           (let [stat       (get-in (:stats stats) path)
+                 transforms (util/get-transforms result path)
+                 thresholds (stats/boxplot-outlier-thresholds
+                             (:0.25 stat)
+                             (:0.75 stat))
+                 thresholds (mapv
+                             #(util/transform->sample % transforms)
+                             thresholds)
+                 samples    (remove
+                             (comp
+                              (apply partial
+                                     outlier-in-range? remove-ranges thresholds)
+                              #(get-in % path))
+                             samples)]
+             samples))
+         samples
+         (metric/metric-paths metric)))
+      samples
+      metrics)]))
 
 (defn analyze
   [{:keys [samples] :as sampled} metrics analysis-config]

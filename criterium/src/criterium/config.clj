@@ -38,11 +38,15 @@
        Long/MAX_VALUE)))
 
 (defn full-sample-scheme
-  [{:keys [limit-time-s limit-eval-count
-           estimation-fraction estimation-period-ns
-           warmup-fraction warmup-period-ns
-           sample-fraction _sample-period-ns
-           max-gc-attempts batch-time-ns]
+  [{:keys [batch-time-ns
+           estimation-fraction
+           estimation-period-ns
+           limit-eval-count
+           limit-time-s
+           max-gc-attempts
+           thread-priority
+           warmup-fraction
+           warmup-period-ns]
     :as   _options}]
   (let [total-budget      (budget-for-limits limit-time-s limit-eval-count)
         estimation-frac   (or estimation-fraction
@@ -63,14 +67,15 @@
         batch-time-ns     (or batch-time-ns DEFAULT-BATCH-TIME-NS)]
 
     {:scheme-type       :full
+     :batch-time-ns     batch-time-ns
      :estimation-budget estimation-budget
-     :warmup-budget     warmup-budget
+     :max-gc-attempts   max-gc-attempts
      :sample-budget     (budget/subtract
                          total-budget
                          estimation-budget
                          warmup-budget)
-     :max-gc-attempts   max-gc-attempts
-     :batch-time-ns     batch-time-ns}))
+     :thread-priority   thread-priority
+     :warmup-budget     warmup-budget}))
 
 (defn one-shot-sample-scheme
   [{:keys [max-gc-attempts]

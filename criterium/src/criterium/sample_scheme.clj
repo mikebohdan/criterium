@@ -59,11 +59,12 @@
   ;; Return a sampled data map.
   [pipeline
    measured
-   {:keys [max-gc-attempts
-           batch-time-ns
+   {:keys [batch-time-ns
            estimation-budget
-           warmup-budget
-           sample-budget]
+           max-gc-attempts
+           sample-budget
+           thread-priority
+           warmup-budget]
     :as   config}]
   {:pre [pipeline
          (measured/measured? measured)
@@ -71,56 +72,43 @@
   ;; Start by running GC until it has nothing to do.
   (toolkit/throw-away-sample measured)
   (toolkit/force-gc max-gc-attempts)
-  (let[
-       ;; lock            (net.openhft.affinity.AffinityLock/acquireLock)
-       ;; TODO make this configurable
-       thread-priority (.getPriority (Thread/currentThread))
-       _               (.setPriority
-                        (Thread/currentThread)
-                        Thread/MAX_PRIORITY)
-
-       t0         (toolkit/first-estimate measured)
-       batch-size (toolkit/estimate-batch-size
-                   t0 estimation-budget batch-time-ns)
-       t1         (toolkit/estimate-execution-time
-                   measured
-                   estimation-budget
-                   batch-size)
-       _          (toolkit/force-gc max-gc-attempts)
-
-       batch-size (toolkit/estimate-batch-size
-                   t1 warmup-budget batch-time-ns)
-       {:keys [elapsed-time-ns eval-count] :as warmup-data}
-       (toolkit/warmup
-        measured
-        warmup-budget
-        batch-size)
-       t2         (max 1 (long (/ elapsed-time-ns eval-count)))
-       _          (toolkit/force-gc max-gc-attempts)
-
-       batch-size    (toolkit/estimate-batch-size
-                      t2 sample-budget batch-time-ns)
-       _             (output/progress "Batch-size:" batch-size
-                                      t2 sample-budget batch-time-ns)
-       sample-data   (toolkit/sample
-                      pipeline
+  (util/with-thread-priority thread-priority
+    (let [t0         (toolkit/first-estimate measured)
+          batch-size (toolkit/estimate-batch-size
+                      t0 estimation-budget batch-time-ns)
+          t1         (toolkit/estimate-execution-time
                       measured
-                      sample-budget
+                      estimation-budget
                       batch-size)
-       final-gc-data (toolkit/force-gc max-gc-attempts)
-       result        (assoc sample-data
-                            :warmup warmup-data
-                            :final-gc final-gc-data)
-       batch-size    (:batch-size sample-data)
-       sample->      (fn sample-> [v] (/ v batch-size))
-       ->sample      (fn ->sample [v] (* v batch-size))]
-    (.setPriority (Thread/currentThread) thread-priority)
-    ;;(.release lock)
-    (add-transforms
-     result
-     pipeline
-     sample->
-     ->sample)))
+          _          (toolkit/force-gc max-gc-attempts)
+
+          batch-size (toolkit/estimate-batch-size
+                      t1 warmup-budget batch-time-ns)
+          {:keys [elapsed-time-ns eval-count] :as warmup-data}
+          (toolkit/warmup
+           measured
+           warmup-budget
+           batch-size)
+          t2         (max 1 (long (/ elapsed-time-ns eval-count)))
+          _          (toolkit/force-gc max-gc-attempts)
+
+          batch-size    (toolkit/estimate-batch-size
+                         t2 sample-budget batch-time-ns)
+          _             (output/progress "Batch-size:" batch-size
+                                         t2 sample-budget batch-time-ns)
+          sample-data   (toolkit/sample
+                         pipeline
+                         measured
+                         sample-budget
+                         batch-size)
+          final-gc-data (toolkit/force-gc max-gc-attempts)
+          result        (assoc sample-data
+                               :warmup warmup-data
+                               :final-gc final-gc-data)
+          batch-size    (:batch-size sample-data)
+          sample->      (fn sample-> [v] (/ v batch-size))
+          ->sample      (fn ->sample [v] (* v batch-size))]
+      (add-transforms result pipeline sample-> ->sample))))
 
 (s/def ::scheme-type #{:one-shot :full})
 

@@ -132,26 +132,15 @@
         (print-outlier-count (:num-samples stats) stat)
         (print-outlier-significance stat)))))
 
-(defn view-histogram
-  [{:keys [file title]}
-   {:keys [samples batch-size bootstrap-stats stats] :as _result} path]
+(defn view-histogram*
+  [{:keys [file title]} path mean vs]
   (util/assert-optional-ns
    'criterium.chart
    "Please add criterium/chart to the classpath to enable histograms")
-  (let [stat                      (get-in (:stats stats) path)
-        bootstrap-stat            (get-in (:bootstrap-stats bootstrap-stats)
-                                          path)
-        mean                      (or (:point-estimate (:mean bootstrap-stat))
-                                      (:mean stat))
-        _                         (assert mean
-                                          "histogram requires stats analysis")
-        {:keys [dimension label]} (metric/metric-format path)
+  (assert mean "must have a mean provided")
+  (let [{:keys [dimension label]} (metric/metric-format path)
         [scale units]             (format/scale dimension mean)
-        vs                        (->>
-                                   samples
-                                   (mapv (metric/path-accessor path))
-                                   (mapv #(/ % (double batch-size)))
-                                   (mapv #(* % scale)))
+        vs                        (mapv #(* % scale) vs)
         chart-options             {:title       (or title label)
                                    :value-label (str "value [" units "]")}
         chart                     (histogram
@@ -160,6 +149,49 @@
     (if file
       (spit chart file)
       (view chart))))
+
+(defn view-histogram
+  [histogram-config
+   {:keys [samples batch-size bootstrap-stats stats] :as result} path]
+  (util/assert-optional-ns
+   'criterium.chart
+   "Please add criterium/chart to the classpath to enable histograms")
+  (let [stat           (get-in (:stats stats) path)
+        bootstrap-stat (get-in (:bootstrap-stats bootstrap-stats)
+                               path)
+        mean           (or (:point-estimate (:mean bootstrap-stat))
+                           (:mean stat))
+        _              (assert mean
+                               "histogram requires stats analysis")
+        transforms     (util/get-transforms result path)
+        vs             (->>
+                        samples
+                        (mapv (metric/path-accessor path))
+                        (mapv #(util/transform-sample->
+                                %
+                                transforms)))]
+    (view-histogram* histogram-config path mean vs)))
+
+
+(defn view-sample-histogram
+  [histogram-config
+   {:keys [samples batch-size bootstrap-stats stats] :as result} path]
+  (util/assert-optional-ns
+   'criterium.chart
+   "Please add criterium/chart to the classpath to enable histograms")
+  (let [stat           (get-in (:stats stats) path)
+        bootstrap-stat (get-in (:bootstrap-stats bootstrap-stats)
+                               path)
+        mean           (or (:point-estimate (:mean bootstrap-stat))
+                           (:mean stat))
+        _              (assert mean
+                               "histogram requires stats analysis")
+        transforms     (util/get-transforms result path)
+        mean           (util/transform->sample mean transforms)
+        vs             (->>
+                        samples
+                        (mapv (metric/path-accessor path)))]
+    (view-histogram* histogram-config path mean vs)))
 
 (defn print-metrics
   [metrics]
@@ -216,6 +248,12 @@
   (doseq [metric (:metrics config)]
     (doseq [path (metric/metric-paths metric)]
       (view-histogram report result path))))
+
+(defmethod report-impl :sample-histogram
+  [report {:keys [samples] :as result} config]
+  (doseq [metric (:metrics config)]
+    (doseq [path (metric/metric-paths metric)]
+      (view-sample-histogram report result path))))
 
 (defmethod report-impl :jvm-event-stats
   [_report {:keys [samples] :as result} _config]
