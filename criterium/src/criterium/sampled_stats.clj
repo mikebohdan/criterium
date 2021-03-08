@@ -48,9 +48,7 @@
   (let [tail-quantile (:tail-quantile opts 0.025) ; TODO pull out default into config
         vs            (sorted-samples-for-path samples path)
         fns           (stats-fns tail-quantile)
-        scale-1       (fn [v]
-                        (/ (util/transform v transforms)
-                           batch-size))]
+        scale-1       (fn [v] (util/transform-sample-> v transforms))]
     (-> (zipmap ks (fns vs))
         (update-mean-3-sigma scale-1)
         (scale-key-values scale-1 (drop 2 ks)))))
@@ -118,7 +116,7 @@
                        (:bootstrap-size opts (long (* (count vs) 0.8)))
                        [0.5 tail-quantile (- 1.0 tail-quantile)]
                        well/well-rng-1024a)
-        scale-1       (fn [v] (/ (util/transform v transforms) batch-size))
+        scale-1       (fn [v] (util/transform-sample-> v transforms))
         scale-f       (partial scale-bootstrap-stat scale-1)]
     (-> (zipmap ks stats)
         (update-bootstrap-mean-3-sigma scale-f)

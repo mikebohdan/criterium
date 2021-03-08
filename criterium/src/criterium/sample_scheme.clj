@@ -5,9 +5,11 @@
    [criterium.budget :as budget]
    [criterium.domain :as domain]
    [criterium.measured :as measured]
+   [criterium.metric :as metric]
    [criterium.output :as output]
    [criterium.pipeline :as pipeline]
-   [criterium.toolkit :as toolkit]))
+   [criterium.toolkit :as toolkit]
+   [criterium.util :as util]))
 
 (defmulti required-stages
   "Pipeline stages required for the given schema-type"
@@ -40,6 +42,18 @@
      :eval-count      1
      :samples         [sample]}))
 
+(defn add-transforms
+  [result pipeline sample-> ->sample]
+  (reduce
+   (fn [result metric]
+     (reduce
+      (fn [result path]
+        (util/add-transform result path sample-> ->sample))
+      result
+      (metric/metric-paths metric)))
+   result
+   (pipeline/metrics (-> pipeline meta :config))))
+
 (defmethod sample :full
   ;; Sample measured with estimation, warmup and forced GC.
   ;; Return a sampled data map.
@@ -57,49 +71,56 @@
   ;; Start by running GC until it has nothing to do.
   (toolkit/throw-away-sample measured)
   (toolkit/force-gc max-gc-attempts)
-  (let [
-        ;; lock            (net.openhft.affinity.AffinityLock/acquireLock)
-        ;; TODO make this configurable
-        thread-priority (.getPriority (Thread/currentThread))
-        _               (.setPriority
-                         (Thread/currentThread)
-                         Thread/MAX_PRIORITY)
+  (let[
+       ;; lock            (net.openhft.affinity.AffinityLock/acquireLock)
+       ;; TODO make this configurable
+       thread-priority (.getPriority (Thread/currentThread))
+       _               (.setPriority
+                        (Thread/currentThread)
+                        Thread/MAX_PRIORITY)
 
-        t0         (toolkit/first-estimate measured)
-        batch-size (toolkit/estimate-batch-size
-                    t0 estimation-budget batch-time-ns)
-        t1         (toolkit/estimate-execution-time
-                    measured
-                    estimation-budget
-                    batch-size)
-        _          (toolkit/force-gc max-gc-attempts)
+       t0         (toolkit/first-estimate measured)
+       batch-size (toolkit/estimate-batch-size
+                   t0 estimation-budget batch-time-ns)
+       t1         (toolkit/estimate-execution-time
+                   measured
+                   estimation-budget
+                   batch-size)
+       _          (toolkit/force-gc max-gc-attempts)
 
-        batch-size (toolkit/estimate-batch-size
-                    t1 warmup-budget batch-time-ns)
-        {:keys [elapsed-time-ns eval-count] :as warmup-data}
-        (toolkit/warmup
-         measured
-         warmup-budget
-         batch-size)
-        t2         (max 1 (long (/ elapsed-time-ns eval-count)))
-        _          (toolkit/force-gc max-gc-attempts)
+       batch-size (toolkit/estimate-batch-size
+                   t1 warmup-budget batch-time-ns)
+       {:keys [elapsed-time-ns eval-count] :as warmup-data}
+       (toolkit/warmup
+        measured
+        warmup-budget
+        batch-size)
+       t2         (max 1 (long (/ elapsed-time-ns eval-count)))
+       _          (toolkit/force-gc max-gc-attempts)
 
-        batch-size (toolkit/estimate-batch-size
-                    t2 sample-budget batch-time-ns)
-        _          (output/progress "Batch-size:" batch-size
-                                    t2 sample-budget batch-time-ns)
-
-        sample-data   (toolkit/sample
-                       pipeline
-                       measured
-                       sample-budget
-                       batch-size)
-        final-gc-data (toolkit/force-gc max-gc-attempts)]
+       batch-size    (toolkit/estimate-batch-size
+                      t2 sample-budget batch-time-ns)
+       _             (output/progress "Batch-size:" batch-size
+                                      t2 sample-budget batch-time-ns)
+       sample-data   (toolkit/sample
+                      pipeline
+                      measured
+                      sample-budget
+                      batch-size)
+       final-gc-data (toolkit/force-gc max-gc-attempts)
+       result        (assoc sample-data
+                            :warmup warmup-data
+                            :final-gc final-gc-data)
+       batch-size    (:batch-size sample-data)
+       sample->      (fn sample-> [v] (/ v batch-size))
+       ->sample      (fn ->sample [v] (* v batch-size))]
     (.setPriority (Thread/currentThread) thread-priority)
     ;;(.release lock)
-    (assoc sample-data
-           :warmup warmup-data
-           :final-gc final-gc-data)))
+    (add-transforms
+     result
+     pipeline
+     sample->
+     ->sample)))
 
 (s/def ::scheme-type #{:one-shot :full})
 

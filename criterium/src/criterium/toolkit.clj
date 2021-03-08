@@ -112,7 +112,9 @@
     (let [sample          (pipeline/execute pipeline measured batch-size)
           t               (pipeline/elapsed-time sample)
           elapsed-time-ns (unchecked-add elapsed-time-ns t)
-          eval-count      (unchecked-add eval-count (long (:eval-count sample)))]
+          eval-count      (unchecked-add
+                           eval-count
+                           (long (:eval-count sample)))]
       (if (or (budget/budget-remaining? budget elapsed-time-ns eval-count)
               (< (count samples) 2))
         (recur eval-count

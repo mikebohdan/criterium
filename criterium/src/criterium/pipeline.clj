@@ -178,20 +178,22 @@
   "Build a pipeline by specifying pipeline function keywords.
 
   Returns a pipeline."
-  [{:keys [stages terminator]}]
+  [{:keys [stages terminator] :as pipeline-config}]
   (let [terminal-fn (terminal-fns terminator)]
     (when-not terminal-fn
       (throw (ex-info "Unknown terminator function"
                       {:stages     stages
                        :terminator terminator})))
-    (reduce
-     (fn [pipeline stage]
-       (let [f (pipeline-fns stage)]
-         (when-not f
-           (throw (ex-info "Unknown pipeline function" {:stage stage})))
-         (f pipeline)))
-     terminal-fn
-     stages)))
+    (with-meta
+      (reduce
+       (fn [pipeline stage]
+         (let [f (pipeline-fns stage)]
+           (when-not f
+             (throw (ex-info "Unknown pipeline function" {:stage stage})))
+           (f pipeline)))
+       terminal-fn
+       stages)
+      {:config pipeline-config})))
 
 (defn metrics
   "Return a sequence of all metrics produced by a pipeline with the

@@ -181,13 +181,22 @@
 
 ;;; Value transforms
 
-(defn add-transform [result path transform]
+(defn add-transform-paths [v sample-> ->sample]
+  (-> v
+      (update :sample-> (fnil conj '()) sample->)
+      (update :->sample (fnil conj '[]) ->sample)))
+
+(defn add-transform [result path sample-> ->sample]
   (update-in result (into [:value-transforms] path)
-             (fnil conj [])
-             transform))
+             add-transform-paths
+             sample->
+             ->sample))
 
 (defn get-transforms [result path]
   (get-in result (into [:value-transforms] path)))
 
-(defn transform [value transforms]
-  (reduce (fn [v f] (f v)) value transforms))
+(defn transform-sample-> [value transforms]
+  (reduce (fn [v f] (f v)) value (:sample-> transforms)))
+
+(defn transform->sample [value transforms]
+  (reduce (fn [v f] (f v)) value (:->sample transforms)))

@@ -15,6 +15,9 @@
 (defn exp [v]
   (Math/exp v))
 
+(defn log [v]
+  (Math/log v))
+
 (defmethod analyze-samples :transform-log
   ;; take the log of sampled values
   [_analysis [result samples] metrics]
@@ -22,7 +25,7 @@
    (fn [[result samples] metric]
      (reduce
       (fn [[result samples] path]
-        [(util/add-transform result path exp)
+        [(util/add-transform result path exp log)
          (mapv
           (fn [sample]
             (let [v (get-in sample path)]
@@ -146,12 +149,15 @@
         (reduce
          (fn [result path]
            (let [stat           (get-in (:stats stats) path)
+                 transforms     (util/get-transforms result path)
                  thresholds     (stats/boxplot-outlier-thresholds
                                  (:0.25 stat)
                                  (:0.75 stat))
                  outlier-counts (reduce
                                  (apply partial add-outlier
-                                        (mapv #(* batch-size %) thresholds))
+                                        (mapv
+                                         #(util/transform->sample % transforms)
+                                         thresholds))
                                  (outlier-count 0 0 0 0)
                                  (mapv #(get-in % path) samples))
                  outlier-sig    (when (some pos? (vals outlier-counts))

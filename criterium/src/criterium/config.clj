@@ -30,7 +30,7 @@
 (defn budget-for-limits
   ^Budget [limit-time-s limit-eval-count]
   (budget/budget
-   (or (and limit-time-s (* limit-time-s toolkit/SEC-NS))
+   (or (and limit-time-s (long (* limit-time-s toolkit/SEC-NS)))
        (if limit-eval-count
          Long/MAX_VALUE
          DEFAULT-TIME-BUDGET-NS))

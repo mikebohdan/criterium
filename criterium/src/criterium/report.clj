@@ -11,37 +11,50 @@
 
 (defn print-stat
   [path
-   {:keys [mean
-           mean-minus-3sigma
-           mean-plus-3sigma
-           variance]
-    :as   _stat}]
+   {:keys  [mean
+            mean-minus-3sigma
+            mean-plus-3sigma
+            variance]
+    minval :min
+    :as    _stat}]
   (let [{:keys [dimension label]} (metric/metric-format path)
         [scale units]             (format/scale dimension mean)]
     (println
-     (format "%36s: %.3g %s  3σ [%.3g %.3g]"
+     (format "%36s: %.3g %s  3σ [%.3g %.3g]  min %.3g"
              label
              (* scale mean)
              units
              (* scale mean-minus-3sigma)
-             (* scale mean-plus-3sigma)))))
+             (* scale mean-plus-3sigma)
+             (* scale minval)))))
 
 (defn print-bootstrap-stat
   [path
-   {:keys [mean
-           mean-minus-3sigma
-           mean-plus-3sigma
-           variance]
-    :as   _stat}]
+   {:keys  [mean
+            mean-minus-3sigma
+            mean-plus-3sigma
+            variance]
+    minval :min
+    :as    _stat}]
   (let [{:keys [dimension label]} (metric/metric-format path)
         [scale units]             (format/scale
                                    dimension
                                    (:point-estimate mean))
+        min-quantiles             (:estimate-quantiles minval)
         quantiles                 (:estimate-quantiles mean)
         var-quantiles             (:estimate-quantiles variance)]
     (println
      (format "%36s: %.3g %s CI [%.3g %.3g] (%.3f %.3f)"
-             label
+             (str label " min")
+             (* scale (:point-estimate minval))
+             units
+             (* scale (-> min-quantiles first :value))
+             (* scale (-> min-quantiles second :value))
+             (-> min-quantiles first :alpha)
+             (-> min-quantiles second :alpha)))
+    (println
+     (format "%36s: %.3g %s CI [%.3g %.3g] (%.3f %.3f)"
+             (str label " mean")
              (* scale (:point-estimate mean))
              units
              (* scale (-> quantiles first :value))
@@ -53,12 +66,7 @@
              (str label " 3σ")
              (* scale (:point-estimate mean-minus-3sigma))
              (* scale (:point-estimate mean-plus-3sigma))
-             units
-             ;; (* scale (Math/sqrt (-> var-quantiles first :value)))
-             ;; (* scale (Math/sqrt (-> var-quantiles second :value)))
-             ;; (-> var-quantiles first :alpha)
-             ;; (-> var-quantiles second :alpha)
-             ))))
+             units))))
 
 (defn print-outlier-count
   [num-samples
