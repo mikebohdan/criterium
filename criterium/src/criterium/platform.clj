@@ -13,8 +13,10 @@
    (criterium/time-measured
     (measured/expr (jvm/timestamp))
     (merge
-     {:limit-time-s 10
-      :return-value ::nil}
+     {:sample-scheme {:scheme-type     :full
+                      :limit-time-s    10
+                      :thread-priority :max-priority}
+      :return-value  ::nil}
      options))))
 
 (defn- nanotime-granularity-fn
@@ -44,8 +46,10 @@
    (criterium/time-measured
     (nanotime-granularity-measured)
     (merge
-     {:limit-time-s 10
-      :return-value ::nil}
+     {:sample-scheme {:scheme-type     :full
+                      :limit-time-s    10
+                      :thread-priority :max-priority}
+      :return-value  ::nil}
      options))))
 
 ;; Minimum measured time

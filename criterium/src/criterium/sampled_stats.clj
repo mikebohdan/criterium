@@ -44,8 +44,9 @@
    stats
    ks))
 
-(defn stats-for [path batch-size samples opts transforms]
-  (let [tail-quantile (:tail-quantile opts 0.025) ; TODO pull out default into config
+(defn stats-for
+  [path samples config transforms]
+  (let [tail-quantile (:tail-quantile config)
         vs            (sorted-samples-for-path samples path)
         fns           (stats-fns tail-quantile)
         scale-1       (fn [v] (util/transform-sample-> v transforms))]
@@ -53,29 +54,23 @@
         (update-mean-3-sigma scale-1)
         (scale-key-values scale-1 (drop 2 ks)))))
 
-(defn sample-stats [result metrics batch-size samples config]
-  (let [sum        (pipeline/total samples)
-        eval-count (:eval-count sum)
-        avg        (pipeline/divide sum eval-count)
-        paths      (mapcat metric/metric-paths metrics)
-        stats      (reduce
-                    (fn [res path]
-                      (assoc-in
-                       res path
-                       (stats-for
-                        path
-                        batch-size
-                        samples
-                        config
-                        (util/get-transforms result path))))
-                    {}
-                    paths)]
+(defn sample-stats
+  [result metrics samples config]
+  (let [paths (mapcat metric/metric-paths metrics)
+        stats (reduce
+               (fn [res path]
+                 (assoc-in
+                  res path
+                  (stats-for
+                   path
+                   samples
+                   config
+                   (util/get-transforms result path))))
+               {}
+               paths)]
 
-    {:eval-count  eval-count
-     :avg         avg
-     :stats       stats
+    {:stats       stats
      :num-samples (count samples)
-     :batch-size  batch-size
      :metrics     metrics}))
 
 (defn- scale-bootstrap-stat [scale-f stat]

@@ -108,13 +108,67 @@
                                  ::report
                                  ::return-value]))
 
-(defn- default-analysis [{:keys [sample-scheme]}]
-  (if (= :one-shot (:scheme-type sample-scheme))
-    [{:analysis-type :samples}]
-    [{:analysis-type  :stats
-      :tail-quantile  0.025
-      ;; :bootstrap-size 100
-      }]))
+;;; analysis stages
+
+(defn analyze-stats
+  "Add simple sample stats to the result."
+  {:arglists '([][{:keys [tail-quartile]}])}
+  ([] (analyze-stats {}))
+  ([options]
+   (merge
+    {:analysis-type :stats
+     :tail-quantile 0.025}
+    options)))
+
+(defn analyze-bootstrap-stats
+  "Add simple bootstrap sample stats to the result."
+  {:arglists '([][{:keys [tail-quartile bootstrap-size]}])}
+  ([] (analyze-stats {}))
+  ([options]
+   (merge
+    {:analysis-type  :bootstrap-stats
+     :tail-quantile  0.025
+     :bootstrap-size nil}
+    options)))
+
+(defn analyze-samples
+  "Add the samples to the result on the :samples key."
+  []
+  {:analysis-type :samples})
+
+(defn default-analysis-full
+  []
+  [(analyze-stats)])
+
+(defn default-analysis-one-shot
+  []
+  [(analyze-samples)])
+
+;;; report stages
+
+(defn report-stats
+  "Print sample stats for each metric."
+  {:arglists '([][{:keys []}])}
+  ([] (report-stats {}))
+  ([options]
+   (merge
+    {:report-type :stats}
+    options)))
+
+(defn report-metrics
+  "Print values for each metric."
+  ([] (report-stats {}))
+  ([options]
+   (merge
+    {:report-type :metrics}
+    options)))
+
+;;; options builder
+
+(defn- add-metrics
+  "Add any injected stages that aren't already present."
+  [{:keys [pipeline sample-scheme] :as config}]
+  (assoc config :metrics (pipeline/metrics (:pipeline config))))
 
 (defn ensure-pipeline-stages
   "Add any injected stages that aren't already present."
@@ -127,11 +181,6 @@
      (fnil into [])
      (remove stages injected))))
 
-(defn- add-metrics
-  "Add any injected stages that aren't already present."
-  [{:keys [pipeline sample-scheme] :as config}]
-  (assoc config :metrics (pipeline/metrics (:pipeline config))))
-
 (defn expand-options
   "Convert option arguments into a criterium config map.
   The config map specifies how criterium will execute."
@@ -141,7 +190,11 @@
         default-config
         (cond-> {}
           (not (:analysis options-map))
-          (assoc :analysis (default-analysis options-map))
+          (assoc
+           :analysis
+           (if (= :one-shot (some-> options-map :sample-scheme :scheme-type))
+             (default-analysis-one-shot)
+             (default-analysis-full)))
 
           (:sample-scheme options-map)
           (assoc :sample-scheme nil)))

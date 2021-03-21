@@ -52,7 +52,6 @@
   (let [res (sampled-stats/sample-stats
              result
              metrics
-             (:batch-size result)
              samples
              analysis)
         res (assoc
