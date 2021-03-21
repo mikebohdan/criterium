@@ -2,14 +2,13 @@
         criterium/arg-gen   {:mvn/version "0.5.0-alpha1-SNAPSHOT"}
         criterium/chart     {:mvn/version "0.5.0-alpha1-SNAPSHOT"}}
  :aliases
- {:dev {:override-deps
-        {criterium/criterium {:local/root "criterium"}
-         criterium/arg-gen   {:local/root "criterium.arg-gen"}
-         criterium/chart     {:local/root "criterium.chart"}}
-        :extra-deps
-        {lambdaisland/kaocha                       {:mvn/version "1.0.641"}
-         lambdaisland/kaocha-cloverage             {:mvn/version "1.0-45"}
-         com.clojure-goes-fast/clj-java-decompiler {:mvn/version "0.3.0"}
-         com.clojure-goes-fast/clj-memory-meter    {:mvn/version "0.1.3"}
-         ;; net.openhft/affinity                      {:mvn/version "3.21ea1"}
-         }}}}
+ {:dev      {:override-deps
+             {criterium/criterium {:local/root "criterium"}
+              criterium/arg-gen   {:local/root "criterium.arg-gen"}
+              criterium/chart     {:local/root "criterium.chart"}}
+             :extra-deps
+             {lambdaisland/kaocha                       {:mvn/version "1.0.641"}
+              lambdaisland/kaocha-cloverage             {:mvn/version "1.0-45"}
+              com.clojure-goes-fast/clj-java-decompiler {:mvn/version "0.3.0"}
+              com.clojure-goes-fast/clj-memory-meter    {:mvn/version "0.1.3"}}}
+  :platform {:main-opts ["-m" "criterium.platform"]}}}

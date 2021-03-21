@@ -1,6 +1,7 @@
 (ns criterium.platform
   "Platform characterisation"
   (:require
+   [clojure.pprint :as pp]
    [criterium :as criterium]
    [criterium.jvm :as jvm]
    [criterium.measured :as measured]))
@@ -18,6 +19,8 @@
                       :thread-priority :max-priority}
       :return-value  ::nil}
      options))))
+
+;;; nanoTime granularity
 
 (defn- nanotime-granularity-fn
   [_ ^long eval-count]
@@ -52,7 +55,8 @@
       :return-value  ::nil}
      options))))
 
-;; Minimum measured time
+;;; Minimum measured time
+
 (defn constant-long
   ([] (constant-long {}))
   ([options]
@@ -89,32 +93,64 @@
      {:limit-time-s 10}
      options))))
 
+;;; platform description
+
 (defn- mean-elapsed-time-ns [result]
-  (-> result :stats :elapsed-time-ns :mean first))
+  (-> result :stats :elapsed-time-ns :mean))
 
 (defn- min-elapsed-time-ns [result]
-  (-> result :stats :elapsed-time-ns :min first))
+  (-> result :stats :elapsed-time-ns :min))
 
 (defn platform-stats
-  "Return mean estimates for times that describe the accuracy of timing."
+  "Return a sequence of estimates for times that describe accuracy of timing.
+
+  Each estimate has a :name value."
   ([] (platform-stats {}))
   ([options]
-   (let [options         (merge
-                          {:report       []
-                           :limit-time-s 10}
-                          options
-                          {:return-value :stats})
-         latency         (nanotime-latency options)
-         granularity     (nanotime-granularity options)
-         constant-long   (constant-long options)
-         constant-double (constant-double options)
-         constant-object (constant-object options)
-         constant-nil    (constant-nil options)]
-     {:latency         (min-elapsed-time-ns latency)
-      :granularity     (min-elapsed-time-ns granularity)
-      :constant-long   (mean-elapsed-time-ns constant-long)
-      :constant-double (mean-elapsed-time-ns constant-double)
-      :constant-object (mean-elapsed-time-ns constant-object)
-      :constant-nil    (mean-elapsed-time-ns constant-nil)})))
+   (let [options (merge
+                  {:report       []
+                   :limit-time-s 10}
+                  options
+                  {:return-value :stats})
+         ]
+     [(assoc (nanotime-latency options) :name "latency")
+      (assoc (nanotime-granularity options) :name "granularity")
+      (assoc (constant-long options) :name "constant-long")
+      (assoc (constant-double options) :name "constant-double")
+      (assoc (constant-object options) :name "constant-object")
+      (assoc (constant-nil options) :name "constant-nil")])))
 
-;; (platform-stats)
+(defn platform-point-estimates
+  "Return estimates for times that describe the accuracy of timing.
+
+  The latency and granularity are min estimate, and the the rest are
+  mean estimates."
+  ([] (platform-point-estimates {}))
+  ([options]
+   (let [stats          (platform-stats options)
+         point-estimate {:latency         min-elapsed-time-ns
+                         :granularity     min-elapsed-time-ns
+                         :constant-long   mean-elapsed-time-ns
+                         :constant-double mean-elapsed-time-ns
+                         :constant-object mean-elapsed-time-ns
+                         :constant-nil    mean-elapsed-time-ns}]
+     (reduce
+      (fn [res stat]
+        (let [kw (keyword (:name stat))]
+          (assoc res kw ((point-estimate kw) stat))))
+      {}
+      stats))))
+
+(defn -main
+  "Output a table of the platform min and mean point estimates."
+  []
+  (let [stats
+        (reduce
+         (fn [res stat]
+           (let [view {:name    (:name stat)
+                       :min-ns  (min-elapsed-time-ns stat)
+                       :mean-ns (mean-elapsed-time-ns stat)}]
+             (conj res view)))
+         []
+         (platform-stats))]
+    (pp/print-table stats)))
