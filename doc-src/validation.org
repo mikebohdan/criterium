@@ -52,34 +52,6 @@ minimum.
 
 
 
-WIP : show x1.1 exponential backoff
-
-posit model as, in log space,  Latency + (some prob 0..n) * noise model
-
-#+begin_src clojure :results pp
-(def samples (platform/nanotime-latency
-                         {:limit-time-s 10
-                          :verbose      true
-                          :sample-scheme (config/full-sample-scheme
-                                          {:thread-priority :min-priority})
-                          :analysis     [{:analysis-type :stats}
-                                         {:analysis-type :remove-outliers}
-                                         {:analysis-type :transform-log}
-                                         {:analysis-type :stats}
-                                         {:analysis-type :outlier-counts}
-                                         {:analysis-type :bootstrap-stats}
-                                         {:analysis-type :samples}]
-                          :report       [{:report-type :bootstrap-stats}
-                                         {:report-type :stats}
-                                         {:report-type :outlier-counts}
-                                         {:report-type :histogram
-                                          :title "Nanotime latency"}
-                                         {:report-type :sample-histogram
-                                          :title "Nanotime latency log"}]
-                                          :return-value :samples}))
-#+end_src
-
-
 
 
 
