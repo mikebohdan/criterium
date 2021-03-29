@@ -183,8 +183,9 @@
           (apply confidence-interval stats))))
 
 (defn scale-bootstrap-estimate [estimate scale]
-  [(* (first estimate) scale)
-   (map #(* scale %1) (last estimate))])
+  (prn :scale-bootstrap-estimate estimate scale)
+  [(* (:point-estimate estimate) scale)
+   (map #(* scale (:value %1)) (:estimate-quantiles estimate))])
 
 (defn polynomial-value
   "Evaluate a polynomial at the given value x, for the coefficients given in

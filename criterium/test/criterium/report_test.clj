@@ -64,3 +64,10 @@
                  {:outlier-counts
                   (analyze/outlier-count
                    0 2 3 0)}))))))))
+
+
+(deftest outlier-effect-test
+  (is (= :unaffected (report/outlier-effect 0.009)))
+  (is (= :slight (report/outlier-effect 0.09)))
+  (is (= :moderate (report/outlier-effect 0.49)))
+  (is (= :severe (report/outlier-effect 0.51))))

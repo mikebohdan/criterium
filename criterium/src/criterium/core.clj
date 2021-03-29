@@ -521,7 +521,7 @@
 ;;; Sample statistic
 
 (defn point-estimate [estimate]
-  (first estimate))
+  (:point-estimate estimate))
 
 (defn sample-stats
   "Compute sample statistics for the given values."
@@ -549,12 +549,15 @@
      :mean             (stats/scale-bootstrap-estimate
                         (first stats) (/ 1e-9 execution-count))
      :sample-mean      (stats/scale-bootstrap-estimate
-                        [m [(- m (* 3 s)) (+ m (* 3 s))]]
+                        {:point-estimate     m
+                         :estimate-quantiles [{:value (- m (* 3 s))}
+                                              {:value (+ m (* 3 s))}]}
                         (/ 1e-9 execution-count))
      :variance         (stats/scale-bootstrap-estimate
                         (second stats) (sqr (/ 1e-9 execution-count)))
      :sample-variance  (stats/scale-bootstrap-estimate
-                        [(sqr s) [0 0]]
+                        {:point-estimate     (sqr s)
+                         :estimate-quantiles [{:value 0} {:value 0}]}
                         (sqr (/ 1e-9 execution-count)))
      :lower-q          (stats/scale-bootstrap-estimate
                         (nth stats 2) (/ 1e-9 execution-count))
