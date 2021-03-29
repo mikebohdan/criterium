@@ -5,14 +5,9 @@
 #+HTML_HEAD: <link rel="stylesheet" type="text/css" href="public/css/criterium.css" />
 
 #+begin_src clojure :results value silent
-(require 'criterium)
 (require '[criterium
-           [chart :as chart]
-           [jvm :as jvm]
-           [measured :as measured]
-           [pipeline :as pipeline]
            [platform :as platform]
-           [toolkit :as toolkit]])
+           [time :as time]])
 #+end_src
 
 

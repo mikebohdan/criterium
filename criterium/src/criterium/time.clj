@@ -1,5 +1,5 @@
-(ns criterium
-  "Criterium top level"
+(ns criterium.time
+  "Main criterium time functions."
   (:refer-clojure :exclude [time])
   (:require
    [clojure.set :as set]

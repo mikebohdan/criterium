@@ -47,18 +47,15 @@ different answers
 
 #+begin_src clojure :results output
 (do
-  (require 'criterium)
+  (require '[criterium.time :as criterium])
   (criterium/time 1))
 #+end_src
 
 #+RESULTS:
-:                 JIT Compilation Time: 0.00 ± 0.00 ns
-:                              GC Time: 0.00 ± 0.00 ns
-:                             GC count: 0.00 ± 0.00
-:                         Elapsed Time: 1.15 ± 0.254 ns
+:                         Elapsed Time: 0.849 ns  3σ [0.800 0.898]  min 0.835
 
-There are 7 orders of magnitude difference here.  Criterium's time by
-default does some warmup on quick functions to activate the JIT
+There are several orders of magnitude difference here.  Criterium's time
+by default does some warmup on quick functions to activate the JIT
 compiler.  We can tell Criterium to use a one shot measurement.
 
 #+begin_src clojure :results output
@@ -66,7 +63,7 @@ compiler.  We can tell Criterium to use a one shot measurement.
 #+end_src
 
 #+RESULTS:
-:                     Elapsed time: 314 ns
+:                     Elapsed time: 266 ns
 
 We see there is now just a 3 order of magnitude difference.
 
@@ -81,32 +78,27 @@ the difference by creating a slightly modified version of clojure's
     `(let [start#  (. System (nanoTime))
            ret#    ~expr
            finish# (. System (nanoTime))]
-       (prn (str "Elapsed time: " (/ (double (- finish# start#)) 1000000.0) " msecs"))
+       (prn
+        (str "Elapsed time: "
+             (/ (double (- finish# start#)) 1000000.0)
+             " msecs"))
        ret#))
   (ttime 1))
 #+end_src
 
 #+RESULTS:
-: "Elapsed time: 2.48E-4 msecs"
+: "Elapsed time: 3.25E-4 msecs"
 
 
 This is now much more comparable, being the same order of magnitude as
 criterium's one-shot sample.
 
-The remaining difference is due to how criterium lifts constants out of
-the timing loop.
-
-Secondly it
-evaluates the constants within the expression within the timing.
-
-Criterium achieves this by running multiple iterations for quick
-expressions.  It only does this when it can without creating an
-appreciable lag (100ms).
-
+Another difference, in more complex expressions, is due to how criterium
+lifts constants out of the timing loop.
 
 ** Controlling how hard criterium tries to get an answer
 
-Often I see people putting their expressions in a loop, and then
+Often we see people putting their expressions in a loop, and then
 adjusting the number of iterations to run to give an answer in a
 reasonable time.
 
@@ -116,33 +108,65 @@ use.
 
 
 #+begin_src clojure :results output
-(require 'criterium)
-(criterium/time 1 :limit-time-s 1)
+(criterium/time 1 :limit-time-s 0.00001)
 #+end_src
 
 #+RESULTS:
-:                     Elapsed time: 45.0 ns
+:                         Elapsed Time: 188 ns  3σ [-247 623]  min 82.0
 
 In this case Criterium displays a mean and variance.
+
+When the time is limited, then criterium will often show a compilation
+warning.  This means that JIT compilation took place during the timing
+loop, and is causing an inaccurate answer.  In this case, giving
+criterium a higher time limit will result in an estimate once JIT has
+completed, and reduce the three sigma range of the estimate.
+
+#+begin_src clojure :results output
+(criterium/time 1 :limit-time-s 10)
+#+end_src
+
+#+RESULTS:
+:                         Elapsed Time: 1.03 ns  3σ [0.933 1.13]  min 1.00
 
 
 ** Examining Time Distribution
 
 The mean and variance displayed are not always useful.  The distribution
-tends to have a hard lower bound and a long tail, making it skewed. We
-can ask criterium to plot the distribution.
+tends to have a hard lower bound and a long tail, making it skewed. An
+example of this is that the lower bound of the 3 sigma estimate is often
+below the minimum measurement.
+
+To give more insight, we can ask criterium to plot the distribution.
 
 For this to work you will need ~criterium/chart~ on your classpath.
 
-#+begin_src clojure :results output
+#+begin_src clojure :results silent
 (criterium/time 1 :limit-time-s 1 :histogram true)
 #+end_src
 
+#+begin_src clojure :exports results :results file graphics :dir "data/images" :file "histogram.png" :var dir=(concat (file-name-directory (buffer-file-name)) "data/images/")
+(criterium/time
+ 1
+ :limit-time-s 1
+ :histogram {:file "doc-src/data/images/histogram.png"})
+#+end_src
+
+#+RESULTS:
+[[file:data/images/histogram.png]]
+
+
 ** Using CPU Time rather than Elapsed Time
 
-Using CPU time, if available, may produce less variation in the timings.
+Using CPU time, if available, may produce less variation in the
+timings.  However, the cpu time often has less accuracy, and may require
+lareger execution limits.
 
 #+begin_src clojure :results output
-(require '[criterium.jvm :as jvm])
-(criterium/time 1 :time-fn jvm/current-thread-cpu-time)
+(do
+  (require '[criterium.jvm :as jvm])
+  (criterium/time 1 :time-fn jvm/current-thread-cpu-time))
 #+end_src
+
+#+RESULTS:
+:                         Elapsed Time: 1.15 ns  3σ [1.00 1.30]  min 1.12
