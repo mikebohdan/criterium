@@ -1,11 +1,11 @@
-(ns criterium-test
+(ns criterium.time-test
   (:require
    [clojure.spec.alpha :as s]
    [clojure.test :refer [deftest is testing]]
-   [criterium :as criterium]
    [criterium.config :as config]
    [criterium.jvm :as jvm]
-   [criterium.pipeline :as pipeline]))
+   [criterium.pipeline :as pipeline]
+   [criterium.time :as criterium]))
 
 (deftest config-map-test
   (is (= (-> config/default-config

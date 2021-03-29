@@ -2,7 +2,7 @@
   "Platform characterisation"
   (:require
    [clojure.pprint :as pp]
-   [criterium :as criterium]
+   [criterium.time :as criterium]
    [criterium.jvm :as jvm]
    [criterium.measured :as measured]))
 

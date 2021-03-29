@@ -89,9 +89,8 @@
    :pipeline      {:stages     []
                    :terminator :elapsed-time-ns}
    :sample-scheme (full-sample-scheme {})
-   :analysis      [{:analysis-type  :stats
-                    :tail-quantile  0.025
-                    :bootstrap-size 100}]
+   :analysis      [{:analysis-type :stats
+                    :tail-quantile 0.025}]
    :report        [{:report-type :stats}
                    {:report-type :jvm-event-stats}
                    {:report-type :final-gc-warnings}]

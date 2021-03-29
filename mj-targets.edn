@@ -13,7 +13,6 @@
      :test          {:doc     "Run tests"
                      :invoker :clojure
                      :aliases [:kaocha]
-                     :main    kaocha.runner
                      :options {:out             :inherit
                                :forward-options false}}
      :build-install {:doc     "pom, jar and install project"

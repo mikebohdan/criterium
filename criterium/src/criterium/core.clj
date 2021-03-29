@@ -32,10 +32,12 @@
   library that applies many of the same statistical techniques."
   (:require
    [clojure.set :as set]
+   [criterium.analyze :as analyze]
    [criterium.budget :as budget]
    [criterium.jvm :as jvm]
    [criterium.measured :as measured]
    [criterium.pipeline :as pipeline]
+   [criterium.report :as report]
    [criterium.stats :as stats]
    [criterium.toolkit :as toolkit]
    [criterium.util :as util]
@@ -518,6 +520,8 @@
 
 ;;; Sample statistic
 
+(defn point-estimate [estimate]
+  (first estimate))
 
 (defn sample-stats
   "Compute sample statistics for the given values."
@@ -535,8 +539,8 @@
                        [0.5 tail-quantile (- 1.0 tail-quantile)]
                        well/well-rng-1024a)
         analysis      (analyze/outlier-significance
-                       (analyze/point-estimte (first stats))
-                       (analyze/point-estimte (second stats))
+                       (point-estimate (first stats))
+                       (point-estimate (second stats))
                        sample-count)
         sqr           (fn [x] (* x x))
         m             (stats/mean (map double values))
@@ -793,7 +797,7 @@
       (report " Variance from outliers : %2.4f %%"
               (* (:outlier-variance results) 100.0))
       (report " Variance is %s by outliers\n"
-              (-> (:outlier-variance results) outlier-effect labels)))))
+              (-> (:outlier-variance results) report/outlier-effect labels)))))
 
 (defn report-sample-stats [results dimension scale-fn verbose]
   (when verbose

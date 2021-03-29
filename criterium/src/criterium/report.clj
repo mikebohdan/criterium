@@ -84,7 +84,7 @@
          "\t%s\t %d (%2.4f %%)\n"
          c v (* 100.0 (/ v num-samples)))))))
 
-(defn- outlier-effect
+(defn outlier-effect
   "Return a keyword describing the effect of outliers on a point estimate."
   [var-out-min]
   (cond
