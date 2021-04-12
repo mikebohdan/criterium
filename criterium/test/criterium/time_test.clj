@@ -38,13 +38,15 @@
     (is (nil? (criterium/last-time)))
     (let [out (with-out-str (criterium/time 1))]
       (testing "outputs the estimated time on stdout"
-        (is (re-find #"\s+Elapsed Time: [0-9.]+ ± [0-9.]+ [mn]s" out)))
+        (is (re-find
+             #"Elapsed Time: [0-9.]+ [mn]s  3σ \[[0-9.]+ [0-9.]+]  min [0-9.]+"
+             out)))
       (testing "makes the timing data available with last-time"
         (is (s/conform ::pipeline/sample (criterium/last-time))))))
   (testing "time with stats"
     (let [out (with-out-str (criterium/time 1 :limit-eval-count 10000))]
       (testing "outputs statistics on stdout"
-        (is (re-find #"±" out)))))
+        (is (re-find #"3σ" out)))))
   (testing "time with one-shot"
     (let [out (with-out-str (criterium/time 1 :sample-scheme :one-shot))]
       (testing "outputs statistics on stdout"
@@ -54,4 +56,4 @@
                              1
                              :time-fn jvm/current-thread-cpu-time))]
       (testing "outputs statistics on stdout"
-        (is (re-find #"±" out))))))
+        (is (re-find #"3σ" out))))))

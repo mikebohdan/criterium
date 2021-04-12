@@ -116,7 +116,9 @@
 
 (deftest bootstrap-estimate-scale-test
   (is (= [1e-9 [1e-8 1e-8]]
-         (stats/scale-bootstrap-estimate [1 1 [10 10]] 1e-9))))
+         (stats/scale-bootstrap-estimate
+          (stats/->BcaEstimate 1 [{:value 10} {:value 10}])
+          1e-9))))
 
 ;; Values from R, qnorm (with options(digits=15))
 (deftest normal-quantile-test
@@ -176,20 +178,23 @@
 
 (deftest bootstrap-bca-test
   (let [ci 0.95]
-    (is (= {:point-estimate     1
-            :estimate-quantiles [{:value 1 :alpha 0.95}
-                                 {:value 1 :alpha (- 1 0.95)}]}
+    (is (= (stats/map->BcaEstimate
+            {:point-estimate     1
+             :estimate-quantiles [{:value 1 :alpha 0.95}
+                                  {:value 1 :alpha (- 1 0.95)}]})
            (stats/bootstrap-bca (take 20 (repeatedly (constantly 1)))
                                 stats/mean
                                 100
                                 [0.5 ci (- 1.0 ci)]
                                 well/well-rng-1024a)))
-    (is (=  [{:point-estimate     1
-              :estimate-quantiles [{:value 1 :alpha 0.95}
-                                   {:value 1 :alpha (- 1 0.95)}]}
-             {:point-estimate     0.0
-              :estimate-quantiles [{:value 0.0 :alpha 0.95}
-                                   {:value 0.0 :alpha (- 1 0.95)}]}]
+    (is (=  [(stats/map->BcaEstimate
+              {:point-estimate     1
+               :estimate-quantiles [{:value 1 :alpha 0.95}
+                                    {:value 1 :alpha (- 1 0.95)}]})
+             (stats/map->BcaEstimate
+              {:point-estimate     0.0
+               :estimate-quantiles [{:value 0.0 :alpha 0.95}
+                                    {:value 0.0 :alpha (- 1 0.95)}]})]
             (stats/bootstrap-bca (take 20 (repeatedly (constantly 1)))
                                  (juxt stats/mean stats/variance)
                                  100

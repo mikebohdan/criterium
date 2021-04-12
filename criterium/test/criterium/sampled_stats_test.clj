@@ -131,7 +131,7 @@
         mean         (stats/mean values)
         variance     (stats/variance values)]
     (test-max-error mean mean-hat 1e-5)
-    (test-max-error variance variance-hat 0.2)))
+    (test-max-error variance variance-hat 0.35)))
 
 (defn random-values
   [random-seed mean n-sigma]
@@ -207,19 +207,18 @@
 
 (defspec stats-for-test-property 10
   (prop/for-all
-   [batch-size (gen-bounded 1 1000)
-    random-seed gen/pos-int]
-   (let [num-samples    (long (quot 10000 batch-size))
-         mean           10
-         sigma          3
-         {:keys [mean variance mean-hat variance-hat]}
-         (stats-values batch-size num-samples random-seed mean sigma)
-         mean-error     (abs-error mean mean-hat)
-         variance-error (abs-error variance variance-hat)
-         mean-tol       (max (* sigma 1e-1) 1e-2)
-         variance-tol   (* variance 5e-1)]
-     (prn :variance variance variance-hat)
-     (is (< mean-error mean-tol))
-     (is (< variance-error variance-tol))
-     (and (< mean-error mean-tol)
-          (< variance-error variance-tol)))))
+      [batch-size (gen-bounded 1 1000)
+       random-seed gen/pos-int]
+    (let [num-samples    (long (quot 10000 batch-size))
+          mean           10
+          sigma          3
+          {:keys [mean variance mean-hat variance-hat]}
+          (stats-values batch-size num-samples random-seed mean sigma)
+          mean-error     (abs-error mean mean-hat)
+          variance-error (abs-error variance variance-hat)
+          mean-tol       (max (* sigma 1e-1) 1e-2)
+          variance-tol   (* variance 5e-1)]
+      (is (< mean-error mean-tol))
+      (is (< variance-error variance-tol))
+      (and (< mean-error mean-tol)
+           (< variance-error variance-tol)))))

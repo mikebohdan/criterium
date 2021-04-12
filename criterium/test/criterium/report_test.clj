@@ -7,13 +7,16 @@
 
 (deftest print-stat-test
   (testing "print-stat"
-    (is (= "Elapsed Time: 100 ± 12.0 ns"
+    (is (= "Elapsed Time: 100 ns  3σ [88.0 112]  min 89.0"
            (str/trim
             (with-out-str
               (report/print-stat
                [:elapsed-time-ns]
-               {:mean     100.0
-                :variance 16.0})))))))
+               {:mean              100.0
+                :variance          16.0
+                :mean-plus-3sigma  112.0
+                :mean-minus-3sigma 88.0
+                :min               89.0})))))))
 
 (defn- trimmed-lines
   [s]
@@ -23,20 +26,33 @@
 
 (deftest print-booststrap-stat-test
   (testing "print-bootstrap-stat"
-    (is (= ["Elapsed Time: 100 ns CI [95.0 105] (0.050 0.950)"
-            "Elapsed Time σ: 4.00 ns CI [3.00 5.00] (0.050 0.950)"]
+    (is (= ["Elapsed Time min: 16.0 ns CI [9.00 25.0] (0.050 0.950)"
+            "Elapsed Time mean: 100 ns CI [95.0 105] (0.050 0.950)"
+            "Elapsed Time 3σ: [76.0 124] ns"]
            (trimmed-lines
             (with-out-str
               (report/print-bootstrap-stat
                [:elapsed-time-ns]
-               {:mean     {:point-estimate 100.0
-                           :estimate-quantiles
-                           [{:value 95.0 :alpha 0.05}
-                            {:value 105.0 :alpha 0.95}]}
-                :variance {:point-estimate 16.0
-                           :estimate-quantiles
-                           [{:value 9.0 :alpha 0.05}
-                            {:value 25.0 :alpha 0.95}]}})))))))
+               {:mean              {:point-estimate 100.0
+                                    :estimate-quantiles
+                                    [{:value 95.0 :alpha 0.05}
+                                     {:value 105.0 :alpha 0.95}]}
+                :variance          {:point-estimate 16.0
+                                    :estimate-quantiles
+                                    [{:value 9.0 :alpha 0.05}
+                                     {:value 25.0 :alpha 0.95}]}
+                :min               {:point-estimate 16.0
+                                    :estimate-quantiles
+                                    [{:value 9.0 :alpha 0.05}
+                                     {:value 25.0 :alpha 0.95}]}
+                :mean-plus-3sigma  {:point-estimate 124.0
+                                    :estimate-quantiles
+                                    [{:value 9.0 :alpha 0.05}
+                                     {:value 25.0 :alpha 0.95}]}
+                :mean-minus-3sigma {:point-estimate 76.0
+                                    :estimate-quantiles
+                                    [{:value 9.0 :alpha 0.05}
+                                     {:value 25.0 :alpha 0.95}]}})))))))
 
 (deftest print-outlier-count-test
   (testing "print-outlier-count"
