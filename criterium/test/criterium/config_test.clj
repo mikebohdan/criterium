@@ -18,9 +18,8 @@
                                      :max-gc-attempts 3}})]
         (is (s/valid? ::config/config config)
             (s/explain-str (s/get-spec ::config/config) config))
-        (is (= [{:analysis-type  :stats
-                 :tail-quantile  0.025
-                 :bootstrap-size 100}]
+        (is (= [{:analysis-type :stats
+                 :tail-quantile 0.025}]
                (:analysis config)))))
     (testing "sets processing to :sample for :sample-mode :one-shot"
       (let [config (config/expand-options

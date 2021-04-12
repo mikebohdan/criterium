@@ -181,6 +181,9 @@
 
 ;;; Value transforms
 
+;; These allow sample values to be transformed to mesurements, and vice versa.  This
+;; enables, using a log-normal transform of the samples.
+
 (defn add-transform-paths [v sample-> ->sample]
   (-> v
       (update :sample-> (fnil conj '()) sample->)

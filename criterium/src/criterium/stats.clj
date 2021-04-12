@@ -183,7 +183,6 @@
           (apply confidence-interval stats))))
 
 (defn scale-bootstrap-estimate [estimate scale]
-  (prn :scale-bootstrap-estimate estimate scale)
   [(* (:point-estimate estimate) scale)
    (map #(* scale (:value %1)) (:estimate-quantiles estimate))])
 
@@ -333,26 +332,31 @@ descending order (so the last element of coefficients is the constant term)."
   See http://lib.stat.cmu.edu/S/bootstrap.funs for Efron's original
    implementation."
   [data statistic size alpha rng-factory]
-  (let [data (sort data)
-        estimate (statistic data)
-        samples (bootstrap-sample data statistic size rng-factory)
+  (let [data         (sort data)
+        estimate     (statistic data)
+        samples      (bootstrap-sample data statistic size rng-factory)
         jack-samples (jacknife data statistic)
-        alpha (if (vector? alpha) alpha [alpha])
-        z-alpha (map normal-quantile alpha)]
+        alpha        (if (vector? alpha) alpha [alpha])
+        z-alpha      (map normal-quantile alpha)]
     (if (vector? estimate)
       (map
        (partial bca-nonparametric-eval size z-alpha)
        estimate samples jack-samples)
       (bca-nonparametric-eval size z-alpha estimate samples jack-samples))))
 
+(defrecord BcaEstimate
+    [point-estimate
+     estimate-quantiles])
+
 (defn- bca-to-estimate
   [alpha bca-estimate]
   (assert (= 0.5 (first alpha)) alpha)
-  {:point-estimate     (first (first bca-estimate))
-   :estimate-quantiles (mapv
-                        (fn [value z] {:value value :alpha z})
-                        (next (first bca-estimate))
-                        (next alpha))})
+  (->BcaEstimate
+   (first (first bca-estimate))
+   (mapv
+    (fn [value z] {:value value :alpha z})
+    (next (first bca-estimate))
+    (next alpha))))
 
 (defn bootstrap-bca
   "Bootstrap a statistic. Statistic can produce multiple statistics as a vector
@@ -369,7 +373,7 @@ descending order (so the last element of coefficients is the constant term)."
    so you can use juxt to pass multiple statistics.
    http://en.wikipedia.org/wiki/Bootstrapping_(statistics)"
   [data statistic size rng-factory]
-  (let [samples   (bootstrap-sample data statistic size rng-factory)]
+  (let [samples (bootstrap-sample data statistic size rng-factory)]
     (if (vector? (first samples))
       (map bootstrap-estimate samples)
       (bootstrap-estimate samples))))

@@ -2,7 +2,7 @@
      :modules ["criterium" "criterium.arg-gen" "criterium.chart"]
      :targets
      #merge
-     [#default-targets [:pom :clean :jar :install :deploy]
+     [#default-targets [:bump :pom :clean :jar :install :deploy]
       {:api-doc {:doc     "Generate API documentation from sources."
                  :invoker :clojure
                  :aliases [:clj-xchart :test.check]

@@ -1,6 +1,7 @@
 {:deps    {criterium/criterium    {:mvn/version "0.5.0-alpha1-SNAPSHOT"}
            org.clojure/test.check {:mvn/version "1.0.0"}}
- :aliases {:dev    {:override-deps {criterium/criterium {:local/root "../criterium"}}}
+ :aliases {:dev    {:override-deps
+                    {criterium/criterium {:local/root "../criterium"}}}
            :kaocha {:extra-deps
                     {lambdaisland/kaocha           {:mvn/version "1.0.641"}
                      lambdaisland/kaocha-cloverage {:mvn/version "1.0-45"}}}}}
